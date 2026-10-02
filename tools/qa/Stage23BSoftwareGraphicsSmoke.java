@@ -46,9 +46,30 @@ public class Stage23BSoftwareGraphicsSmoke {
   var game=new com.spacesim.GeneratedWorldCommandGame(1);game.create();
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
-  game.render();processor.keyDown(Input.Keys.SPACE);game.render();
+  var pendingSave=(java.nio.file.Path)save.get(game);
+  byte[] previousSave={1,2,3};java.nio.file.Files.write(pendingSave,previousSave);
+  game.render();processor.keyDown(Input.Keys.F8);game.render();
+  if(!java.util.Arrays.equals(previousSave,java.nio.file.Files.readAllBytes(pendingSave)))throw new AssertionError("Unconfirmed creation overwrote the previous save");
+  var startRf=game.getClass().getDeclaredField("renderer");startRf.setAccessible(true);
+  var startRenderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)startRf.get(game);
+  keyboardAction(startRenderer,game,"pilot.preview");
+  if(campaign(game).playerState().isPresent())throw new AssertionError("Start preview mutated live player");
+  keyboardAction(startRenderer,game,"pilot.confirm");
+  var startingPlayer=campaign(game).playerState().orElseThrow();
+  if(startingPlayer.walletMilliCredits()!=75_000_000L||startingPlayer.ownedFleetIds().size()!=1
+          ||startingPlayer.factionContentId()!=null)throw new AssertionError("Fresh independent start failed");
+  var playerPlacement=campaign(game).coordinator().runtime().world().findFleet(startingPlayer.activeFleetId()).orElseThrow();
+  if(!playerPlacement.systemId().equals(campaign(game).coordinator().runtime().world().getActiveSystemId()))throw new AssertionError("Start did not open the personal home system");
+  keyboardAction(startRenderer,game,"focus");
+  held.add(Input.Keys.W);
+  processor.keyDown(Input.Keys.SPACE);for(int i=0;i<12;i++)game.render();held.clear();
+  var physical=campaign(game).coordinator().runtime().arrival().materialization(playerPlacement.systemId()).physicalState(playerPlacement.localEntityId()).orElseThrow();
+  if(physical.velocityYMps()<=0d)throw new AssertionError("Keyboard thrust did not reach real fitted ship");
+  processor.keyDown(Input.Keys.SPACE);game.render();
+  System.out.println("Fresh pilot keyboard preview/purchase/focus/thrust passed without fixture");
+  processor.keyDown(Input.Keys.SPACE);game.render();
   int[] keys={Input.Keys.F1,Input.Keys.F2,Input.Keys.F3,Input.Keys.F4,Input.Keys.F5,Input.Keys.F6,Input.Keys.F7,Input.Keys.O};
-  for(int k:keys){processor.keyDown(k);game.render();processor.keyDown(Input.Keys.DOWN);game.render();com.badlogic.gdx.graphics.Pixmap px=ScreenUtils.getFrameBufferPixmap(0,0,1280,720);com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/stage23b-screen-"+k+".png"),px);px.dispose();if(GL11.glGetError()!=0)throw new IllegalStateException("GL error tab "+k);System.out.println("Rendered key "+k);}
+  for(int k:keys){processor.keyDown(k);game.render();processor.keyDown(Input.Keys.DOWN);game.render();com.badlogic.gdx.graphics.Pixmap px=new com.badlogic.gdx.graphics.Pixmap(1280,720,com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);px.getPixels().put(ScreenUtils.getFrameBufferPixels(0,0,1280,720,true)).flip();com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/stage23b-screen-"+k+".png"),px);px.dispose();if(GL11.glGetError()!=0)throw new IllegalStateException("GL error tab "+k);System.out.println("Rendered key "+k);}
   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
@@ -70,6 +91,41 @@ public class Stage23BSoftwareGraphicsSmoke {
   }
   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
   var sf=game.getClass().getDeclaredField("status");sf.setAccessible(true);System.out.println("Save/load status: "+sf.get(game));if(!sf.get(game).toString().contains("загруж"))throw new AssertionError("Save/load failed");
+  // Physical docking setup is an explicit geometry fixture; creation and UI commands remain real.
+  var pilotCampaign=campaign(game);var pilotRuntime=pilotCampaign.coordinator().runtime();
+  var pilotFleet=pilotRuntime.world().findFleet(pilotCampaign.playerState().orElseThrow().activeFleetId()).orElseThrow();
+  String water="commodity.material.purified_water";
+  var endpoint=pilotRuntime.infrastructure().endpoints().stream().filter(e->e.systemId().equals(pilotFleet.systemId())
+          &&e.storage().commodityMassKg(water)>1&&pilotCampaign.pilotMarketReference(e.stationId()).isPresent()).findFirst().orElseThrow();
+  pilotCampaign.coordinator().setPaused(true);
+  pilotRuntime.arrival().materialization(pilotFleet.systemId()).updatePhysicalState(pilotFleet.localEntityId(),
+          com.spacesim.world.LocalPhysicalKinematics.stationary(endpoint.position().translated(500,0)));
+  processor.keyDown(Input.Keys.F5);game.render();int pilotMoves=0;
+  while(!workspace.view().selection().stableId().equals("pilot-station|"+endpoint.stationId())){
+   processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Personal station unreachable");}
+  keyboardAction(renderer,game,"focus");
+  if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+          ||!workspace.view().selection().stableId().equals("station:"+endpoint.stationId()))throw new AssertionError("Station focus failed");
+  processor.keyDown(Input.Keys.F5);game.render();pilotMoves=0;
+  while(!workspace.view().selection().stableId().equals("pilot-station|"+endpoint.stationId())){
+   processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Personal station unreachable");}
+  keyboardAction(renderer,game,"pilot.dock");
+  if(pilotCampaign.playerState().orElseThrow().docked())throw new AssertionError("Dock preview mutated state");
+  keyboardAction(renderer,game,"pilot.physical-confirm");
+  if(!pilotCampaign.playerState().orElseThrow().docked())throw new AssertionError("Dock confirmation failed");
+  processor.keyDown(Input.Keys.SPACE);for(int i=0;i<10;i++)game.render();
+  for(int i=0;i<30;i++){processor.keyDown(Input.Keys.UP);game.render();}
+  pilotMoves=0;while(!workspace.view().selection().stableId().equals("pilot-market|"+endpoint.stationId()+"|"+water)){
+   processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Water offer unreachable");}
+  long money=pilotCampaign.playerState().orElseThrow().walletMilliCredits();
+  keyboardAction(renderer,game,"pilot.buy");
+  if(pilotCampaign.playerState().orElseThrow().walletMilliCredits()!=money)throw new AssertionError("Trade preview mutated wallet");
+  keyboardAction(renderer,game,"pilot.physical-confirm");
+  if(pilotCampaign.playerState().orElseThrow().walletMilliCredits()!=money-5000
+          ||pilotRuntime.freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=1d)throw new AssertionError("UI physical purchase failed");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+  if(campaign(game).coordinator().runtime().freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=1d)throw new AssertionError("Purchased cargo was not saved");
+  System.out.println("Keyboard station focus/dock/preview/physical purchase/save/load passed with explicit docking geometry fixture");
   if(args.length>0){
    // Optional exact test checkpoint, copied before load. This is command-path engineering evidence,
    // not proof of a newly generated player start, authored contracts, or B18 human acceptance.
@@ -78,7 +134,7 @@ public class Stage23BSoftwareGraphicsSmoke {
    processor.keyDown(Input.Keys.F9);game.render();selectMission(workspace,game);
    keyboardAction(renderer,game,"mission.accept");
    if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED)throw new AssertionError("Preview mutated live mission");
-   com.badlogic.gdx.graphics.Pixmap px=ScreenUtils.getFrameBufferPixmap(0,0,1280,720);com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/stage23b-mission-preview.png"),px);px.dispose();
+   com.badlogic.gdx.graphics.Pixmap px=new com.badlogic.gdx.graphics.Pixmap(1280,720,com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);px.getPixels().put(ScreenUtils.getFrameBufferPixels(0,0,1280,720,true)).flip();com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/stage23b-mission-preview.png"),px);px.dispose();
    keyboardAction(renderer,game,"mission.confirm");
    if(campaign(game).coordinator().npcMissions().missions().get(0).status()!=com.spacesim.world.Stage21HNpcMissionState.MissionStatus.ACCEPTED)throw new AssertionError("Keyboard acceptance failed");
    processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();selectMission(workspace,game);

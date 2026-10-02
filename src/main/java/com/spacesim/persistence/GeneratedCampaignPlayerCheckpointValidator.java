@@ -18,10 +18,15 @@ final class GeneratedCampaignPlayerCheckpointValidator {
     }
 
     static void validate(Stage21IGeneratedWorldRuntimePersistentState stage21, PlayerState player) {
-        Objects.requireNonNull(player, "player");
         var stage20 = Objects.requireNonNull(stage21, "stage21").stage21HRuntime()
                 .stage21GRuntime().stage21FRuntime().stage21ERuntime().stage21DRuntime()
                 .stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
+        for (var lot : stage20.freight().cargoLots()) {
+            if (lot.orderId().equals(Stage20FreightPersistentState.manualCargoOrderId(lot.fleetId()))
+                    && (player == null || !player.ownedFleetIds().contains(lot.fleetId())))
+                throw new IllegalArgumentException("Manual cargo must belong to a persisted personal fleet");
+        }
+        if (player == null) return;
         var world = stage20.worldState();
         var content = ContentCatalogLoader.loadDefault();
         var identities = FactionIdentityResolver.createDefault(content, world.factionIdentities());

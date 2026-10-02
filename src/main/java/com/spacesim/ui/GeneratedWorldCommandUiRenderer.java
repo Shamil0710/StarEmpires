@@ -494,6 +494,11 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
     }
 
+    private boolean saveAvailable = true;
+
+    /** @param available whether character creation is complete and Save is usable */
+    public void bindSaveAvailability(boolean available) { saveAvailable = available; }
+
     private void drawWorkspaceBar() {
         float y = height - metrics.topBarHeight() - 10f * metrics.scale();
         batch.begin();
@@ -512,7 +517,7 @@ public final class GeneratedWorldCommandUiRenderer {
         float unit = (width - metrics.outerMargin() * 2f) / 8f;
         for (int i = 0; i < ids.length; i++) {
             Rect bounds = new Rect(x + i * unit, y, unit - 4f * metrics.scale(), 28f * metrics.scale());
-            boolean enabled = i != 0 || workspace.canGoBack();
+            boolean enabled = (i != 0 || workspace.canGoBack()) && (i != 6 || saveAvailable);
             button(bounds, labels[i], enabled);
             if (enabled) hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, bounds));
         }
@@ -564,7 +569,8 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
         } else {
             boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
-            Rect details = missionActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
+            Rect details = physicalPilotActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
+                    inspectorRect.width(), inspectorRect.height() - 156f * metrics.scale()) : missionActions || pilotStartActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
                             inspectorRect.height() - 115f * metrics.scale()) : navigable ? new Rect(inspectorRect.x(), inspectorRect.y() + 58f * metrics.scale(),
@@ -572,7 +578,9 @@ public final class GeneratedWorldCommandUiRenderer {
             drawInspector(details, selected.name(), selected.category(), selected.summary(),
                     selected.explainedSections(), workspace.view().detailScroll());
             if (missionActions) drawMissionActions();
-            if (navigable) {
+            if (pilotStartActions) drawPilotStartActions();
+            if (physicalPilotActions) drawPhysicalPilotActions();
+            if (navigable && !physicalPilotActions) {
                 Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
                         inspectorRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
                 boolean available = selected.focusSystem() != null;
@@ -590,6 +598,67 @@ public final class GeneratedWorldCommandUiRenderer {
 
     private boolean missionActions;
     private boolean missionConfirmation;
+    private boolean pilotStartActions;
+    private boolean pilotStartConfirmation;
+    private boolean physicalPilotActions;
+    private boolean physicalPilotTrade;
+    private boolean physicalPilotConfirmation;
+    private int physicalPilotKilograms;
+
+    /**
+     * Binds presentation-only docking/trade controls to the current personal market row.
+     * @param available whether the selected row belongs to a commissioned personal market
+     * @param trade whether quantity and buy/sell are relevant
+     * @param confirmation whether a validated current preview awaits confirmation
+     * @param kilograms currently requested whole kilograms
+     */
+    public void bindPhysicalPilotActions(boolean available, boolean trade, boolean confirmation, int kilograms) {
+        physicalPilotActions = available; physicalPilotTrade = trade;
+        physicalPilotConfirmation = confirmation; physicalPilotKilograms = kilograms;
+    }
+
+    private void drawPhysicalPilotActions() {
+        float scale = metrics.scale();
+        float width = (inspectorRect.width() - 40f * scale) / 3f;
+        String[] ids = physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
+                : new String[]{"pilot.dock", "pilot.undock", "focus"};
+        String[] labels = physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
+                : new String[]{"СТЫКОВКА", "ОТСТЫКОВКА", "НА КАРТЕ"};
+        for (int i = 0; i < 3; i++) {
+            Rect r = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
+                    inspectorRect.y() + 106f * scale, width, 36f * scale);
+            button(r, labels[i], true); hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, r));
+        }
+        Rect second = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 58f * scale,
+                inspectorRect.width() - 32f * scale, 36f * scale);
+        if (physicalPilotTrade) {
+            button(second, "ПРОДАТЬ " + physicalPilotKilograms + " КГ", true);
+            hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.sell", null, second));
+        }
+        Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
+        button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
+        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.physical-confirm", null, confirm));
+    }
+
+    /**
+     * Binds new-game start buttons to the selected disclosed conditions.
+     * @param available whether the selected row is the new-game offer
+     * @param confirmation whether a permitted authority preview is pending
+     */
+    public void bindPilotStartActions(boolean available, boolean confirmation) {
+        pilotStartActions = available; pilotStartConfirmation = confirmation;
+    }
+
+    private void drawPilotStartActions() {
+        float scale = metrics.scale();
+        Rect check = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 58f * scale,
+                inspectorRect.width() - 32f * scale, 36f * scale);
+        button(check, "ПРОВЕРИТЬ УСЛОВИЯ СТАРТА", true);
+        hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.preview", null, check));
+        Rect confirm = new Rect(check.x(), inspectorRect.y() + 12f * scale, check.width(), check.height());
+        button(confirm, "КУПИТЬ КОРАБЛЬ И НАЧАТЬ", pilotStartConfirmation);
+        if (pilotStartConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.confirm", null, confirm));
+    }
 
     /**
      * Binds presentation-only availability for the currently selected personal contract.

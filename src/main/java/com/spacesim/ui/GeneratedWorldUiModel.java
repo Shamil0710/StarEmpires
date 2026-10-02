@@ -173,7 +173,7 @@ public final class GeneratedWorldUiModel {
                                                 .toList())))));
             }
             result.add(new LocalObjectView(
-                    "station:" + endpoint.stationId(), ObjectKind.STATION, displayId(endpoint.stationId()),
+                    "station:" + endpoint.stationId(), ObjectKind.STATION, endpointDisplayName(endpoint),
                     yard ? "Орбитальная верфь" : endpoint.generatedIndustrial()
                             ? "Промышленная станция" : "Станция",
                     active, endpoint.position(), ownerId, factionName(ownerId), sprite.binding(), sections)
@@ -318,6 +318,8 @@ public final class GeneratedWorldUiModel {
         for (Entity entity : session.getEngine().getEntities()) {
             var idComponent = entity.getComponent(com.spacesim.components.EntityIdComponent.class);
             IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            // These ECS entities bind wallet/docking identity to an already displayed exact endpoint.
+            if (identity != null && identity.name.startsWith(com.spacesim.campaign.Stage228CampaignAuthority.PILOT_MARKET_IDENTITY_PREFIX)) continue;
             TransformComponent transform = entity.getComponent(TransformComponent.class);
             if (idComponent == null || identity == null || transform == null
                     || freightEntityIds.contains(idComponent.id)
@@ -742,6 +744,21 @@ public final class GeneratedWorldUiModel {
     private static String joinIds(List<String> ids) {
         return ids.isEmpty() ? "Нет" : ids.stream().map(GeneratedWorldUiModel::displayId)
                 .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    /**
+     * Names ordinary station endpoints by their authored role rather than a system-ID suffix.
+     * @param endpoint existing infrastructure endpoint
+     * @return readable role label, stable across market and local-map surfaces
+     */
+    public static String endpointDisplayName(RuntimeEndpoint endpoint) {
+        return switch (endpoint.stationArchetypeId()) {
+            case "station.infrastructure.trade_logistics_hub" -> "Торговый узел";
+            case "station.infrastructure.high_tech_hub" -> "Научно-производственный узел";
+            case "station.infrastructure.refinery_complex" -> "Перерабатывающий комплекс";
+            case "station.infrastructure.frontier_multipurpose" -> "Многоцелевая станция";
+            default -> endpoint.generatedIndustrial() ? "Промышленная станция" : "Торговая станция";
+        };
     }
 
     private static String displayId(String id) {

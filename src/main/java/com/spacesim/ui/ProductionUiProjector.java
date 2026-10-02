@@ -19,6 +19,8 @@ import java.util.Objects;
 /** Composes existing Stage-20/21/M22.8 projections without granting player control of a faction. */
 @SuppressWarnings("doclint:missing")
 public final class ProductionUiProjector {
+    private static final com.spacesim.ship.ProductionEngineeringRuntimeResolver PERSONAL_ENGINEERING =
+            new com.spacesim.ship.ProductionEngineeringRuntimeResolver();
     private final String viewerFactionId;
     private final Stage21IFinalLivingWorldUiProjector living = new Stage21IFinalLivingWorldUiProjector();
 
@@ -40,11 +42,121 @@ public final class ProductionUiProjector {
      * @return immutable presentation with explanations
      */
     public ProductionUiSnapshot capture(Stage228CampaignAuthority campaign, GeneratedWorldUiSnapshot world) {
+        return capture(campaign, world, false);
+    }
+
+    /**
+     * Captures the client view with an explicit transient character-creation invitation.
+     * Ordinary two-argument capture projects durable world information and remains exact on restore.
+     * @param campaign current campaign authority
+     * @param world current read-only world projection
+     * @param includeNewGameOffer whether the client is showing fresh character creation
+     * @return projection with the invitation only while the authoritative new-game gate permits it
+     */
+    public ProductionUiSnapshot capture(Stage228CampaignAuthority campaign, GeneratedWorldUiSnapshot world,
+            boolean includeNewGameOffer) {
         Objects.requireNonNull(campaign);
         var checkpoint = campaign.captureState();
         var bounded = living.project(checkpoint.stage21Runtime().stage21HRuntime(), viewerFactionId);
         EnumMap<Tab, List<Row>> rows = compose(world, bounded);
+        var settings = new ArrayList<>(rows.get(Tab.SETTINGS));
+        if (includeNewGameOffer && campaign.canStartIndependentPilot()) {
+            settings.add(0, row("pilot-start", "Начать независимым пилотом", "Новая игра", "Подтвердите покупку резервного корабля",
+                    List.of(InfoSection.of("Условия старта", "Личные сбережения", credits(Stage228CampaignAuthority.PILOT_SAVINGS_MILLI_CREDITS),
+                            "Цена корабля", credits(Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS),
+                            "После покупки", credits(Stage228CampaignAuthority.PILOT_SAVINGS_MILLI_CREDITS - Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS),
+                            "Владение", "Один существующий резервный грузовик без назначенного рейса",
+                            "Статус", "Независимый пилот; казна и другие активы продавца недоступны",
+                            "Источник средств", "Ограниченные личные сбережения при подтверждении новой игры",
+                            "Рынки старта", "Существующие склады; каждой станции домашней системы выдаётся 10 000 кредитов конечного оборотного капитала")),
+                    "New-game pilot profile v1; PlayerOwnershipService; ordinary faction treasury; PlayerState",
+                    null, 0, world.worldTick()));
+        }
+        rows.put(Tab.SETTINGS, List.copyOf(settings));
+        var logistics = new ArrayList<>(rows.get(Tab.LOGISTICS));
+        campaign.playerState().ifPresent(player -> {
+            if (player.activeFleetId() == null) return;
+            var fleet = campaign.coordinator().runtime().world().findFleet(player.activeFleetId()).orElse(null);
+            if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return;
+            var runtime = campaign.coordinator().runtime();
+            var physical = runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElseThrow();
+            var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+            var hold = runtime.freight().findFreighter(fleet.fleetId()).orElse(null);
+            for (var endpoint : runtime.infrastructure().endpoints()) {
+                if (!endpoint.systemId().equals(fleet.systemId()) || campaign.pilotMarketReference(endpoint.stationId()).isEmpty()) continue;
+                String name = GeneratedWorldUiModel.endpointDisplayName(endpoint);
+                var ref = campaign.pilotMarketReference(endpoint.stationId()).orElseThrow();
+                boolean docked = ref.equals(player.dockedAt());
+                logistics.add(row("pilot-station|" + endpoint.stationId(), name, "Личные рынки", docked ? "Корабль пристыкован" : "Требуется стыковка",
+                        List.of(InfoSection.of("Доступ к рынку", "Расстояние", String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(endpoint.position())),
+                                "Скорость корабля", String.format(Locale.ROOT, "%.2f м/с", Math.hypot(physical.velocityXMps(), physical.velocityYMps())),
+                                "Условия стыковки", "Не далее 1 км; скорость не выше 1 м/с",
+                                "Управление тягой", "WASD в системе; X — торможение; без тяги — движение по инерции",
+                                "Кошелёк", credits(player.walletMilliCredits()))),
+                        "Stage-20 exact physical separation; existing PlayerState docking; ordinary station wallet",
+                        endpoint.systemId(), 0, world.worldTick()));
+                if (hold == null) continue;
+                for (String commodity : List.of("commodity.material.purified_water", "commodity.material.structural_alloy", "commodity.ore.metallic")) {
+                    var definition = ontology.findCommodity(commodity);
+                    if (definition == null || !hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
+                            || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())) continue;
+                    logistics.add(row("pilot-market|" + endpoint.stationId() + "|" + commodity, switch (commodity) {
+                        case "commodity.material.purified_water" -> "Очищенная вода";
+                        case "commodity.material.structural_alloy" -> "Конструкционный сплав";
+                        default -> "Металлическая руда";
+                    }, "Товары личного рынка", name,
+                            List.of(InfoSection.of("Физическая сделка", "Запас станции", endpoint.storage().commodityMassKg(commodity) + " кг",
+                                    "В трюме", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d) + " кг",
+                                    "Покупка за 1 кг", credits(Stage228CampaignAuthority.pilotCommodityPrice(commodity, true)),
+                                    "Продажа за 1 кг", credits(Stage228CampaignAuthority.pilotCommodityPrice(commodity, false)),
+                                    "Кошелёк", credits(player.walletMilliCredits()), "Стыковка", docked ? "Да" : "Нет",
+                                    "Обработка за такт", String.format(Locale.ROOT, "%.2f кг", endpoint.handlingCapability().massRateKgPerSecond() * campaign.coordinator().session().fixedStepSeconds()),
+                                    "Лимит времени", "Одна физическая сделка корабля за завершённый такт; после сделки нужно продолжить время")),
+                            "Opening market profile v1 (milli-credits/kg); TradeController access/customs/payment; Stage-18/20 physical storage and cargo-lot provenance",
+                            null, 0, world.worldTick()));
+                }
+            }
+        });
+        rows.put(Tab.LOGISTICS, List.copyOf(logistics));
         var craftRows = new ArrayList<>(rows.get(Tab.SHIPS));
+        campaign.playerState().ifPresent(player -> {
+            for (var id : player.ownedFleetIds()) {
+                var placement = campaign.coordinator().runtime().world().findFleet(id).orElseThrow();
+                var personalSections = new ArrayList<InfoSection>();
+                personalSections.add(InfoSection.of("Пилот", "Кошелёк", credits(player.walletMilliCredits()),
+                        "Принадлежность", player.factionContentId() == null ? "Независимый" : factionName(world, player.factionContentId()),
+                        "Физическое владение", "Существующий корабль; новые корпуса при загрузке не создаются",
+                        "Регистрация", "Происхождение корпуса не даёт полномочий над фракцией продавца"));
+                if (placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM) {
+                    var runtime = campaign.coordinator().runtime();
+                    var entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                            .getEntityRegistry().require(placement.localEntityId());
+                    var fitted = entity.getComponent(com.spacesim.components.EngineeringComponent.class);
+                    var physical = runtime.arrival().materialization(placement.systemId()).physicalState(placement.localEntityId()).orElseThrow();
+                    personalSections.add(InfoSection.of("Полёт", "Скорость", String.format(Locale.ROOT, "%.2f м/с", Math.hypot(physical.velocityXMps(), physical.velocityYMps())),
+                            "Стыковка", player.docked() ? "Да" : "Нет", "Управление", "Откройте корабль на карте: WASD — тяга, X — торможение; без тяги — инерция"));
+                    if (fitted != null) {
+                        var derived = PERSONAL_ENGINEERING.derive(fitted);
+                        personalSections.add(InfoSection.of("Инженерное состояние", "Полная масса", String.format(Locale.ROOT, "%.1f кг", derived.totalMassKg()),
+                                "Груз", String.format(Locale.ROOT, "%.1f кг", derived.cargoMassKg()),
+                                "Реактивная масса", String.format(Locale.ROOT, "%.1f кг", derived.reactionMassKg()),
+                                "Доступная тяга", String.format(Locale.ROOT, "%.1f Н", derived.availableThrustN()),
+                                "Ускорение", String.format(Locale.ROOT, "%.4f м/с²", derived.accelerationMps2()),
+                                "Запас изменения скорости", String.format(Locale.ROOT, "%.1f м/с", derived.deltaVMps()),
+                                "Баланс мощности", String.format(Locale.ROOT, "%+.1f Вт", derived.continuousPowerMarginW()),
+                                "Энергия шины", String.format(Locale.ROOT, "%.1f Дж", fitted.runtimeState.sharedBusEnergyJ()),
+                                "Накопленное тепло", String.format(Locale.ROOT, "%.1f Дж", fitted.runtimeState.shipHeatStoredJ()),
+                                "Боеприпасы", Long.toString(derived.ammunitionCount())));
+                    }
+                }
+                craftRows.add(0, row("personal-ship:" + id.value(), "Личный корабль", "Мои корабли",
+                        player.activeFleetId() != null && player.activeFleetId().equals(id) ? "Активный" : "В собственности",
+                        personalSections,
+                        "PlayerState personal ownership and wallet; WorldSimulation physical fleet placement",
+                        placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM ? placement.systemId() : null,
+                        id.value(), world.worldTick()));
+            }
+        });
         for (var craft : checkpoint.smallCraft().craft()) {
             if (!craft.stableFactionId().equals(viewerFactionId)) continue;
             var assignment = checkpoint.hangars().assignments().stream()

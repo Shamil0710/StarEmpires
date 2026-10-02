@@ -7,7 +7,7 @@
 - Content version: `se-content-1`
 - Content fingerprint: `<sha256>`
 - Save: `core=4 / envelope=2 / campaign=5 / m22.8.generated-campaign.v5`
-- Generator profile: `se-gen-1`
+- Generator profile: `se-gen-2` (Stage-23 entry alias was `se-gen-1`; underlying saved generation IDs retained)
 - Package SHA-256: `<sha256>`
 - Build environment/provenance: `<jdk/os/workflow/run>`
 

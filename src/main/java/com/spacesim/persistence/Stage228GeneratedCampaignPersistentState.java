@@ -114,9 +114,7 @@ public record Stage228GeneratedCampaignPersistentState(
         Objects.requireNonNull(hangars, "hangars");
         Objects.requireNonNull(flightDeck, "flightDeck");
         Objects.requireNonNull(operations, "operations");
-        if (playerState != null) {
-            GeneratedCampaignPlayerCheckpointValidator.validate(stage21Runtime, playerState);
-        }
+        GeneratedCampaignPlayerCheckpointValidator.validate(stage21Runtime, playerState);
     }
 
     /**

@@ -385,6 +385,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     private static void validateOrderEndpoints(
             Stage20FreightPersistentState freight,
             InfrastructureRegistry infrastructure) {
+        for (var lot : freight.cargoLots()) {
+            if (lot.orderId().equals(Stage20FreightPersistentState.manualCargoOrderId(lot.fleetId())))
+                infrastructure.endpoint(lot.sourceEndpointId());
+        }
         for (TransportOrderState order : freight.orders()) {
             RuntimeEndpoint source = infrastructure.endpoint(order.sourceEndpointId());
             RuntimeEndpoint destination = infrastructure.endpoint(order.destinationEndpointId());
@@ -615,7 +619,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             return result;
         }
 
-        private void synchronizeFreightEngineeringCargo(FleetId fleetId) {
+        /** @param fleetId existing local physical hold whose cargo mass must update the shared fitted-mass authority */
+        public void synchronizeFreightEngineeringCargo(FleetId fleetId) {
             FreighterState fleetState = freight.findFreighter(fleetId).orElseThrow();
             FleetPlacementState placement = world.findFleet(fleetId).orElseThrow();
             if (placement.locationKind() != FleetLocationKind.IN_SYSTEM) {

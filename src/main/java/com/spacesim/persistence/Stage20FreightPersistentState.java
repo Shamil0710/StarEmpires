@@ -47,7 +47,7 @@ public record Stage20FreightPersistentState(
         List<CargoLotState> cargoLots,
         List<TransportOrderState> orders) {
     /** Current physical-freight persistence schema. */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
     private static final double EPSILON = 1.0e-9d;
 
     /** Physical route lifecycle for one real freighter. */
@@ -310,9 +310,11 @@ public record Stage20FreightPersistentState(
      * @param orders ordinary persistent transport orders
      */
     public Stage20FreightPersistentState {
-        if (schemaVersion != CURRENT_VERSION) {
+        if (schemaVersion != CURRENT_VERSION && schemaVersion != 1) {
             throw new IllegalArgumentException("Unsupported Stage-20.5B freight schema: " + schemaVersion);
         }
+        boolean historical = schemaVersion == 1;
+        schemaVersion = CURRENT_VERSION;
         generatorVersion = requireText(generatorVersion, "generatorVersion");
         worldFingerprint = requireText(worldFingerprint, "worldFingerprint");
         materializationVersion = requireText(materializationVersion, "materializationVersion");
@@ -381,8 +383,12 @@ public record Stage20FreightPersistentState(
         for (CargoLotState lot : lotCopy) {
             FreighterState fleet = fleetsById.get(lot.fleetId());
             TransportOrderState order = ordersById.get(lot.orderId());
-            if (fleet == null || order == null || !order.fleetId().equals(lot.fleetId())
-                    || !order.commodityId().equals(lot.commodityId()) || !lotIds.add(lot.lotId())) {
+            boolean manual = fleet != null && fleet.phase() == FreightPhase.IDLE
+                    && lot.orderId().equals(manualCargoOrderId(fleet.fleetId()))
+                    && lot.sourceProvenanceId().equals("player-market:" + lot.sourceEndpointId());
+            if (historical && manual) throw new IllegalArgumentException("Manual cargo requires freight schema v2");
+            if (fleet == null || !manual && (order == null || !order.fleetId().equals(lot.fleetId())
+                    || !order.commodityId().equals(lot.commodityId())) || !lotIds.add(lot.lotId())) {
                 throw new IllegalArgumentException("cargo lot must match one existing fleet order");
             }
             lotMassByFleetCommodity.computeIfAbsent(lot.fleetId(), ignored -> new HashMap<>())
@@ -413,6 +419,13 @@ public record Stage20FreightPersistentState(
     public static String cargoHoldId(FleetId fleetId) {
         return "freight-hold:" + Objects.requireNonNull(fleetId, "fleetId").value();
     }
+
+    /**
+     * Identifies manually purchased cargo on one existing reserve fleet.
+     * @param fleetId carrying reserve fleet
+     * @return ordinary manually purchased cargo provenance identity
+     */
+    public static String manualCargoOrderId(FleetId fleetId) { return "player-market-cargo:" + fleetId.value(); }
 
     private static boolean sameMassMap(Map<String, Double> left, Map<String, Double> right) {
         Set<String> keys = new HashSet<>(left.keySet());

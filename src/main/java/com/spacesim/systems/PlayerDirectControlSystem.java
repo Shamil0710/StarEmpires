@@ -32,6 +32,47 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
         super(Family.all(PlayerControlledComponent.class, TransformComponent.class).get());
     }
 
+    /**
+     * Advances the same fitted propulsion over exact generated-world kinematics.
+     * Zero input coasts; explicit braking consumes finite reaction mass. The campaign supplies
+     * one completed fixed interval, so this method never advances a second clock.
+     * @param entity existing player ship with engineering
+     * @param physical exact Stage-20 kinematics
+     * @param axisX finite normalized horizontal thrust
+     * @param axisY finite normalized vertical thrust
+     * @param braking whether to request finite counter-thrust
+     * @param deltaSeconds positive fixed interval
+     * @return exact next physical state
+     */
+    public com.spacesim.world.LocalPhysicalKinematics advanceExact(
+            Entity entity, com.spacesim.world.LocalPhysicalKinematics physical,
+            float axisX, float axisY, boolean braking, double deltaSeconds) {
+        if (!Float.isFinite(axisX) || !Float.isFinite(axisY)
+                || !Double.isFinite(deltaSeconds) || deltaSeconds <= 0)
+            throw new IllegalArgumentException("Invalid physical control interval or axes");
+        EngineeringComponent fitted = entity.getComponent(EngineeringComponent.class);
+        if (fitted == null) throw new IllegalStateException("Physical player movement requires fitted propulsion");
+        double speed = Math.hypot(physical.velocityXMps(), physical.velocityYMps());
+        double magnitude = Math.min(1d, Math.hypot(axisX, axisY));
+        double x = axisX, y = axisY;
+        double norm = Math.hypot(x, y);
+        if (norm > 0) { x /= norm; y /= norm; }
+        double throttle = magnitude;
+        if (braking) {
+            x = speed > 0 ? -physical.velocityXMps() / speed : 0d;
+            y = speed > 0 ? -physical.velocityYMps() / speed : 0d;
+            throttle = engineering.throttleForDeltaV(fitted, speed, deltaSeconds);
+        }
+        var result = engineering.advancePropulsion(fitted, throttle, deltaSeconds);
+        double deltaV = result.actualThrustN() / result.derivedState().totalMassKg() * deltaSeconds;
+        if (braking) deltaV = Math.min(speed, deltaV);
+        double vx = physical.velocityXMps() + x * deltaV;
+        double vy = physical.velocityYMps() + y * deltaV;
+        return new com.spacesim.world.LocalPhysicalKinematics(physical.position().translated(
+                (physical.velocityXMps() + vx) * 0.5d * deltaSeconds,
+                (physical.velocityYMps() + vy) * 0.5d * deltaSeconds), vx, vy);
+    }
+
     /** Applies one fixed-tick movement step under finite acceleration/braking limits. */
     @Override
     protected void processEntity(Entity entity, float deltaTime) {

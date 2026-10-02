@@ -150,7 +150,7 @@ public final class GeneratedCampaignSession {
     }
 
     /** @return exact authoritative fixed-step duration in simulation seconds */
-    float fixedStepSeconds() {
+    public float fixedStepSeconds() {
         return activeClock().getFixedStepSeconds();
     }
 

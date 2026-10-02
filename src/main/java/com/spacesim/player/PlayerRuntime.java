@@ -54,6 +54,7 @@ public final class PlayerRuntime {
     private final ContentCatalog content;
     private final PlayerFleetOrderExecutor fleetOrderExecutor;
     private PlayerState player;
+    private boolean composed;
 
     private PlayerRuntime(WorldSimulation world, ContentCatalog content, PlayerState player) {
         this.world = Objects.requireNonNull(world, "WorldSimulation not set");
@@ -77,6 +78,26 @@ public final class PlayerRuntime {
      */
     public static PlayerRuntime create(WorldSimulation world, ContentCatalog content, PlayerState player) {
         return new PlayerRuntime(world, content, player);
+    }
+
+    /**
+     * Attaches existing player services without installing legacy movement or another clock.
+     * @param world campaign-owned world
+     * @param content shared content
+     * @param player existing durable player
+     * @return service adapter whose time remains owned by the campaign
+     */
+    public static PlayerRuntime attachToCampaign(WorldSimulation world, ContentCatalog content, PlayerState player) {
+        return new PlayerRuntime(world, content, player, true);
+    }
+
+    private PlayerRuntime(WorldSimulation world, ContentCatalog content, PlayerState player, boolean composed) {
+        this.world = Objects.requireNonNull(world);
+        this.content = Objects.requireNonNull(content);
+        this.player = Objects.requireNonNull(player);
+        this.composed = composed;
+        validateReferences(world, content, player);
+        this.fleetOrderExecutor = new PlayerFleetOrderExecutor(this, content);
     }
 
     /**
@@ -134,6 +155,7 @@ public final class PlayerRuntime {
      * @return ordinary WorldSimulation advance report
      */
     public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
+        if (composed) throw new IllegalStateException("Campaign owns the simulation clock");
         synchronizeDirectControlBinding();
         fleetOrderExecutor.prepare();
         WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
@@ -161,6 +183,7 @@ public final class PlayerRuntime {
      * @return true when an undocked local active ship accepted the intent
      */
     public boolean setMovementIntent(float axisX, float axisY) {
+        if (composed) return false;
         if (player.docked() || player.activeFleetId() == null
                 || world.findFleetJump(player.activeFleetId()).isPresent()) {
             return false;
@@ -368,8 +391,10 @@ public final class PlayerRuntime {
         player = checked;
         releaseRemovedOwnedFleets(previous, checked);
         reconcileOwnedStations();
-        synchronizePlayerLocationAndControl();
-        fleetOrderExecutor.prepare();
+        if (!composed) {
+            synchronizePlayerLocationAndControl();
+            fleetOrderExecutor.prepare();
+        }
     }
 
     private void installPlayerControlSystems() {

@@ -39,6 +39,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private ProductionUiProjector projector;
     private ProductionUiSnapshot production;
     private Stage228CampaignAuthority.MissionCommandPreview pendingMissionPreview;
+    private Stage228CampaignAuthority.PilotStartPreview pendingPilotStart;
+    private Stage228CampaignAuthority.PlayerPhysicalPreview pendingPilotPhysical;
+    private String pendingPilotSelection = "";
+    private int pilotKilograms = 1;
     private float projectionAge;
     private String status = "Генерация мира…";
     private Path savePath;
@@ -60,9 +64,11 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer = new GeneratedWorldCommandUiRenderer();
         portraits = new FactionCharacterPortraitOverlay();
         savePath = Gdx.files.local(SAVE_FILE).file().toPath();
-        campaign.coordinator().setPaused(false);
+        campaign.coordinator().setPaused(true);
         campaign.coordinator().setTimeScale(1d);
-        status = "Открыта кампания. Меню — F7; поиск — Ctrl+F; назад — Esc.";
+        workspace.navigate(Tab.SETTINGS);
+        workspace.select(new UiSelection(SelectionKind.SURFACE_ROW, "pilot-start"));
+        status = "Новая игра на паузе. Проверьте условия старта независимого пилота.";
         Gdx.input.setInputProcessor(input());
     }
 
@@ -78,7 +84,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private void refreshProjection() {
-        production = projector.capture(campaign, snapshot);
+        production = projector.capture(campaign, snapshot, true);
         projectionAge = 0f;
     }
 
@@ -229,6 +235,45 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "save" -> save();
             case "load" -> load();
             case "focus" -> focusSelection();
+            case "pilot.preview" -> {
+                if (!selectedPilotStart()) yield false;
+                campaign.coordinator().setPaused(true);
+                pendingPilotStart = campaign.previewIndependentPilotStart();
+                status = pendingPilotStart.allowed() ? "Условия проверены. Подтверждение переведёт оплату продавцу и оформит личное владение."
+                        : "Старт недоступен: резервный корабль или возможность оплаты отсутствуют.";
+                refreshProjection(); yield true;
+            }
+            case "pilot.confirm" -> {
+                var preview = pendingPilotStart; pendingPilotStart = null;
+                if (preview == null || !selectedPilotStart()) yield false;
+                try {
+                    var pilot = campaign.submitIndependentPilotStart(preview);
+                    var world = campaign.coordinator().runtime().world();
+                    world.activateSystem(world.findFleet(pilot.activeFleetId()).orElseThrow().systemId());
+                    renderer.resetSystemMapCamera();
+                    switchTab(Tab.SHIPS);
+                    workspace.select(new UiSelection(SelectionKind.SURFACE_ROW, "personal-ship:" + preview.fleetId().value()));
+                    status = "Корабль куплен. Кампания на паузе; Пробел — продолжить.";
+                } catch (IllegalStateException exception) {
+                    status = "Условия изменились. Проверьте старт заново.";
+                }
+                snapshot = model.capture(); refreshProjection(); yield true;
+            }
+            case "pilot.less", "pilot.more" -> {
+                pilotKilograms = Math.max(1, Math.min(10000, pilotKilograms + (id.equals("pilot.less") ? -1 : 1)));
+                pendingPilotPhysical = null; yield true;
+            }
+            case "pilot.dock" -> previewPilotPhysical("DOCK");
+            case "pilot.undock" -> previewPilotPhysical("UNDOCK");
+            case "pilot.buy" -> previewPilotPhysical("BUY");
+            case "pilot.sell" -> previewPilotPhysical("SELL");
+            case "pilot.physical-confirm" -> {
+                var p = pendingPilotPhysical; pendingPilotPhysical = null;
+                if (p == null || !pendingPilotSelection.equals(workspace.view().selection().stableId())) yield false;
+                try { campaign.submitPilotAction(p); status = "Действие выполнено. Для новой сделки продолжите время: Пробел."; }
+                catch (IllegalStateException exception) { status = "Состояние изменилось. Проверьте действие заново."; }
+                snapshot = model.capture(); refreshProjection(); yield true;
+            }
             case "mission.accept" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.ACCEPT);
             case "mission.reject" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.REJECT);
             case "mission.cancel" -> previewMission(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.CANCEL);
@@ -236,6 +281,26 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "exit" -> { Gdx.app.exit(); yield true; }
             default -> false;
         };
+    }
+
+    private boolean selectedPilotStart() {
+        return workspace.tab() == Tab.SETTINGS && workspace.view().selection().stableId().equals("pilot-start")
+                && campaign.canStartIndependentPilot();
+    }
+
+    private boolean previewPilotPhysical(String action) {
+        String id = workspace.view().selection().stableId();
+        String[] pieces = id.split("\\|", -1);
+        if (workspace.tab() != Tab.LOGISTICS || pieces.length < 2
+                || !(pieces[0].equals("pilot-station") || pieces[0].equals("pilot-market"))) return false;
+        campaign.coordinator().setPaused(true);
+        pendingPilotSelection = id;
+        pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", pilotKilograms);
+        status = pendingPilotPhysical.allowed() ? ((action.equals("BUY") || action.equals("SELL"))
+                ? String.format(java.util.Locale.ROOT, "Проверено: %d кг; кошелёк %+.3f кр. Подтвердите сделку.", pilotKilograms, pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
+                : "Стыковка проверена. Подтвердите действие.")
+                : "Действие недоступно: проверьте расстояние, скорость, стыковку, запас, деньги и обработку за такт.";
+        refreshProjection(); return true;
     }
 
     private String selectedPersonalMissionId() {
@@ -326,8 +391,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             if (row.focusFleet() > 0) return focusFleet(row.focusFleet());
             if (row.focusSystem() != null) {
                 openSystem(row.focusSystem());
-                workspace.select(selected);
-                return renderer.focusLocalObject(snapshot, selected.stableId());
+                String objectId = selected.stableId().startsWith("pilot-station|")
+                        ? "station:" + selected.stableId().substring("pilot-station|".length()) : selected.stableId();
+                workspace.select(new UiSelection(SelectionKind.LOCAL_OBJECT, objectId));
+                return renderer.focusLocalObject(snapshot, objectId);
             }
         }
         return selected.kind() == SelectionKind.LOCAL_OBJECT
@@ -364,6 +431,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean switchTab(Tab target) {
         pendingMissionPreview = null;
+        pendingPilotStart = null;
+        pendingPilotPhysical = null;
         workspace.navigate(target);
         renderer.clearKeyboardFocus();
         dragPointer = -1;
@@ -393,6 +462,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean save() {
+        if (campaign.canStartIndependentPilot()) {
+            status = "Сначала завершите создание пилота: Меню — условия старта. Загрузка доступна.";
+            return true;
+        }
         try {
             Stage228GeneratedCampaignPersistenceCodec.write(savePath, campaign.captureState());
             status = "Кампания сохранена.";
@@ -411,8 +484,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             var nextSnapshot = nextModel.capture();
             var nextProjector = new ProductionUiProjector(coordinator.actors().capture().stream()
                     .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow());
-            var nextProjection = nextProjector.capture(candidate, nextSnapshot);
+            var nextProjection = nextProjector.capture(candidate, nextSnapshot, true);
             pendingMissionPreview = null;
+            pendingPilotStart = null;
+            pendingPilotPhysical = null;
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
@@ -428,6 +503,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     public void render() {
         float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
         try {
+            boolean flying = !workspace.searching() && workspace.tab() == Tab.SYSTEM;
+            campaign.setPilotThrust(flying ? (Gdx.input.isKeyPressed(Input.Keys.D) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.A) ? 1 : 0) : 0,
+                    flying ? (Gdx.input.isKeyPressed(Input.Keys.W) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.S) ? 1 : 0) : 0,
+                    flying && Gdx.input.isKeyPressed(Input.Keys.X));
             campaign.advanceFrame(delta);
             snapshot = model.capture();
             projectionAge += delta;
@@ -439,6 +518,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         String missionId = selectedPersonalMissionId();
         if (pendingMissionPreview != null && !pendingMissionPreview.missionId().equals(missionId)) pendingMissionPreview = null;
         renderer.bindMissionActions(missionId != null, pendingMissionPreview != null && pendingMissionPreview.allowed());
+        if (!selectedPilotStart()) pendingPilotStart = null;
+        renderer.bindPilotStartActions(selectedPilotStart(), pendingPilotStart != null && pendingPilotStart.allowed());
+        String selectedPilot = workspace.view().selection().stableId();
+        if (!selectedPilot.equals(pendingPilotSelection)) pendingPilotPhysical = null;
+        renderer.bindPhysicalPilotActions(workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
+                selectedPilot.startsWith("pilot-market|"), pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
+        renderer.bindSaveAvailability(!campaign.canStartIndependentPilot());
         renderer.bindWorkspace(production, workspace);
         renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),
                 workspace.view().listScroll(), campaign.coordinator().isPaused(), campaign.coordinator().timeScale(),

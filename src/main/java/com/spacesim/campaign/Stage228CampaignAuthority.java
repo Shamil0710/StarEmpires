@@ -44,6 +44,16 @@ import java.util.function.LongFunction;
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
     private PlayerState playerState;
+    private boolean freshPilotStart;
+    private float thrustAxisX;
+    private float thrustAxisY;
+    private boolean braking;
+    private final com.spacesim.systems.PlayerDirectControlSystem playerFlight = new com.spacesim.systems.PlayerDirectControlSystem();
+
+    /** Explicit, finite new-game savings; never issued during restore. */
+    public static final long PILOT_SAVINGS_MILLI_CREDITS = 100_000_000L;
+    /** Disclosed price of the already materialized reserve hull. */
+    public static final long PILOT_SHIP_PRICE_MILLI_CREDITS = 25_000_000L;
     private final SmallCraftRegistry smallCraft;
     private final SmallCraftHangarRegistry hangars;
     private final SmallCraftFlightDeckOperations flightDeck;
@@ -103,7 +113,7 @@ public final class Stage228CampaignAuthority {
         SmallCraftFitAuthority fitAuthority = productionFitAuthority();
         SmallCraftRegistry smallCraft = SmallCraftRegistry.empty(fitAuthority);
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(smallCraft);
-        return new Stage228CampaignAuthority(
+        Stage228CampaignAuthority created = new Stage228CampaignAuthority(
                 GeneratedCampaignCoordinator.create(rootSeed),
                 smallCraft,
                 hangars,
@@ -114,6 +124,8 @@ public final class Stage228CampaignAuthority {
                 LogisticsState.empty(),
                 List.of(),
                 null);
+        created.freshPilotStart = true;
+        return created;
     }
 
     /**
@@ -202,6 +214,293 @@ public final class Stage228CampaignAuthority {
      */
     public Optional<PlayerState> playerState() {
         return Optional.ofNullable(playerState);
+    }
+
+    /** @return whether this unsaved new-game session can still initialize a pilot */
+    public boolean canStartIndependentPilot() { return freshPilotStart && playerState == null; }
+
+    /** Immutable campaign-bound new-game confirmation. */
+    public static final class PilotStartPreview {
+        private final Stage228CampaignAuthority owner;
+        private final Stage228GeneratedCampaignPersistentState baseline;
+        private final FleetId fleet;
+        private final String seller;
+        private PilotStartPreview(Stage228CampaignAuthority owner,
+                Stage228GeneratedCampaignPersistentState baseline, FleetId fleet, String seller) {
+            this.owner = owner; this.baseline = baseline; this.fleet = fleet; this.seller = seller;
+        }
+        /** @return whether an existing reserve asset is available */
+        public boolean allowed() { return fleet != null; }
+        /** @return offered physical asset, used internally by the interface */
+        public FleetId fleetId() { return fleet; }
+    }
+
+    /**
+     * Validates the disclosed new-game purchase on an isolated checkpoint.
+     * @return pure confirmation token; restoring a historical save cannot enable this action
+     */
+    public PilotStartPreview previewIndependentPilotStart() {
+        var baseline = captureState();
+        if (!canStartIndependentPilot()) return new PilotStartPreview(this, baseline, null, null);
+        var reserve = coordinator.runtime().freight().capture().freighters().stream()
+                .filter(f -> f.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
+                .filter(f -> f.cargoMassKg() == 0d && coordinator.runtime().world().findFleet(f.fleetId()).isPresent())
+                .findFirst().orElse(null);
+        if (reserve == null) return new PilotStartPreview(this, baseline, null, null);
+        var candidate = restore(baseline);
+        try {
+            candidate.initializePilot(reserve.fleetId(), reserve.stableFactionId());
+            candidate.captureState();
+            return new PilotStartPreview(this, baseline, reserve.fleetId(), reserve.stableFactionId());
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            return new PilotStartPreview(this, baseline, null, null);
+        }
+    }
+
+    /**
+     * Commits a once-only start after verifying the exact campaign and sale again.
+     * @param preview current confirmation token issued by this campaign
+     * @return initialized existing PlayerState
+     */
+    public PlayerState submitIndependentPilotStart(PilotStartPreview preview) {
+        var checked = Objects.requireNonNull(preview);
+        if (checked.owner != this || !checked.allowed() || !canStartIndependentPilot()
+                || !checked.baseline.equals(captureState())) throw new IllegalStateException("Pilot start is stale or unavailable");
+        initializePilot(checked.fleet, checked.seller);
+        freshPilotStart = false;
+        return playerState;
+    }
+
+    private void initializePilot(FleetId fleetId, String seller) {
+        if (playerState != null) throw new IllegalStateException("Player already initialized");
+        var runtime = coordinator.runtime();
+        var reserve = runtime.freight().findFreighter(fleetId).orElseThrow();
+        var placement = runtime.world().findFleet(fleetId).orElseThrow();
+        if (reserve.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                || reserve.cargoMassKg() != 0d || !reserve.stableFactionId().equals(seller)
+                || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM)
+            throw new IllegalStateException("Asset is not an uncommitted local reserve");
+        var initial = new PlayerState(PILOT_SAVINGS_MILLI_CREDITS, null, List.of(), List.of(), null,
+                List.of(placement.systemId()), List.of(), placement.systemId());
+        runtime.world().findSession(runtime.world().getActiveSystemId()).orElseThrow().getLedger()
+                .recordMoneySource("PLAYER", PILOT_SAVINGS_MILLI_CREDITS, "new-game-pilot-personal-savings.v1");
+        var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(runtime.world(), coordinator.content(), initial);
+        if (!new com.spacesim.player.PlayerOwnershipService(adapter)
+                .purchaseFactionFleet(fleetId, seller, PILOT_SHIP_PRICE_MILLI_CREDITS))
+            throw new IllegalStateException("Reserve purchase cannot settle");
+        playerState = adapter.player();
+        initializePilotMarkets(placement.systemId());
+    }
+
+    /** Stable binding of an ordinary station wallet to its existing physical storage endpoint. */
+    public static final String PILOT_MARKET_IDENTITY_PREFIX = "Generated market ";
+    /** Finite disclosed per-station opening liquidity, created only by new-game confirmation. */
+    public static final long PILOT_MARKET_INITIAL_LIQUIDITY = 10_000_000L;
+
+    private void initializePilotMarkets(com.spacesim.world.StarSystemId system) {
+        var runtime = coordinator.runtime();
+        var session = runtime.world().findSession(system).orElseThrow();
+        for (var endpoint : runtime.infrastructure().endpoints()) {
+            if (!endpoint.systemId().equals(system)) continue;
+            var transform = new com.spacesim.components.TransformComponent();
+            transform.position.set((float) endpoint.position().offsetXM(), (float) endpoint.position().offsetYM());
+            var entity = new com.badlogic.ashley.core.Entity()
+                    .add(new com.spacesim.components.IdentityComponent(PILOT_MARKET_IDENTITY_PREFIX + endpoint.stationId(),
+                            com.spacesim.components.IdentityComponent.Kind.STATION))
+                    .add(transform).add(new com.spacesim.components.MarketComponent())
+                    .add(new WalletComponent());
+            runtime.world().controllingFaction(system).ifPresent(f -> entity.add(new com.spacesim.components.FactionComponent(
+                    runtime.world().findFactionRuntimeId(f).orElseThrow())));
+            runtime.world().createEntity(system, entity);
+            if (!entity.getComponent(WalletComponent.class).creditFromSource(PILOT_MARKET_INITIAL_LIQUIDITY))
+                throw new IllegalStateException("Opening market liquidity cannot be credited");
+            session.getLedger().recordMoneySource(PILOT_MARKET_IDENTITY_PREFIX + endpoint.stationId(),
+                    PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v1");
+        }
+    }
+
+    /**
+     * Returns an existing station entity representing the endpoint's ordinary wallet, never its cargo.
+     * @param stationId exact physical endpoint
+     * @return durable station reference, or empty where no market has been commissioned
+     */
+    public Optional<com.spacesim.player.DiscoveredObjectRef> pilotMarketReference(String stationId) {
+        var endpoint = coordinator.runtime().infrastructure().endpoint(stationId);
+        var session = coordinator.runtime().world().findSession(endpoint.systemId()).orElseThrow();
+        for (var entity : session.getEngine().getEntities()) {
+            var name = entity.getComponent(com.spacesim.components.IdentityComponent.class);
+            if (name != null && name.name.equals(PILOT_MARKET_IDENTITY_PREFIX + stationId)) {
+                var id = entity.getComponent(com.spacesim.components.EntityIdComponent.class);
+                if (id != null) return Optional.of(new com.spacesim.player.DiscoveredObjectRef(endpoint.systemId(), id.id));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Existing ordinary-state preview used for docking and physical cargo trades.
+     * @param action DOCK, UNDOCK, BUY or SELL
+     * @param stationId exact physical endpoint (ignored by UNDOCK)
+     * @param commodityId physical commodity for a trade
+     * @param kilograms positive whole kilograms for a trade
+     * @return pure exact-state confirmation with no live changes
+     */
+    public PlayerPhysicalPreview previewPilotAction(String action, String stationId, String commodityId, int kilograms) {
+        var baseline = captureState();
+        var candidate = restore(baseline);
+        boolean allowed;
+        long walletChange = 0;
+        try { candidate.executePilotAction(action, stationId, commodityId, kilograms); candidate.captureState(); allowed = true;
+            walletChange = candidate.playerState.walletMilliCredits() - playerState.walletMilliCredits(); }
+        catch (IllegalStateException | IllegalArgumentException | ArithmeticException exception) { allowed = false; }
+        return new PlayerPhysicalPreview(this, baseline, action, stationId, commodityId, kilograms, allowed, walletChange);
+    }
+
+    /** Exact-state confirmation for one physical player action. */
+    public static final class PlayerPhysicalPreview {
+        private final Stage228CampaignAuthority owner;
+        private final Stage228GeneratedCampaignPersistentState baseline;
+        private final String action, station, commodity;
+        private final int kilograms;
+        private final boolean allowed;
+        private final long walletChange;
+        private PlayerPhysicalPreview(Stage228CampaignAuthority owner, Stage228GeneratedCampaignPersistentState baseline,
+                String action, String station, String commodity, int kilograms, boolean allowed, long walletChange) {
+            this.owner = owner; this.baseline = baseline; this.action = action; this.station = station;
+            this.commodity = commodity; this.kilograms = kilograms; this.allowed = allowed; this.walletChange = walletChange;
+        }
+        /** @return whether the shared domain path accepts the command */
+        public boolean allowed() { return allowed; }
+        /** @return exact personal wallet delta including ordinary customs */
+        public long walletChangeMilliCredits() { return walletChange; }
+    }
+
+    /**
+     * Submits the same prevalidated physical action against the unchanged live checkpoint.
+     * @param preview exact current token
+     * @return updated existing durable player state
+     */
+    public PlayerState submitPilotAction(PlayerPhysicalPreview preview) {
+        var p = Objects.requireNonNull(preview);
+        if (p.owner != this || !p.allowed || !p.baseline.equals(captureState()))
+            throw new IllegalStateException("Physical action is stale or unauthorized");
+        executePilotAction(p.action, p.station, p.commodity, p.kilograms);
+        return playerState;
+    }
+
+    private void replacePilotFinancialDocking(long wallet, com.spacesim.player.DiscoveredObjectRef dock,
+            List<com.spacesim.player.DiscoveredObjectRef> discovered) {
+        var p = playerState;
+        playerState = new PlayerState(wallet, p.factionContentId(), p.reputations(), p.ownedFleetIds(), p.activeFleetId(),
+                p.discoveredSystemIds(), discovered, p.homeSystemId(), dock, p.fleetOrders(), p.threatIntel(),
+                p.ownedConstructionProjectIds(), p.ownedStations());
+    }
+
+    private void executePilotAction(String action, String stationId, String commodity, int kg) {
+        if (playerState == null || playerState.activeFleetId() == null) throw new IllegalStateException("No active personal ship");
+        var runtime = coordinator.runtime();
+        var world = runtime.world();
+        var fleet = world.findFleet(playerState.activeFleetId()).orElseThrow();
+        if (fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || world.findFleetJump(fleet.fleetId()).isPresent()) throw new IllegalStateException("Ship in transit");
+        if ("UNDOCK".equals(action)) {
+            if (!playerState.docked()) throw new IllegalStateException("Ship not docked");
+            replacePilotFinancialDocking(playerState.walletMilliCredits(), null, playerState.discoveredObjects()); return;
+        }
+        var endpoint = runtime.infrastructure().endpoint(stationId);
+        var ref = pilotMarketReference(stationId).orElseThrow(() -> new IllegalStateException("No commissioned market"));
+        var physical = runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElseThrow();
+        if (!fleet.systemId().equals(endpoint.systemId()) || physical.position().distanceTo(endpoint.position()) > 1000d
+                || Math.hypot(physical.velocityXMps(), physical.velocityYMps()) > 1d)
+            throw new IllegalStateException("Dock requires a local ship within 1 km and at most 1 m/s");
+        if ("DOCK".equals(action)) {
+            if (playerState.docked()) throw new IllegalStateException("Already docked");
+            var discovered = new java.util.ArrayList<>(playerState.discoveredObjects());
+            if (!discovered.contains(ref)) discovered.add(ref);
+            replacePilotFinancialDocking(playerState.walletMilliCredits(), ref, discovered); return;
+        }
+        boolean buying = "BUY".equals(action);
+        if (!buying && !"SELL".equals(action) || !ref.equals(playerState.dockedAt()) || kg <= 0)
+            throw new IllegalStateException("Trade requires this dock and a positive amount");
+        var station = world.findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId());
+        var proxy = new com.badlogic.ashley.core.Entity().add(new WalletComponent(playerState.walletMilliCredits()))
+                .add(new com.spacesim.components.IdentityComponent("PLAYER", com.spacesim.components.IdentityComponent.Kind.FLEET));
+        if (playerState.factionContentId() != null) proxy.add(new com.spacesim.components.FactionComponent(
+                world.findFactionRuntimeId(playerState.factionContentId()).orElseThrow()));
+        var session = world.findSession(ref.systemId()).orElseThrow();
+        long tick = world.getAuthoritativeWorldTick();
+        String handlingReason = "player-market-handling:" + fleet.fleetId().value() + ":" + tick + ":";
+        if (tick == 0 || session.getLedger().getEntries().stream().anyMatch(e -> e.reason().startsWith(handlingReason)))
+            throw new IllegalStateException("This tick's physical handling budget is unavailable");
+        long unitPrice = pilotCommodityPrice(commodity, buying);
+        var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+        var definition = ontology.findCommodity(commodity);
+        var hold = runtime.freight().cargoHoldSnapshot(fleet.fleetId());
+        if (definition == null || !hold.capacityByStorageClassKg().containsKey(definition.storageClassId())
+                || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId()))
+            throw new IllegalStateException("Cargo interface incompatible");
+        var handling = endpoint.handlingCapability();
+        if (!world.createTradeController(session).settlePhysicalCargo(station, proxy,
+                buying ? com.spacesim.controllers.TradeTransactionPolicy.Direction.BUY_FROM_STATION
+                        : com.spacesim.controllers.TradeTransactionPolicy.Direction.SELL_TO_STATION,
+                Math.multiplyExact(unitPrice, kg), handlingReason + commodity + ":kg=" + kg,
+                () -> runtime.freight().exchangeManualCommodity(fleet.fleetId(), endpoint.storage(), commodity, kg,
+                        buying, tick * coordinator.session().fixedStepSeconds(), handling,
+                        handling.openInterval(coordinator.session().fixedStepSeconds()))))
+            throw new IllegalStateException("Cargo, wallet, access or handling budget rejected trade");
+        runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+        replacePilotFinancialDocking(proxy.getComponent(WalletComponent.class).getBalanceMilliCredits(), ref, playerState.discoveredObjects());
+    }
+
+    /**
+     * Disclosed opening market profile v1, in milli-credits per SI kilogram.
+     * @param commodityId exact ordinary physical commodity
+     * @param buying whether the pilot buys from the market
+     * @return station quote; the bounded opening spread is part of the explicit new-game profile
+     */
+    public static long pilotCommodityPrice(String commodityId, boolean buying) {
+        long base = switch (commodityId) {
+            case "commodity.material.purified_water" -> 5000L;
+            case "commodity.material.structural_alloy" -> 50000L;
+            case "commodity.ore.metallic" -> 10000L;
+            default -> throw new IllegalArgumentException("Commodity has no admitted opening market quote");
+        };
+        return buying ? base : base * 9 / 10;
+    }
+
+    /**
+     * Sets transient direct thrust, never coordinates or simulation time.
+     * @param axisX normalized horizontal thrust
+     * @param axisY normalized vertical thrust
+     * @param brake explicit finite counter-thrust
+     * @return whether a local undocked personally owned ship can accept input
+     */
+    public boolean setPilotThrust(float axisX, float axisY, boolean brake) {
+        if (!Float.isFinite(axisX) || !Float.isFinite(axisY)) throw new IllegalArgumentException("Non-finite thrust axes");
+        if (playerState == null || playerState.activeFleetId() == null || playerState.docked()
+                || coordinator.runtime().world().findFleetJump(playerState.activeFleetId()).isPresent()) {
+            thrustAxisX = 0; thrustAxisY = 0; braking = false; return false;
+        }
+        float magnitude = (float) Math.hypot(axisX, axisY);
+        thrustAxisX = magnitude > 1 ? axisX / magnitude : axisX;
+        thrustAxisY = magnitude > 1 ? axisY / magnitude : axisY;
+        braking = brake; return true;
+    }
+
+    private void advancePilotAtTick(long tick) {
+        if (playerState == null || playerState.activeFleetId() == null || playerState.docked()) return;
+        var runtime = coordinator.runtime();
+        var placement = runtime.world().findFleet(playerState.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || runtime.world().findFleetJump(playerState.activeFleetId()).isPresent()) return;
+        var entity = runtime.world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        // Legacy checkpoint fixtures may have a non-fitted ship. They get no physical-control grant.
+        if (entity.getComponent(com.spacesim.components.EngineeringComponent.class) == null) return;
+        var materialization = runtime.arrival().materialization(placement.systemId());
+        var physical = materialization.physicalState(placement.localEntityId()).orElseThrow();
+        materialization.updatePhysicalState(placement.localEntityId(), playerFlight.advanceExact(entity, physical,
+                thrustAxisX, thrustAxisY, braking, coordinator.session().fixedStepSeconds()));
     }
 
     /** @return accepted Stage-20/21 campaign composition root */
@@ -293,7 +592,10 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException(
                     "Active flight-deck work requires per-tick physical bay projection");
         }
-        return coordinator.advanceFrame(realDeltaSeconds, this::reconcilePlayerMissionsAtTick);
+        return coordinator.advanceFrame(realDeltaSeconds, tick -> {
+            advancePilotAtTick(tick);
+            reconcilePlayerMissionsAtTick(tick);
+        });
     }
 
     /**
@@ -317,6 +619,7 @@ public final class Stage228CampaignAuthority {
             Map<BayId, BayDefinition> bays =
                     Objects.requireNonNull(provider.apply(tick), "bay projection");
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
+            advancePilotAtTick(tick);
             reconcilePlayerMissionsAtTick(tick);
         });
     }

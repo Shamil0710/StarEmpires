@@ -69,3 +69,20 @@ Player reference hygiene at completed ticks reuses the existing `PlayerRuntime` 
 API shared with the original playable runtime. Destruction/project completion/invalid docking may
 therefore reconcile existing references without adding assets, rewriting migration input or
 advancing a second clock. The physical-loss save regression is part of the NPC integration suite.
+
+
+## Subsequent explicit pilot and physical cargo composition
+
+The explicit new-game purchase, original physical hold and ordinary market wallets are now composed
+into the same PlayerState/v5 envelope. Character creation completes before Save is available in the
+fresh client, and neither restore nor capture enables the transient initial offer. The ordinary
+world projection remains exact across save/load; the client explicitly requests the creation-only
+invitation. No second wallet, cargo store or simulation clock is persisted.
+
+The owning freight schema advances from 1 to 2 for manual acquired-cargo provenance; old schema 1
+adopts without resources, unsupported schemas and false schema-1 manual lots reject before live
+replacement. A composed personal owner is required for manual cargo. The new-game release alias
+advances to `se-gen-2`, retaining underlying saved generation identities. Numeric profile/fingerprint,
+funding sources, fixed corpus including four upstream rejections, evidence and remaining limits are
+recorded in `docs/release/stage23b_pilot_start_profile_v1.md` and the UI evidence document. This is a
+partial integration gate and does not authorize a 23B-completion merge.

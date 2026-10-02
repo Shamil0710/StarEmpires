@@ -297,3 +297,55 @@ After correcting the local Javadoc launcher, strict Java-17 Javadoc, desktop pac
 configured coverage checks passed. That continuation used accumulated execution data and reported
 an old/new nested PlayerRuntime-class mismatch, so it is not promoted to clean exact-head coverage
 evidence. The mandatory remote `clean verify` must rebuild and rerun the complete final source.
+
+
+### Explicit independent-pilot start and physical local commands
+
+The ordinary fresh client now opens paused on disclosed start conditions. Preview validates a sale
+on an isolated checkpoint; confirmation spends 25,000 of the pilot's 100,000-credit initial savings
+to acquire one existing empty IDLE reserve through PlayerOwnershipService and the real seller
+treasury. It opens the ship's home system and personal inspector; the knowledge viewer still grants
+no ownership or faction management. Restore/migration never initializes or repeats this start.
+
+WASD sends transient thrust only while viewing the personal ship's system. Exact hierarchical
+position/velocity advances on completed existing campaign ticks through fitted engineering; idle
+input coasts and X requests finite braking. No legacy float integrator or second clock is installed.
+The personal inspector derives actual cargo, mass, reaction mass, thrust, acceleration, delta-v,
+power, energy and heat from the existing ship component. It writes no derived state.
+
+Home-system endpoints receive finite ordinary wallet markers only on confirmed new game. Their
+commodity stock remains the existing Stage-18 storage. Station names use authored roles consistently
+on the local map and market inspector. Docking validates exact range/speed without moving the ship.
+BUY/SELL previews disclose quantity and exact wallet delta including applicable existing customs.
+Confirmation uses TradeController and finite logistics handling; ordinary persisted ledger evidence
+prevents spending one ship's handling interval twice in the same completed tick, including after load.
+The marker has no legacy item inventory, so autonomous item economies cannot create these commodities.
+
+Numeric policy/fingerprint, explicit money sources, freight schema 1→2 adoption, release profile
+`se-gen-1`→`se-gen-2` and the unchanged saved Stage-20 generator boundary are recorded in
+`docs/release/stage23b_pilot_start_profile_v1.md`. Campaign v5 is retained. The fixed seed 1–16
+rerun has twelve opening/round-trip passes and four unchanged generation rejections (4/6/8/10),
+with no substitutions. It is not an all-seed PASS.
+
+The initial corrected targeted JUnit gate passed 20 tests, zero failures/errors: four start, four
+physical-command, five freight materialization, three legacy player movement and four wallet trade
+regressions. The full local JUnit run then reported **2363 tests, one failure, zero errors and one
+skip**: the transient creation invitation changed the ordinary saved-world projection. The client
+now explicitly requests that invitation while ordinary projection remains exact after restore; the
+original save/load equality assertion is retained. The corrected final-source **39-test JUnit gate
+passed with zero failures/errors**, including physical settlement/customs/overflow, unsupported-schema
+and unchanged-input adoption, pure engineering projection, governance and original UI/player/freight
+regressions. Strict Java-17 Javadoc and desktop packaging passed against the final source with tests
+and coverage skipped for that packaging continuation. This is not clean final-source coverage; the
+mandatory clean exact-head gate and its full result are recorded on PR #413.
+
+The final packaged desktop JAR passed a software-EGL client journey: fresh keyboard start/
+purchase/focus/thrust, eleven keyboard/mouse surfaces, save/load, station focus, pure docking/trade
+preview, physical purchase and cargo persistence. The docking geometry is explicitly positioned by
+the smoke fixture; creation, ownership, payment and UI commands are real. This is engineering
+evidence, not human navigation, all player loops or B18 PASS.
+
+**23B remains ACTIVE/PARTIAL.** These opening quotes are a finite static profile, not a dynamic
+market or proof of a profitable trader career. Inter-system player travel, mining, fitting, physical
+construction/supply, fleet/faction/carrier commands, production NPC offers and the final B18 gate
+remain mandatory. #412/#370 stay open and 23C has not started.
