@@ -2,6 +2,7 @@
 
 **Status:** CANONICAL TECHNICAL PRODUCTION SPECIFICATION  
 **Parent contract:** docs/stage23e_final_presentation_plan.md  
+**Generation/authoring catalog:** docs/stage23e_generation_prompt_catalog.md  
 **Stage:** 23E — final art, VFX, animation and audio replacement  
 **Scope:** exact authoring/package rules for release-facing art, animation, VFX and audio.  
 **Important:** this document specifies presentation assets only. It does not create simulation authority.
