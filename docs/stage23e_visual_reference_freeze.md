@@ -1447,3 +1447,40 @@ art-production process only.
 - output hard-rejected before candidate numbering/scoring;
 - manifest remains `PLANNED`, `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_generation_attempt_001.md`.
+
+
+### Run 006 — Resource-body promoted-reference freeze gate
+
+- references: four Stage-20.5 resource-body atlas regions;
+- source atlas geometry is unchanged;
+- added `Stage23EResourceReferenceFreezeTest` for transparent-corner, grayscale, 25%/12.5%,
+  silhouette-occupancy and near-duplicate QA;
+- prior manual knowledge-scope audit remains the authority for the no-reserve/no-grade/no-yield rule;
+- all four manifest rows move from `SELECTED` to `FROZEN` in the same acceptance batch;
+- exact-head CI remains mandatory;
+- review: `docs/art/reference_freeze/reviews/stage23e_resource_reference_freeze_qa.md`.
+
+### Run 007 — Escort-hull derelict dead-state recheck
+
+- reference: `ref.world.special.escort_hull_derelict.v1`;
+- source geometry remains suitable for promotion;
+- main engines read non-thrusting and no fresh explosion/fire/smoke is baked into the base;
+- small cyan/amber service/navigation-like lights remain and can still read as powered emission;
+- reference therefore stays `SELECTED`, `geometry_frozen=false`;
+- next action is deterministic dead-emissive cleanup without geometry redesign;
+- review: `docs/art/reference_freeze/reviews/ref.world.special.escort_hull_derelict.v1_dead_state_recheck.md`.
+
+### Run 008 — Industrial Union carrier small-craft base selection
+
+- reference: `ref.industrial_union.small_craft.base.v1`;
+- after the earlier target-drift rejection, generation was reseeded with accepted Union production
+  corvette/carrier construction language;
+- five separate one-object top-down transparent candidates were generated successfully;
+- candidate 03 hard-rejected for wing-like/fragile lateral booms;
+- candidate 05 scored **94/100** and is `SELECTED`;
+- authoritative physical envelope: 29 x 14 x 6.5 m, 200 t;
+- normalized candidate-05 draft: 512x256, visible bounds 428x220, physical-aspect error 6.1%;
+- local grayscale, 25%, 12.5% and silhouette QA passed;
+- geometry remains **not frozen** until the canonical normalized master is persisted in the repository;
+- no interceptor/defence/strike overlay generation may begin before that freeze;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_batch_001.md`.
