@@ -68,7 +68,9 @@ public final class ProductionUiProjector {
                             "Владение", "Один существующий резервный грузовик без назначенного рейса",
                             "Статус", "Независимый пилот; казна и другие активы продавца недоступны",
                             "Источник средств", "Ограниченные личные сбережения при подтверждении новой игры",
-                            "Рынки старта", "Существующие склады; каждой станции домашней системы выдаётся 10 000 кредитов конечного оборотного капитала")),
+                            "Рынки новой игры", "Существующие склады; каждому физическому рынку выдаётся 10 000 кредитов конечного оборотного капитала",
+                            "Число рынков", Integer.toString(campaign.coordinator().runtime().infrastructure().endpoints().size()),
+                            "Оборотный капитал рынков", credits(Math.multiplyExact(Stage228CampaignAuthority.PILOT_MARKET_INITIAL_LIQUIDITY, campaign.coordinator().runtime().infrastructure().endpoints().size())))),
                     "Подтверждённая новая игра: раскрытые личные сбережения, существующий резерв и оплата в казну продавца",
                     null, 0, world.worldTick()));
         }
@@ -106,6 +108,8 @@ public final class ProductionUiProjector {
                 String name = GeneratedWorldUiModel.endpointDisplayName(endpoint);
                 var ref = campaign.pilotMarketReference(endpoint.stationId()).orElseThrow();
                 boolean docked = ref.equals(player.dockedAt());
+                long marketMoney = runtime.world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
+                        .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
                 logistics.add(row("pilot-station|" + endpoint.stationId(), name, "Личные рынки", docked ? "Корабль пристыкован" : "Требуется стыковка",
                         List.of(InfoSection.of("Доступ к рынку", "Расстояние", String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(endpoint.position())),
                                 "Скорость корабля", String.format(Locale.ROOT, "%.2f м/с", Math.hypot(physical.velocityXMps(), physical.velocityYMps())),
@@ -126,12 +130,14 @@ public final class ProductionUiProjector {
                     }, "Товары личного рынка", name,
                             List.of(InfoSection.of("Физическая сделка", "Запас станции", endpoint.storage().commodityMassKg(commodity) + " кг",
                                     "В трюме", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d) + " кг",
-                                    "Покупка за 1 кг", credits(Stage228CampaignAuthority.pilotCommodityPrice(commodity, true)),
-                                    "Продажа за 1 кг", credits(Stage228CampaignAuthority.pilotCommodityPrice(commodity, false)),
+                                    "Свободно на складе", endpoint.storage().remainingCapacityKg(definition.storageClassId()) + " кг",
+                                    "Кошелёк рынка", credits(marketMoney),
+                                    "Покупка за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true)),
+                                    "Продажа за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false)),
                                     "Кошелёк", credits(player.walletMilliCredits()), "Стыковка", docked ? "Да" : "Нет",
                                     "Обработка за такт", String.format(Locale.ROOT, "%.2f кг", endpoint.handlingCapability().massRateKgPerSecond() * campaign.coordinator().session().fixedStepSeconds()),
                                     "Лимит времени", "Одна физическая сделка корабля за завершённый такт; после сделки нужно продолжить время")),
-                            "Раскрытые начальные цены за килограмм; фактический склад станции, груз корабля, доступ и таможенные платежи",
+                            "Фактические запасы и ёмкость склада; раскрытые рыночные условия за килограмм, доступ и таможенные платежи",
                             null, 0, world.worldTick()));
                 }
             }

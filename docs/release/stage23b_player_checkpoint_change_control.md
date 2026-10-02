@@ -102,3 +102,16 @@ identity and existing player affiliation persist through the existing WorldState
 Own-treasury capitalization/return use existing conserved financial services and ledger evidence.
 No new monetary, political, cargo, save or clock authority is introduced. These are additional
 implemented command slices; remaining physical/strategic loops and human B18 acceptance stay open.
+
+
+## Subsequent global market profile without owning schema changes
+
+New-game markets are explicitly versioned by their existing persisted ordinary IdentityComponent.
+Only confirmed fresh v2 opening funds all physical endpoints; ancestor unversioned markers preserve
+their exact static policy/home-only liquidity and never gain resources during restore. The retained
+genuine ancestor checkpoint proves this adoption boundary. SI scarcity quotes read existing physical
+stock/capacity and reuse MarketSystem's dimensionless rule, preserving legacy item units. Release
+alias `se-gen-3` records the changed opening profile; saved underlying generation IDs stay unchanged.
+The default explicitly founded player faction is now a governed PLAYER_CREATED identity, preserving
+existing WorldState identity allocation/save/collision rules without creating it at generation/load.
+Full evidence and incomplete stage scope remain in the production UI document and profile v2.

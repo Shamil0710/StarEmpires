@@ -636,7 +636,7 @@ public final class GeneratedWorldCommandUiRenderer {
         float width = (inspectorRect.width() - 40f * scale) / 3f;
         boolean foundation = physicalPilotAssetAction.equals("FOUNDATION");
         boolean finance = physicalPilotAssetAction.equals("FINANCE");
-        String[] ids = foundation ? new String[]{"faction.preview"} : finance ? new String[]{"faction.capitalize", "faction.withdraw"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "pilot.purchase" : "pilot.switch", "focus"} : physicalPilotJump ? new String[]{"pilot.jump"} : physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
+        String[] ids = foundation ? new String[]{"pilot.faction-preview"} : finance ? new String[]{"pilot.faction-capitalize", "pilot.faction-withdraw"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "pilot.purchase" : "pilot.switch", "focus"} : physicalPilotJump ? new String[]{"pilot.jump"} : physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
                 : new String[]{"pilot.dock", "pilot.undock", "focus"};
         String[] labels = foundation ? new String[]{"ОСНОВАТЬ"} : finance ? new String[]{"ВНЕСТИ 1 000", "ВЕРНУТЬ 1 000"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "КУПИТЬ" : "УПРАВЛЕНИЕ", "НА КАРТЕ"} : physicalPilotJump ? new String[]{"ВЫЛЕТ"} : physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
                 : new String[]{"СТЫКОВКА", "ОТСТЫКОВКА", "НА КАРТЕ"};
@@ -653,7 +653,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
         button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
-        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, foundation ? "faction.confirm" : "pilot.physical-confirm", null, confirm));
+        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, foundation ? "pilot.faction-confirm" : "pilot.physical-confirm", null, confirm));
     }
 
     /**

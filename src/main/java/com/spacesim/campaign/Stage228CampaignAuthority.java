@@ -289,11 +289,13 @@ public final class Stage228CampaignAuthority {
                 .purchaseFactionFleet(fleetId, seller, PILOT_SHIP_PRICE_MILLI_CREDITS))
             throw new IllegalStateException("Reserve purchase cannot settle");
         playerState = adapter.player();
-        initializePilotMarkets(placement.systemId());
+        initializePilotMarkets();
     }
 
     /** Stable binding of an ordinary station wallet to its existing physical storage endpoint. */
     public static final String PILOT_MARKET_IDENTITY_PREFIX = "Generated market ";
+    /** Persisted ordinary identity tag for stock-responsive new-game market policy v2. */
+    public static final String PILOT_MARKET_V2_IDENTITY_PREFIX = PILOT_MARKET_IDENTITY_PREFIX + "v2 ";
     /** Finite disclosed per-station opening liquidity, created only by new-game confirmation. */
     public static final long PILOT_MARKET_INITIAL_LIQUIDITY = 10_000_000L;
 
@@ -346,15 +348,15 @@ public final class Stage228CampaignAuthority {
         return adopted;
     }
 
-    private void initializePilotMarkets(com.spacesim.world.StarSystemId system) {
+    private void initializePilotMarkets() {
         var runtime = coordinator.runtime();
-        var session = runtime.world().findSession(system).orElseThrow();
         for (var endpoint : runtime.infrastructure().endpoints()) {
-            if (!endpoint.systemId().equals(system)) continue;
+            var system = endpoint.systemId();
+            var session = runtime.world().findSession(system).orElseThrow();
             var transform = new com.spacesim.components.TransformComponent();
             transform.position.set((float) endpoint.position().offsetXM(), (float) endpoint.position().offsetYM());
             var entity = new com.badlogic.ashley.core.Entity()
-                    .add(new com.spacesim.components.IdentityComponent(PILOT_MARKET_IDENTITY_PREFIX + endpoint.stationId(),
+                    .add(new com.spacesim.components.IdentityComponent(PILOT_MARKET_V2_IDENTITY_PREFIX + endpoint.stationId(),
                             com.spacesim.components.IdentityComponent.Kind.STATION))
                     .add(transform).add(new com.spacesim.components.MarketComponent())
                     .add(new WalletComponent());
@@ -363,8 +365,8 @@ public final class Stage228CampaignAuthority {
             runtime.world().createEntity(system, entity);
             if (!entity.getComponent(WalletComponent.class).creditFromSource(PILOT_MARKET_INITIAL_LIQUIDITY))
                 throw new IllegalStateException("Opening market liquidity cannot be credited");
-            session.getLedger().recordMoneySource(PILOT_MARKET_IDENTITY_PREFIX + endpoint.stationId(),
-                    PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v1");
+            session.getLedger().recordMoneySource(PILOT_MARKET_V2_IDENTITY_PREFIX + endpoint.stationId(),
+                    PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v2");
         }
     }
 
@@ -378,7 +380,8 @@ public final class Stage228CampaignAuthority {
         var session = coordinator.runtime().world().findSession(endpoint.systemId()).orElseThrow();
         for (var entity : session.getEngine().getEntities()) {
             var name = entity.getComponent(com.spacesim.components.IdentityComponent.class);
-            if (name != null && name.name.equals(PILOT_MARKET_IDENTITY_PREFIX + stationId)) {
+            if (name != null && (name.name.equals(PILOT_MARKET_IDENTITY_PREFIX + stationId)
+                    || name.name.equals(PILOT_MARKET_V2_IDENTITY_PREFIX + stationId))) {
                 var id = entity.getComponent(com.spacesim.components.EntityIdComponent.class);
                 if (id != null) return Optional.of(new com.spacesim.player.DiscoveredObjectRef(endpoint.systemId(), id.id));
             }
@@ -538,7 +541,7 @@ public final class Stage228CampaignAuthority {
         String handlingReason = "player-market-handling:" + fleet.fleetId().value() + ":" + tick + ":";
         if (tick == 0 || session.getLedger().getEntries().stream().anyMatch(e -> e.reason().startsWith(handlingReason)))
             throw new IllegalStateException("This tick's physical handling budget is unavailable");
-        long unitPrice = pilotCommodityPrice(commodity, buying);
+        long unitPrice = pilotCommodityPrice(stationId, commodity, buying);
         var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
         var definition = ontology.findCommodity(commodity);
         var hold = runtime.freight().cargoHoldSnapshot(fleet.fleetId());
@@ -556,6 +559,37 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException("Cargo, wallet, access or handling budget rejected trade");
         runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
         replacePilotFinancialDocking(proxy.getComponent(WalletComponent.class).getBalanceMilliCredits(), ref, playerState.discoveredObjects());
+    }
+
+    /**
+     * Quotes an existing commissioned market without changing storage, money or prices in a save.
+     * Legacy unversioned markers retain their static opening quotes. Versioned v2 markers reuse
+     * the shared stock-scarcity rule against real kilograms and an authored role/capacity target.
+     * @param stationId existing physical endpoint and ordinary market identity
+     * @param commodityId admitted physical commodity
+     * @param buying whether the pilot buys from the station
+     * @return finite milli-credit quote for one kilogram
+     */
+    public long pilotCommodityPrice(String stationId, String commodityId, boolean buying) {
+        long base = pilotCommodityPrice(commodityId, true);
+        var ref = pilotMarketReference(stationId).orElseThrow(() -> new IllegalStateException("No commissioned market"));
+        var identity = coordinator.runtime().world().findSession(ref.systemId()).orElseThrow()
+                .getEntityRegistry().require(ref.entityId()).getComponent(com.spacesim.components.IdentityComponent.class);
+        if (!identity.name.startsWith(PILOT_MARKET_V2_IDENTITY_PREFIX)) return pilotCommodityPrice(commodityId, buying);
+        var endpoint = coordinator.runtime().infrastructure().endpoint(stationId);
+        var commodity = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault().findCommodity(commodityId);
+        var capacity = endpoint.storage().snapshot().capacityByStorageClassKg().get(commodity.storageClassId());
+        if (capacity == null || capacity <= 0) throw new IllegalArgumentException("Commodity storage class unavailable");
+        double fraction = switch (endpoint.stationArchetypeId()) {
+            case "station.infrastructure.refinery_complex" -> 0.75d;
+            case "station.infrastructure.frontier_multipurpose" -> 0.5d;
+            default -> 0.25d;
+        };
+        double ratio = fraction * capacity / Math.max(1d, endpoint.storage().commodityMassKg(commodityId));
+        double scarcity = com.spacesim.systems.MarketSystem.scarcityMultiplier(ratio);
+        double bounded = Math.max(0.5d, Math.min(2d, scarcity));
+        long sell = Math.max(1L, Math.round(base * bounded));
+        return buying ? sell : Math.max(1L, sell * 9L / 10L);
     }
 
     /**

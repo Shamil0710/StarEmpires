@@ -39,7 +39,7 @@ class GeneratedCampaignPilotPhysicalTest {
     }
 
     @Test void dockRequiresExactRangeAndLowSpeedThenPhysicalTradeConservesCargoAndMoney() {
-        var c = started(); var endpoint = market(c);
+        var c = legacyStarted(); var endpoint = market(c);
         position(c, new LocalPhysicalKinematics(endpoint.position().translated(2000, 0), 0, 0));
         assertFalse(c.previewPilotAction("DOCK", endpoint.stationId(), "", 0).allowed());
         position(c, new LocalPhysicalKinematics(endpoint.position().translated(500, 0), 5, 0));
@@ -110,6 +110,14 @@ class GeneratedCampaignPilotPhysicalTest {
         var cargo = c.coordinator().runtime().freight().capture(); old = Stage20FreightPersistenceCodec.encode(cargo);
         java.nio.ByteBuffer.wrap(old).putInt(8, 1); final byte[] invalidOld = old;
         assertThrows(IllegalArgumentException.class, () -> Stage20FreightPersistenceCodec.decode(invalidOld));
+    }
+
+    // Genuine accepted v1 checkpoint retains all original numeric settlement assertions.
+    private static Stage228CampaignAuthority legacyStarted() {
+        try (var input = new java.util.zip.GZIPInputStream(GeneratedCampaignPilotPhysicalTest.class
+                .getResourceAsStream("/campaign/stage23b-pilot-opening-v1.s25.gz"))) {
+            return Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(input.readAllBytes()));
+        } catch (java.io.IOException exception) { throw new java.io.UncheckedIOException(exception); }
     }
 
     private static Stage228CampaignAuthority started() { var c = Stage228CampaignAuthority.create(1); c.submitIndependentPilotStart(c.previewIndependentPilotStart()); return c; }

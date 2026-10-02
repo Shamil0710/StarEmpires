@@ -264,14 +264,14 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 pilotKilograms = Math.max(1, Math.min(10000, pilotKilograms + (id.equals("pilot.less") ? -1 : 1)));
                 pendingPilotPhysical = null; yield true;
             }
-            case "faction.preview" -> {
+            case "pilot.faction-preview" -> {
                 if (workspace.tab() != Tab.SETTINGS || !workspace.view().selection().stableId().equals("pilot-faction-foundation")) yield false;
                 campaign.coordinator().setPaused(true);
                 pendingFactionFoundation = campaign.previewPlayerFactionFoundation("faction.player", "Содружество пилота");
                 status = pendingFactionFoundation.allowed() ? "Основание проверено: нулевая казна, без территории и новых активов. Подтвердите." : "Основание недоступно.";
                 refreshProjection(); yield true;
             }
-            case "faction.confirm" -> {
+            case "pilot.faction-confirm" -> {
                 var preview = pendingFactionFoundation; pendingFactionFoundation = null;
                 if (preview == null || !workspace.view().selection().stableId().equals("pilot-faction-foundation")) yield false;
                 try {
@@ -282,8 +282,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 } catch (IllegalStateException exception) { status = "Условия изменились. Проверьте основание заново."; }
                 refreshProjection(); yield true;
             }
-            case "faction.capitalize" -> previewPilotPhysical("CAPITALIZE");
-            case "faction.withdraw" -> previewPilotPhysical("WITHDRAW");
+            case "pilot.faction-capitalize" -> previewPilotPhysical("CAPITALIZE");
+            case "pilot.faction-withdraw" -> previewPilotPhysical("WITHDRAW");
             case "pilot.purchase" -> previewPilotPhysical("PURCHASE");
             case "pilot.switch" -> previewPilotPhysical("SWITCH");
             case "pilot.jump" -> previewPilotPhysical("JUMP");

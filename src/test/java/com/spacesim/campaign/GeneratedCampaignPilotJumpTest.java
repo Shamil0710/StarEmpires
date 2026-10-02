@@ -63,6 +63,7 @@ class GeneratedCampaignPilotJumpTest {
         r.arrival().materialization(p.systemId()).updatePhysicalState(p.localEntityId(), LocalPhysicalKinematics.stationary(endpoint.position()));
         c.submitPilotAction(c.previewPilotAction("DOCK", endpoint.stationId(), "", 0));
         c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        long paidQuote = c.pilotCommodityPrice(endpoint.stationId(), water, true);
         c.submitPilotAction(c.previewPilotAction("BUY", endpoint.stationId(), water, 1));
         c.submitPilotAction(c.previewPilotAction("UNDOCK", "", "", 0));
         var destination = r.world().getTopology().neighbors(p.systemId()).get(0);
@@ -89,7 +90,7 @@ class GeneratedCampaignPilotJumpTest {
         assertEquals(1d, freight.cargoStorage().commodityMassByIdKg().get(water));
         assertEquals(1, c.coordinator().runtime().freight().capture().cargoLots().stream().filter(l -> l.fleetId().equals(p.id())).count());
         var loaded = roundtrip(c); assertFalse(loaded.canStartIndependentPilot());
-        assertEquals(74_995_000L, loaded.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(75_000_000L - paidQuote, loaded.playerState().orElseThrow().walletMilliCredits());
     }
     private static Stage228CampaignAuthority started() { var c = Stage228CampaignAuthority.create(1); c.submitIndependentPilotStart(c.previewIndependentPilotStart()); return c; }
     private static com.spacesim.world.FleetPlacementState placement(Stage228CampaignAuthority c) { return c.coordinator().runtime().world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow(); }

@@ -403,3 +403,45 @@ The preceding owning pilot/freight-schema batch received full exact-head CI #774
 Clean coverage checks, strict Java-17 Javadoc, desktop packaging and B18 tooling passed; Maven
 duration 20:06. Run: https://github.com/Shamil0710/StarEmpires/actions/runs/36974078526. This is
 evidence for that preceding commit, not for subsequent travel/faction commands or human B18 PASS.
+
+
+### Global physical markets and conserved profitable trade
+
+The explicit new-game profile advances to `se-pilot-start-2` / release alias `se-gen-3`.
+Every existing physical endpoint receives its disclosed finite 10,000-credit ordinary wallet at
+confirmed creation. Its real Stage-18 storage remains the only goods authority; no item inventory
+is installed. Persisted v2 market identities select the shared dimensionless scarcity rule over
+actual stock and compatible capacity. Role targets, spread, bounds and canonical policy hash are
+in `docs/release/stage23b_pilot_start_profile_v2.md`. Read-only prices do not create a price owner.
+
+The actual ancestor v1 checkpoint is retained compressed with byte hashes and exact commit/tree
+provenance. Current restore preserves its two home markets, original liquidity and 5/4.5-credit
+water quotes without recommissioning or a grant. No owning schema or saved generation ID changes.
+The fixed seeds 1–16 have **12 opening/market/roundtrip passes, zero opening failures and four
+unchanged upstream generation rejections** (4/6/8/10); overall corpus acceptance remains false.
+All outcomes and finite funding totals are in `docs/benchmarks/stage23b-physical-market-corpus-v2.json`.
+
+The previous direct-travel/foundation exact-head CI #7745 on `8444116` completed with **2372 tests,
+one failure, zero errors and one skip**. Its repository identity audit correctly found the default
+player-founded faction ID ungoverned, and mistook `faction.*` action labels for state IDs. Action
+labels now use `pilot.faction-*`; the default `faction.player` is explicitly governed as
+PLAYER_CREATED with preserve/collision/evidence rules. This metadata does not allocate a world
+faction, rewrite saved IDs, mutate ContentCatalog or promote it to a core package. The prior ten
+identities remain unchanged. The audit and foundation/governance regression group passed 13 tests.
+
+A clean local build passed **16 tests** for start, physical cargo, direct travel, new markets and
+legacy MarketSystem. Original production projection/command error tests passed **2 tests**, followed
+by strict Java-17 Javadoc and desktop packaging; coverage was skipped locally. The packaged-JAR
+llvmpipe smoke passed all eleven keyboard/mouse/scroll surfaces, fresh purchase/control, actual
+physical purchase, reserve purchase/handover, zero-grant foundation, conserved treasury transfers,
+ordinary jump, physical sale and save/load. Water bought at 2.50 credits/kg was sold at 7.32
+credits/kg: **4.82 credits profit**, paid by the receiving station. The original cargo-bearing hull
+travels; the second purchased hull remains at home. Dock/departure geometry is explicitly a QA
+fixture; ownership, stock, money, hold, hop and sale are real shared authority. Destination market
+and sale confirmation screens were visually inspected, with readable prices/capacity/wallet and
+keyboard-accessible actions. This is engineering graphical evidence, not human B18 acceptance.
+
+Full clean CI on the next exact commit remains required. **23B remains ACTIVE/PARTIAL**: mining,
+fitting, physical construction/supply, strategic/policy/territorial/affiliation/carrier commands,
+production NPC offers and final human B18 acceptance remain mandatory. No merge or 23C follows
+from this market slice.

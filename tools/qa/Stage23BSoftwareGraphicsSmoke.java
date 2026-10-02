@@ -132,10 +132,11 @@ public class Stage23BSoftwareGraphicsSmoke {
   pilotMoves=0;while(!workspace.view().selection().stableId().equals("pilot-market|"+endpoint.stationId()+"|"+water)){
    processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Water offer unreachable");}
   long money=pilotCampaign.playerState().orElseThrow().walletMilliCredits();
+  long initialQuote=pilotCampaign.pilotCommodityPrice(endpoint.stationId(),water,true);
   keyboardAction(renderer,game,"pilot.buy");
   if(pilotCampaign.playerState().orElseThrow().walletMilliCredits()!=money)throw new AssertionError("Trade preview mutated wallet");
   keyboardAction(renderer,game,"pilot.physical-confirm");
-  if(pilotCampaign.playerState().orElseThrow().walletMilliCredits()!=money-5000
+  if(pilotCampaign.playerState().orElseThrow().walletMilliCredits()!=money-initialQuote
           ||pilotRuntime.freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=1d)throw new AssertionError("UI physical purchase failed");
   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
   if(campaign(game).coordinator().runtime().freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=1d)throw new AssertionError("Purchased cargo was not saved");
@@ -156,35 +157,59 @@ public class Stage23BSoftwareGraphicsSmoke {
   keyboardAction(renderer,game,"pilot.switch");keyboardAction(renderer,game,"pilot.physical-confirm");
   if(!campaign(game).playerState().orElseThrow().activeFleetId().equals(second.fleetId()))throw new AssertionError("Personal handover failed");
   processor.keyDown(Input.Keys.F7);game.render();selectRow(workspace,game,"pilot-faction-foundation");
-  keyboardAction(renderer,game,"faction.preview");screenshot("stage23b-faction-foundation-preview");
+  keyboardAction(renderer,game,"pilot.faction-preview");screenshot("stage23b-faction-foundation-preview");
   if(campaign(game).playerState().orElseThrow().factionContentId()!=null)throw new AssertionError("Foundation preview changed faction");
-  keyboardAction(renderer,game,"faction.confirm");
+  keyboardAction(renderer,game,"pilot.faction-confirm");
   if(!"faction.player".equals(campaign(game).playerState().orElseThrow().factionContentId()))throw new AssertionError("Foundation UI confirmation failed");
   selectRow(workspace,game,"pilot-faction-finance");screenshot("stage23b-faction-finance");
   long personalBefore=campaign(game).playerState().orElseThrow().walletMilliCredits();
-  keyboardAction(renderer,game,"faction.capitalize");keyboardAction(renderer,game,"pilot.physical-confirm");
+  keyboardAction(renderer,game,"pilot.faction-capitalize");keyboardAction(renderer,game,"pilot.physical-confirm");
   if(campaign(game).coordinator().runtime().world().findFactionEconomicState("faction.player").orElseThrow().treasuryMilliCredits()!=1_000_000L)throw new AssertionError("Capitalization failed");
-  keyboardAction(renderer,game,"faction.withdraw");keyboardAction(renderer,game,"pilot.physical-confirm");
+  keyboardAction(renderer,game,"pilot.faction-withdraw");keyboardAction(renderer,game,"pilot.physical-confirm");
   if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=personalBefore)throw new AssertionError("Treasury return failed");
+  // Return control to the original cargo-bearing hull; the purchased reserve remains at home.
+  ships(renderer,game);selectRow(workspace,game,"personal-ship:"+pilotFleet.fleetId().value());
+  keyboardAction(renderer,game,"pilot.switch");keyboardAction(renderer,game,"pilot.physical-confirm");
   // Explicit departure geometry fixture, followed by ordinary campaign ticks and real UI preview/confirmation.
-  var travelCampaign=campaign(game);var travelRuntime=travelCampaign.coordinator().runtime();var traveler=travelRuntime.world().findFleet(second.fleetId()).orElseThrow();
+  var travelCampaign=campaign(game);var travelRuntime=travelCampaign.coordinator().runtime();var traveler=travelRuntime.world().findFleet(pilotFleet.fleetId()).orElseThrow();
   var destination=travelRuntime.world().getTopology().neighbors(traveler.systemId()).get(0);
   var departure=travelRuntime.arrival().resolve(destination,traveler.systemId());
   travelRuntime.arrival().materialization(traveler.systemId()).updatePhysicalState(traveler.localEntityId(),com.spacesim.world.LocalPhysicalKinematics.stationary(departure.physicalState().position()));
   ships(renderer,game);selectRow(workspace,game,"pilot-jump|"+destination.value());
   keyboardAction(renderer,game,"pilot.jump");screenshot("stage23b-jump-preview");
-  if(travelRuntime.world().findFleetJump(second.fleetId()).isPresent())throw new AssertionError("Jump preview started travel");
+  if(travelRuntime.world().findFleetJump(pilotFleet.fleetId()).isPresent())throw new AssertionError("Jump preview started travel");
   keyboardAction(renderer,game,"pilot.physical-confirm");
-  if(travelRuntime.world().findFleetJump(second.fleetId()).isEmpty())throw new AssertionError("Jump UI confirmation failed");
+  if(travelRuntime.world().findFleetJump(pilotFleet.fleetId()).isEmpty())throw new AssertionError("Jump UI confirmation failed");
   processor.keyDown(Input.Keys.SPACE);game.render();
-  for(int i=0;i<2000&&travelRuntime.world().findFleetJump(second.fleetId()).isPresent();i++)travelCampaign.advanceFrame(0.25f);
+  for(int i=0;i<2000&&travelRuntime.world().findFleetJump(pilotFleet.fleetId()).isPresent();i++)travelCampaign.advanceFrame(0.25f);
   game.render();
-  if(travelRuntime.world().findFleetJump(second.fleetId()).isPresent()||!travelRuntime.world().findFleet(second.fleetId()).orElseThrow().systemId().equals(destination)
+  if(travelRuntime.world().findFleetJump(pilotFleet.fleetId()).isPresent()||!travelRuntime.world().findFleet(pilotFleet.fleetId()).orElseThrow().systemId().equals(destination)
           ||!travelCampaign.playerState().orElseThrow().discoveredSystemIds().contains(destination))throw new AssertionError("Real departure failed to arrive");
   processor.keyDown(Input.Keys.SPACE);game.render();processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
   if(campaign(game).playerState().orElseThrow().ownedFleetIds().size()!=2
           ||campaign(game).coordinator().runtime().freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=1d)throw new AssertionError("Travel/faction/assets lost on reload");
-  System.out.println("Additional reserve purchase, handover, faction foundation, treasury transfers, direct jump and reload passed; geometry fixtures labelled");
+  var sellCampaign=campaign(game);var sellRuntime=sellCampaign.coordinator().runtime();
+  var sellFleet=sellRuntime.world().findFleet(pilotFleet.fleetId()).orElseThrow();
+  var buyer=sellRuntime.infrastructure().endpoints().stream().filter(e->e.systemId().equals(destination)
+          &&e.stationArchetypeId().equals("station.infrastructure.refinery_complex")).findFirst().orElseThrow();
+  // Explicit docking geometry fixture; market stock, cash, cargo and UI sale remain ordinary authority.
+  sellRuntime.arrival().materialization(destination).updatePhysicalState(sellFleet.localEntityId(),com.spacesim.world.LocalPhysicalKinematics.stationary(buyer.position()));
+  processor.keyDown(Input.Keys.F5);game.render();selectRow(workspace,game,"pilot-station|"+buyer.stationId());
+  keyboardAction(renderer,game,"pilot.dock");keyboardAction(renderer,game,"pilot.physical-confirm");
+  selectRow(workspace,game,"pilot-market|"+buyer.stationId()+"|"+water);screenshot("stage23b-destination-market");
+  long bid=sellCampaign.pilotCommodityPrice(buyer.stationId(),water,false);
+  long beforeSale=sellCampaign.playerState().orElseThrow().walletMilliCredits();
+  double beforeStock=buyer.storage().commodityMassKg(water);
+  if(bid<=initialQuote)throw new AssertionError("Destination does not offer conserved profit");
+  keyboardAction(renderer,game,"pilot.sell");screenshot("stage23b-profitable-sale-preview");
+  if(sellCampaign.playerState().orElseThrow().walletMilliCredits()!=beforeSale)throw new AssertionError("Sale preview changed money");
+  keyboardAction(renderer,game,"pilot.physical-confirm");
+  if(sellCampaign.playerState().orElseThrow().walletMilliCredits()!=beforeSale+bid
+          ||buyer.storage().commodityMassKg(water)!=beforeStock+1d
+          ||sellRuntime.freight().cargoHoldSnapshot(pilotFleet.fleetId()).commodityMassByIdKg().getOrDefault(water,0d)!=0d)throw new AssertionError("UI profitable physical sale failed");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=beforeSale+bid)throw new AssertionError("Sale payment lost on reload");
+  System.out.println("Additional reserve purchase, handover, faction foundation, treasury transfers, direct jump and profitable physical UI sale/reload passed; geometry fixtures labelled; profit milli-credits="+(bid-initialQuote));
   if(args.length>0){
    // Optional exact test checkpoint, copied before load. This is command-path engineering evidence,
    // not proof of a newly generated player start, authored contracts, or B18 human acceptance.

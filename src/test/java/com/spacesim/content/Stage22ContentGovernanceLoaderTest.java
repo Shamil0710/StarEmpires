@@ -27,7 +27,7 @@ class Stage22ContentGovernanceLoaderTest {
         assertEquals(1, catalog.getSchemaVersion());
         assertEquals(20, catalog.getSources().size());
         assertEquals(13, catalog.getHardcodedDefinitions().size());
-        assertEquals(10, catalog.getFactionIdentities().size());
+        assertEquals(11, catalog.getFactionIdentities().size());
         assertEquals(64, catalog.getFingerprint().length());
 
         assertEquals("core.empire", catalog.canonicalPackageKey("faction.imperial_directorate"));
@@ -56,6 +56,9 @@ class Stage22ContentGovernanceLoaderTest {
                 .allMatch(identity -> identity.disposition() == IdentityDisposition.PRESERVE));
         assertTrue(catalog.getFactionIdentities().stream()
                 .allMatch(identity -> identity.targetStableFactionId() == null));
+
+        assertEquals(IdentityClass.PLAYER_CREATED, catalog.findFactionIdentity("faction.player").identityClass());
+        assertNull(catalog.canonicalPackageKey("faction.player"));
 
         assertEquals(EnumSet.allOf(BindingKind.class),
                 EnumSet.copyOf(catalog.getAuthoringContract().requiredBindingKinds()));

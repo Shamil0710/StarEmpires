@@ -65,7 +65,8 @@ public final class Stage22ContentGovernanceLoader {
             "faction.free_ports",
             "faction.research_consortium",
             "faction.alpha",
-            "faction.beta");
+            "faction.beta",
+            "faction.player");
 
     private Stage22ContentGovernanceLoader() {
         throw new AssertionError("No instances");
@@ -237,6 +238,8 @@ public final class Stage22ContentGovernanceLoader {
         requireIdentity(catalog, "faction.trade_league", IdentityClass.TRANSNATIONAL_NETWORK);
         requireIdentity(catalog, "faction.alpha", IdentityClass.WORLD_GENERATED);
         requireIdentity(catalog, "faction.beta", IdentityClass.WORLD_GENERATED);
+        requireIdentity(catalog, "faction.player", IdentityClass.PLAYER_CREATED);
+        requireNoCoreBinding(catalog, "faction.player");
 
         for (SourceDefinition source : catalog.getSources()) {
             if (source.resourcePath().contains("stage18-")) {

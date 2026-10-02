@@ -48,7 +48,7 @@ A generator-profile change is not implied: no generated starter assets or new fu
 
 Stage-23 entry governance profile: `se-gen-1`.
 
-Current new-game release profile: `se-gen-2` (unchanged accepted Stage-20 generator plus explicitly confirmed `se-pilot-start-1`).
+Current new-game release profile: `se-gen-3` (unchanged accepted Stage-20 generator plus explicitly confirmed `se-pilot-start-2`; preceding opening alias was `se-gen-2`).
 
 These are release metadata aliases. `se-gen-2` records the subsequent new-game physical market/player composition; it does not relabel saved Stage-20 generation identities.
 Any change that can alter newly generated physical world state requires a generator-profile bump and
@@ -81,3 +81,12 @@ sources and unchanged generator boundary are recorded in
 `docs/release/stage23b_pilot_start_profile_v1.md`. Freight owning schema advances from 1 to 2 for
 manual physical cargo provenance, with non-granting schema-1 adoption. Freight file format 1,
 composed campaign v5, core/envelope/content and underlying Stage-20 generation identities remain unchanged; the new-game release alias advances to `se-gen-2`.
+
+## 23B global physical-market composition
+
+The subsequent `se-pilot-start-2` commissions finite markets at all existing physical endpoints and
+adds stock-responsive SI-kilogram quotes through the shared MarketSystem scarcity rule. Because
+new-game physical composition changes, the release alias advances to `se-gen-3`; the full fixed
+seed corpus must be rerun. Existing markers retain v1 policy and existing saves are not
+recommissioned, refunded or regenerated. Owning save schemas/formats remain unchanged. Numeric
+policy/fingerprint and source declarations: `docs/release/stage23b_pilot_start_profile_v2.md`.
