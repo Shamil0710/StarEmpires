@@ -161,6 +161,16 @@ only**:
 
 This exception exists to handle tool-output packaging, not to permit sprite-sheet-style art direction.
 
+If the backend adds a flat/smooth presentation background rather than real alpha, technical background
+matting is also allowed **only for review normalization**, provided that:
+
+- no station/ship pixels are intentionally repainted or invented;
+- only crop, alpha matting, uniform scale and padding are applied;
+- the review record identifies the source generation and the normalization;
+- any ambiguous segmentation is a hard reject for that candidate;
+- the normalized review candidate still cannot become `reference_master.png`;
+- a separately accepted clean transparent master is mandatory before `FROZEN`.
+
 ## 4. Canonical reference output lock
 
 Use for all GENERATE_5_SELECT_1 world-object reference candidates.
@@ -1390,3 +1400,16 @@ art-production process only.
 - mandatory next pass: preserve candidate-02 primary geometry while making the stowed loading arm and
   protected magazine door/track explicit, then create full-resolution master + silhouette + anchor QA.
 - review record: `docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_batch_001.md`.
+
+
+### Run 002 — Industrial Union industrial station candidate selection
+
+- reference: `ref.industrial_union.station.industrial_station.v1`;
+- source generation: `47c6c305-f2f3-4ae3-981b-bdc12212ad15`;
+- backend returned a two-faction presentation board rather than independent files;
+- lower-row Union designs were deterministically normalized into five transparent review candidates;
+- candidate 01 scored **92/100** and is `SELECTED`;
+- geometry remains **not frozen**;
+- clean-master attempt `dee4b31f-9980-42b1-a5b4-3ae0d2974a20` was rejected because it generated a new five-object board instead of preserving selected geometry;
+- next gate: clean transparent candidate-01 master + grayscale/downscale/silhouette/anchor QA;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_batch_001.md`.
