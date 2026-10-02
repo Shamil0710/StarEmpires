@@ -5,7 +5,9 @@
 **Production asset specification:** docs/stage23e_production_asset_spec.md  
 **Generation/authoring catalog:** docs/stage23e_generation_prompt_catalog.md  
 **Faction authorities:** docs/factions/empire_visual_bible.md and docs/factions/industrial_union_visual_bible.md  
-**Purpose:** freeze the visual geometry and identity of every significant Stage-23E object before mass production of layers, animation, VFX bindings and derived runtime art.
+**Purpose:** freeze the visual geometry and identity of every significant Stage-23E object before mass production of layers, animation, VFX bindings and derived runtime art.  
+**Live registry:** `docs/art/reference_freeze/stage23e_reference_manifest.tsv`  
+**Generation reviews:** `docs/art/reference_freeze/reviews/`
 
 ## 1. Why a visual-reference freeze exists
 
@@ -1339,3 +1341,20 @@ The reference phase is complete when:
 - reference IDs are linked from the Stage-23E asset-gap matrix during implementation.
 
 Only after this gate should Stage 23E begin broad production-layer generation.
+
+
+## 24. Reference-generation execution log
+
+The freeze contract is now in active pre-production use.
+
+Current recorded run:
+
+- `stage23e_reference_generation_run_000.md`;
+- broad multi-object review generation;
+- repository review artifact: `docs/art/reference_freeze/generated/stage23e_visual_reference_set_review_v0.svg`;
+- result: **REJECTED as canonical reference input**, retained only as an art-direction review sheet;
+- no reference ID was frozen;
+- the next valid generation must use the strict pilot one-object/five-candidate flow.
+
+This execution log does not waive the Stage-23E implementation gate. It prepares and validates the
+art-production process only.
