@@ -409,17 +409,30 @@ public final class PlayerRuntime {
         }
     }
 
+    /**
+     * Discovers only the active personally owned fleet's committed local system.
+     * Does not change the viewer, control bindings, world state or clock.
+     * @param world existing ordinary world
+     * @param state immutable personal authority
+     * @return original state, or state with the actually reached system discovered
+     */
+    public static PlayerState discoverActiveFleetLocation(WorldSimulation world, PlayerState state) {
+        Objects.requireNonNull(world); Objects.requireNonNull(state);
+        if (state.activeFleetId() == null) return state;
+        var placement = world.findFleet(state.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || state.discoveredSystemIds().contains(placement.systemId())) return state;
+        return copyPlayer(state, state.walletMilliCredits(), state.ownedFleetIds(), state.activeFleetId(),
+                withSystem(state.discoveredSystemIds(), placement.systemId()), state.discoveredObjects(), null);
+    }
+
     private void synchronizePlayerLocationAndControl() {
         FleetId activeId = player.activeFleetId();
         if (activeId != null) {
             FleetPlacementState placement = world.findFleet(activeId).orElse(null);
             if (placement != null && placement.locationKind() == FleetLocationKind.IN_SYSTEM) {
                 world.activateSystem(placement.systemId());
-                if (!player.discoveredSystemIds().contains(placement.systemId())) {
-                    player = copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(), activeId,
-                            withSystem(player.discoveredSystemIds(), placement.systemId()),
-                            player.discoveredObjects(), null);
-                }
+                player = discoverActiveFleetLocation(world, player);
             }
         }
         synchronizeDirectControlBinding();

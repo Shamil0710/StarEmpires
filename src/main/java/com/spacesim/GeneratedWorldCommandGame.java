@@ -41,6 +41,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private Stage228CampaignAuthority.MissionCommandPreview pendingMissionPreview;
     private Stage228CampaignAuthority.PilotStartPreview pendingPilotStart;
     private Stage228CampaignAuthority.PlayerPhysicalPreview pendingPilotPhysical;
+    private Stage228CampaignAuthority.PlayerFactionFoundationPreview pendingFactionFoundation;
     private String pendingPilotSelection = "";
     private int pilotKilograms = 1;
     private float projectionAge;
@@ -263,6 +264,29 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 pilotKilograms = Math.max(1, Math.min(10000, pilotKilograms + (id.equals("pilot.less") ? -1 : 1)));
                 pendingPilotPhysical = null; yield true;
             }
+            case "faction.preview" -> {
+                if (workspace.tab() != Tab.SETTINGS || !workspace.view().selection().stableId().equals("pilot-faction-foundation")) yield false;
+                campaign.coordinator().setPaused(true);
+                pendingFactionFoundation = campaign.previewPlayerFactionFoundation("faction.player", "Содружество пилота");
+                status = pendingFactionFoundation.allowed() ? "Основание проверено: нулевая казна, без территории и новых активов. Подтвердите." : "Основание недоступно.";
+                refreshProjection(); yield true;
+            }
+            case "faction.confirm" -> {
+                var preview = pendingFactionFoundation; pendingFactionFoundation = null;
+                if (preview == null || !workspace.view().selection().stableId().equals("pilot-faction-foundation")) yield false;
+                try {
+                    campaign = campaign.submitPlayerFactionFoundation(preview);
+                    pendingPilotPhysical = null; pendingMissionPreview = null;
+                    bindCampaign(); workspace.select(new UiSelection(SelectionKind.SURFACE_ROW, "pilot-faction-finance"));
+                    status = "Собственная фракция основана. Казна пуста; существующие личные средства доступны для пополнения.";
+                } catch (IllegalStateException exception) { status = "Условия изменились. Проверьте основание заново."; }
+                refreshProjection(); yield true;
+            }
+            case "faction.capitalize" -> previewPilotPhysical("CAPITALIZE");
+            case "faction.withdraw" -> previewPilotPhysical("WITHDRAW");
+            case "pilot.purchase" -> previewPilotPhysical("PURCHASE");
+            case "pilot.switch" -> previewPilotPhysical("SWITCH");
+            case "pilot.jump" -> previewPilotPhysical("JUMP");
             case "pilot.dock" -> previewPilotPhysical("DOCK");
             case "pilot.undock" -> previewPilotPhysical("UNDOCK");
             case "pilot.buy" -> previewPilotPhysical("BUY");
@@ -270,7 +294,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "pilot.physical-confirm" -> {
                 var p = pendingPilotPhysical; pendingPilotPhysical = null;
                 if (p == null || !pendingPilotSelection.equals(workspace.view().selection().stableId())) yield false;
-                try { campaign.submitPilotAction(p); status = "Действие выполнено. Для новой сделки продолжите время: Пробел."; }
+                try { campaign.submitPilotAction(p); status = "Действие выполнено. Пробел — продолжить время; личный корабль доступен во вкладке кораблей."; }
                 catch (IllegalStateException exception) { status = "Состояние изменилось. Проверьте действие заново."; }
                 snapshot = model.capture(); refreshProjection(); yield true;
             }
@@ -291,14 +315,21 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private boolean previewPilotPhysical(String action) {
         String id = workspace.view().selection().stableId();
         String[] pieces = id.split("\\|", -1);
-        if (workspace.tab() != Tab.LOGISTICS || pieces.length < 2
-                || !(pieces[0].equals("pilot-station") || pieces[0].equals("pilot-market"))) return false;
+        if (action.equals("SWITCH") && id.startsWith("personal-ship:")) pieces = new String[]{"personal-ship", id.substring("personal-ship:".length())};
+        boolean finance = workspace.tab() == Tab.SETTINGS && id.equals("pilot-faction-finance")
+                && (action.equals("CAPITALIZE") || action.equals("WITHDRAW"));
+        if (finance) pieces = new String[]{"pilot-faction-finance", "1000000"};
+        boolean jump = action.equals("JUMP") && workspace.tab() == Tab.SHIPS && pieces[0].equals("pilot-jump");
+        boolean asset = workspace.tab() == Tab.SHIPS && (action.equals("PURCHASE") && pieces[0].equals("pilot-reserve")
+                || action.equals("SWITCH") && pieces[0].equals("personal-ship"));
+        boolean market = workspace.tab() == Tab.LOGISTICS && (pieces[0].equals("pilot-station") || pieces[0].equals("pilot-market"));
+        if (pieces.length < 2 || !(jump || market || asset || finance)) return false;
         campaign.coordinator().setPaused(true);
         pendingPilotSelection = id;
         pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", pilotKilograms);
         status = pendingPilotPhysical.allowed() ? ((action.equals("BUY") || action.equals("SELL"))
                 ? String.format(java.util.Locale.ROOT, "Проверено: %d кг; кошелёк %+.3f кр. Подтвердите сделку.", pilotKilograms, pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
-                : "Стыковка проверена. Подтвердите действие.")
+                : finance ? String.format(java.util.Locale.ROOT, "Перевод проверен: личный кошелёк %+.3f кр. Подтвердите.", pendingPilotPhysical.walletChangeMilliCredits() / 1000d) : asset ? "Владение и условия проверены. Подтвердите действие." : jump ? "Вылет проверен: существующее топливо, движение к выходу и перелёт на общих тактах. Подтвердите вылет." : "Стыковка проверена. Подтвердите действие.")
                 : "Действие недоступно: проверьте расстояние, скорость, стыковку, запас, деньги и обработку за такт.";
         refreshProjection(); return true;
     }
@@ -488,6 +519,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             pendingMissionPreview = null;
             pendingPilotStart = null;
             pendingPilotPhysical = null;
+            pendingFactionFoundation = null;
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
@@ -522,8 +554,17 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindPilotStartActions(selectedPilotStart(), pendingPilotStart != null && pendingPilotStart.allowed());
         String selectedPilot = workspace.view().selection().stableId();
         if (!selectedPilot.equals(pendingPilotSelection)) pendingPilotPhysical = null;
-        renderer.bindPhysicalPilotActions(workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
-                selectedPilot.startsWith("pilot-market|"), pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
+        boolean selectedJump = workspace.tab() == Tab.SHIPS && selectedPilot.startsWith("pilot-jump|");
+        String assetAction = workspace.tab() == Tab.SHIPS ? (selectedPilot.startsWith("pilot-reserve|") ? "PURCHASE"
+                : selectedPilot.startsWith("personal-ship:") ? "SWITCH" : "") : "";
+        boolean foundation = workspace.tab() == Tab.SETTINGS && selectedPilot.equals("pilot-faction-foundation");
+        boolean finance = workspace.tab() == Tab.SETTINGS && selectedPilot.equals("pilot-faction-finance");
+        if (!foundation) pendingFactionFoundation = null;
+        renderer.bindPilotAssetAction(foundation ? "FOUNDATION" : finance ? "FINANCE" : assetAction);
+        renderer.bindPilotJumpAction(selectedJump);
+        renderer.bindPhysicalPilotActions(foundation || finance || selectedJump || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
+                selectedPilot.startsWith("pilot-market|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
+                        : pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
         renderer.bindSaveAvailability(!campaign.canStartIndependentPilot());
         renderer.bindWorkspace(production, workspace);
         renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),

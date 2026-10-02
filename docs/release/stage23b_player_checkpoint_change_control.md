@@ -86,3 +86,19 @@ advances to `se-gen-2`, retaining underlying saved generation identities. Numeri
 funding sources, fixed corpus including four upstream rejections, evidence and remaining limits are
 recorded in `docs/release/stage23b_pilot_start_profile_v1.md` and the UI evidence document. This is a
 partial integration gate and does not authorize a 23B-completion merge.
+
+## Subsequent direct travel, asset progression and faction foundation
+
+Direct player hops use the same persisted world jump FSM. Unassigned freight arrival mirrors now
+track committed local relocation, preserving the hold/lots; no freight/campaign schema or generated
+initial condition changes. Completed campaign ticks reuse personal location discovery. Additional
+reserve purchases and stationary local control handover use the existing ownership/progression
+services, with no replacement hulls or duplicated control integrator.
+
+Faction foundation uses the existing pure PlayerFactionFoundationService and a typed re-composition
+of the same world inside Stage-20/21/M22.8. All adjacent owners and migration provenance are retained;
+a validated replacement binding is adopted without elapsed time. The zero-treasury, zero-territory
+identity and existing player affiliation persist through the existing WorldState/PlayerState fields.
+Own-treasury capitalization/return use existing conserved financial services and ledger evidence.
+No new monetary, political, cargo, save or clock authority is introduced. These are additional
+implemented command slices; remaining physical/strategic loops and human B18 acceptance stay open.

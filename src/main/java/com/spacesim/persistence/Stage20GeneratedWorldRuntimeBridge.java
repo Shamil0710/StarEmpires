@@ -895,7 +895,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
         private void synchronizeCompletedHops() {
             for (FreighterState fleetState : freight.capture().freighters()) {
-                if (fleetState.phase() != FreightPhase.OUTBOUND
+                if (fleetState.phase() != FreightPhase.IDLE
+                        && fleetState.phase() != FreightPhase.OUTBOUND
                         && fleetState.phase() != FreightPhase.RETURNING) {
                     continue;
                 }
@@ -915,7 +916,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         .physicalState(placement.localEntityId()).orElseThrow(
                                 () -> new IllegalStateException(
                                         "ordinary freight arrival lacks exact Stage-20 physical state"));
-                if (fleetState.phase() == FreightPhase.OUTBOUND) {
+                if (fleetState.phase() == FreightPhase.IDLE) {
+                    freight.synchronizeIdleArrival(fleetState.fleetId(), placement.systemId(), exact);
+                } else if (fleetState.phase() == FreightPhase.OUTBOUND) {
                     freight.completeNextOutboundHop(
                             fleetState.fleetId(), placement.systemId(), exact);
                 } else {

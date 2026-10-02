@@ -69,9 +69,28 @@ public final class ProductionUiProjector {
                             "Статус", "Независимый пилот; казна и другие активы продавца недоступны",
                             "Источник средств", "Ограниченные личные сбережения при подтверждении новой игры",
                             "Рынки старта", "Существующие склады; каждой станции домашней системы выдаётся 10 000 кредитов конечного оборотного капитала")),
-                    "New-game pilot profile v1; PlayerOwnershipService; ordinary faction treasury; PlayerState",
+                    "Подтверждённая новая игра: раскрытые личные сбережения, существующий резерв и оплата в казну продавца",
                     null, 0, world.worldTick()));
         }
+        campaign.playerState().ifPresent(player -> {
+            if (player.factionContentId() == null) settings.add(row("pilot-faction-foundation", "Основать «Содружество пилота»", "Моя фракция", "Независимый пилот",
+                    List.of(InfoSection.of("Основание фракции", "Имя", "Содружество пилота",
+                            "Казна", "0 кр.", "Территории и новые активы", "Не предоставляются",
+                            "Существующие активы", "Личные корабли и кошелёк сохраняются; регистрация корпусов сохраняется",
+                            "Полномочия", "Новая собственная фракция; полномочия продавца не передаются")),
+                    "Подтверждённое решение пилота; реестр собственной фракции. Деньги, территория и новые активы не выдаются", null, 0, world.worldTick()));
+            else {
+                var own = campaign.coordinator().runtime().world().findFactionEconomicState(player.factionContentId()).orElseThrow();
+                settings.add(row("pilot-faction-finance", "Личные деньги и казна", "Моя фракция", campaign.coordinator().runtime().world().getWorldFactionIdentities().stream()
+                                .filter(identity -> identity.stableFactionId().equals(player.factionContentId()))
+                                .map(com.spacesim.world.WorldFactionIdentityState::displayName).findFirst().orElse(factionName(world, player.factionContentId())),
+                        List.of(InfoSection.of("Обособленные средства", "Личный кошелёк", credits(player.walletMilliCredits()),
+                                "Казна фракции", credits(own.treasuryMilliCredits()), "Размер перевода", "1 000 кр.",
+                                "Пополнение", "Личный кошелёк → собственная казна", "Возврат", "Собственная казна → личный кошелёк",
+                                "Условие", "Полный перевод существующих денег, без кредита и новых источников")),
+                        "Личный кошелёк, фактическая казна собственной фракции и журнал выполненных переводов", null, 0, world.worldTick()));
+            }
+        });
         rows.put(Tab.SETTINGS, List.copyOf(settings));
         var logistics = new ArrayList<>(rows.get(Tab.LOGISTICS));
         campaign.playerState().ifPresent(player -> {
@@ -93,7 +112,7 @@ public final class ProductionUiProjector {
                                 "Условия стыковки", "Не далее 1 км; скорость не выше 1 м/с",
                                 "Управление тягой", "WASD в системе; X — торможение; без тяги — движение по инерции",
                                 "Кошелёк", credits(player.walletMilliCredits()))),
-                        "Stage-20 exact physical separation; existing PlayerState docking; ordinary station wallet",
+                        "Фактическое положение и скорость личного корабля; состояние стыковки и кошелёк станции",
                         endpoint.systemId(), 0, world.worldTick()));
                 if (hold == null) continue;
                 for (String commodity : List.of("commodity.material.purified_water", "commodity.material.structural_alloy", "commodity.ore.metallic")) {
@@ -112,7 +131,7 @@ public final class ProductionUiProjector {
                                     "Кошелёк", credits(player.walletMilliCredits()), "Стыковка", docked ? "Да" : "Нет",
                                     "Обработка за такт", String.format(Locale.ROOT, "%.2f кг", endpoint.handlingCapability().massRateKgPerSecond() * campaign.coordinator().session().fixedStepSeconds()),
                                     "Лимит времени", "Одна физическая сделка корабля за завершённый такт; после сделки нужно продолжить время")),
-                            "Opening market profile v1 (milli-credits/kg); TradeController access/customs/payment; Stage-18/20 physical storage and cargo-lot provenance",
+                            "Раскрытые начальные цены за килограмм; фактический склад станции, груз корабля, доступ и таможенные платежи",
                             null, 0, world.worldTick()));
                 }
             }
@@ -149,12 +168,58 @@ public final class ProductionUiProjector {
                                 "Боеприпасы", Long.toString(derived.ammunitionCount())));
                     }
                 }
-                craftRows.add(0, row("personal-ship:" + id.value(), "Личный корабль", "Мои корабли",
+                var jump = campaign.coordinator().runtime().world().findFleetJump(id).orElse(null);
+                if (jump != null) personalSections.add(InfoSection.of("Межсистемный полёт",
+                        "Фаза", switch (jump.phase()) {
+                            case MOVING_TO_JUMP -> "Движение к выходу";
+                            case JUMP_PENDING -> "Подготовка прыжка";
+                            case IN_TRANSIT -> "В пути";
+                            case ARRIVING -> "Прибытие";
+                        }, "Цель", campaign.coordinator().runtime().world().getTopology().findSystem(jump.destinationSystemId()).orElseThrow().name(),
+                        "Граница фазы", "Такт " + jump.phaseEndsTick(), "Время", "Продолжите кампанию: Пробел; полёт сохраняется вместе с миром"));
+                if (id.equals(player.activeFleetId()) && placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                        && jump == null) {
+                    var ordinaryWorld = campaign.coordinator().runtime().world();
+                    for (var destination : ordinaryWorld.getTopology().neighbors(placement.systemId())) {
+                        var fuel = ordinaryWorld.planFleetRouteFuel(id, List.of(placement.systemId(), destination));
+                        craftRows.add(row("pilot-jump|" + destination.value(),
+                                ordinaryWorld.getTopology().findSystem(destination).orElseThrow().name(), "Прыжки личного корабля",
+                                !player.docked() && fuel.supported() && fuel.feasible() ? "Можно проверить вылет" : "Вылет недоступен",
+                                List.of(InfoSection.of("Вылет по прямому ребру", "Отправление", ordinaryWorld.getTopology().findSystem(placement.systemId()).orElseThrow().name(),
+                                        "Необходимое изменение скорости", String.format(Locale.ROOT, "%.1f м/с", fuel.requiredDeltaVMps()),
+                                        "Расход реактивной массы", String.format(Locale.ROOT, "%.1f кг", fuel.consumedReactionMassKg()),
+                                        "Остаток реактивной массы", String.format(Locale.ROOT, "%.1f кг", fuel.remainingReactionMassKg()),
+                                        "Условия", "Отстыкованный личный корабль; существующее топливо; движение к выходу, зарядка и перелёт на общих тактах")),
+                                "Прямое соединение систем; положение корабля и топливо на борту. Время перелёта идёт вместе с кампанией",
+                                null, 0, world.worldTick()));
+                    }
+                }
+                craftRows.add(0, row("personal-ship:" + id.value(), "Личный корабль " + id.value(), "Мои корабли",
                         player.activeFleetId() != null && player.activeFleetId().equals(id) ? "Активный" : "В собственности",
                         personalSections,
-                        "PlayerState personal ownership and wallet; WorldSimulation physical fleet placement",
+                        "Личные права владения и кошелёк пилота; фактическое местоположение существующего корабля",
                         placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM ? placement.systemId() : null,
                         id.value(), world.worldTick()));
+            }
+        });
+        campaign.playerState().ifPresent(player -> {
+            if (player.activeFleetId() == null) return;
+            var runtime = campaign.coordinator().runtime();
+            var active = runtime.world().findFleet(player.activeFleetId()).orElseThrow();
+            if (active.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return;
+            for (var offered : runtime.freight().capture().freighters()) {
+                var placement = runtime.world().findFleet(offered.fleetId()).orElseThrow();
+                if (player.ownedFleetIds().contains(offered.fleetId()) || offered.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                        || offered.cargoMassKg() != 0d || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                        || !placement.systemId().equals(active.systemId()) || runtime.world().findFleetJump(offered.fleetId()).isPresent()) continue;
+                craftRows.add(row("pilot-reserve|" + offered.fleetId().value(), "Резервный грузовой корабль " + offered.fleetId().value(),
+                        "Покупка существующих кораблей", "Требуется местный док продавца",
+                        List.of(InfoSection.of("Предложение корпуса", "Цена", credits(Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS),
+                                "Продавец", factionName(world, offered.stableFactionId()), "Трюм", offered.cargoCapacityKg() + " кг",
+                                "Оплата", "Личный кошелёк → казна продавца", "Условия", "Стыковка у местной станции продавца; существующий свободный пустой корпус",
+                                "После покупки", "Активный корабль сохраняется; для смены управления отстыкуйтесь и остановитесь")),
+                        "Свободный пустой корпус в текущей системе; местный продавец и оплата в его казну",
+                        placement.systemId(), offered.fleetId().value(), world.worldTick()));
             }
         });
         for (var craft : checkpoint.smallCraft().craft()) {

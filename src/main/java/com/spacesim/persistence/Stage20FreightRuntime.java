@@ -320,6 +320,24 @@ public final class Stage20FreightRuntime {
     }
 
     /**
+     * Mirrors a completed ordinary world hop for an unassigned physical freighter.
+     * This changes neither cargo, orders nor travel time; the caller supplies committed arrival.
+     * @param fleetId existing idle identity
+     * @param systemId committed world location
+     * @param physical exact arrived kinematics
+     * @return the same freight identity and hold at its committed location
+     */
+    public FreighterState synchronizeIdleArrival(FleetId fleetId, StarSystemId systemId,
+            LocalPhysicalKinematics physical) {
+        var fleet = requireFreighter(fleetId);
+        requirePhase(fleet, FreightPhase.IDLE);
+        var updated = copyFreighter(fleet, Objects.requireNonNull(systemId), Objects.requireNonNull(physical),
+                FreightPhase.IDLE, fleet.routeIndex(), requireHold(fleetId).snapshot());
+        freighters.put(fleetId, updated);
+        return updated;
+    }
+
+    /**
      * Completes exactly the next persisted outbound neighbor hop using caller-supplied physical
      * arrival kinematics. Stage-20.5D supplies that edge-authoritative state.
      *

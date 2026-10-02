@@ -349,3 +349,57 @@ evidence, not human navigation, all player loops or B18 PASS.
 market or proof of a profitable trader career. Inter-system player travel, mining, fitting, physical
 construction/supply, fleet/faction/carrier commands, production NPC offers and the final B18 gate
 remain mandatory. #412/#370 stay open and 23C has not started.
+
+### Direct player travel, reserve progression and own-faction composition
+
+The next production command batch uses the ordinary WorldSimulation jump FSM. The personal ship
+must be undocked, have no active jump, select one direct topology neighbor and pass the existing
+exact onboard route-fuel plan. Preview does not load station propellant. Confirmation preserves
+real movement to the departure endpoint, preparation, detached transit and exact edge arrival on
+campaign ticks. The existing freight owner now mirrors IDLE fleet arrivals without changing hold,
+provenance lots or orders. Discovery reuses PlayerRuntime's location rule at completed ticks and
+adds only the actually reached system, without switching the presentation viewer or input systems.
+The ship surface shows direct-hop fuel requirements and the active jump phase/boundary.
+
+The same ship surface exposes existing local empty IDLE reserves for the already disclosed
+25,000-credit price. Purchase requires a commissioned local dock of the actual seller, uses
+PlayerOwnershipService's conserved treasury payment, and does not change the active ship or create
+another hull. Handover uses PlayerShipProgressionService after exact stationary admission, requires
+an owned local target and an undocked current ship, and preserves both identities and positions.
+
+The settings surface exposes the existing PlayerFactionFoundationService transition for the
+explicitly disclosed `faction.player` / «Содружество пилота» identity. Its treasury, territory and asset
+grants are zero. The typed campaign composition retains every adjacent Stage-20/21/M22.8 owner and
+migration provenance; foundation adopts a validated replacement binding with no elapsed time.
+The exact-state confirmation is single-use. A separate personal/own-treasury inspector offers
+1,000-credit capitalization or return through PlayerFactionManagementService and ordinary ledger
+transfers. It cannot choose another faction's treasury. Names and transfer size are currently the
+disclosed defaults; arbitrary-name/amount UI is not claimed.
+
+Local validation scopes so far: corrected direct-hop/UI/NPC regression gate **19 tests**, then
+travel/reserve/legacy ownership/navigation **14 tests**, then foundation/treasury/original projection
+**16 tests**, all with zero failures/errors. The 19-test gate corrected a discovered location-rule
+hook error without weakening the arrival assertion. Travel tests round-trip actual detached transit
+and arrived cargo. Dock/departure positions are labelled engineering fixtures, not proof of human
+navigation. The combined final command-source Maven/JUnit gate passed **36 tests with zero failures/errors**:
+all five new campaign command classes, physical financial settlement, the original projection
+roundtrip and all fifteen NPC mission integration methods. This gate retains ordinary domain
+assertions and does not replace clean exact-head coverage.
+
+The packaged desktop JAR passed the extended software-EGL journey for reserve purchase, control
+handover, foundation, treasury capitalization/return, actual direct jump and asset/cargo reload.
+New confirmation screens were visually checked. The final UI wording was packaged and the same
+complete graphical journey passed again. That final `verify` continuation passed the original
+projection roundtrip, strict Java-17 Javadoc and desktop packaging with coverage skipped; it is not
+clean coverage. Full clean exact-head CI remains mandatory for this new command batch.
+
+**23B remains ACTIVE/PARTIAL.** Mining, fitting, construction/supply, profitable dynamic trade,
+fleet/faction policy/territorial/affiliation commands, carrier commands, production NPC offers and
+B18 human acceptance remain open. No next-stage or merge authorization follows from these slices.
+
+The preceding owning pilot/freight-schema batch received full exact-head CI #7743 on
+`a8b57ba5074b0f68748c91dcbdbe7b0ac8f62113` (tree
+`4121d7a0d62b8e2fe07f0be17d04605dcfc91e8c`): **2363 tests, zero failures/errors, one skip**.
+Clean coverage checks, strict Java-17 Javadoc, desktop packaging and B18 tooling passed; Maven
+duration 20:06. Run: https://github.com/Shamil0710/StarEmpires/actions/runs/36974078526. This is
+evidence for that preceding commit, not for subsequent travel/faction commands or human B18 PASS.

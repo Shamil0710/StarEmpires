@@ -710,7 +710,7 @@ Stage 23 replaces remaining prototype tactical presentation with production ship
 Mandatory closure chain:
 
 - **23A — COMPLETE** — scope lock, issue taxonomy, versioning and release governance; canonical evidence: `docs/release/stage23a_completion_record.md`;
-- **23B — ACTIVE/PARTIAL** — navigation/search/inspectors, v5 player persistence and existing-player NPC contract commands/settlement are implemented; independent-pilot start, exact local control and physical docking/trade are implemented slices; remaining physical/strategic command loops remain mandatory (#412), with final graphical/B18 acceptance (#370) open; evidence: `docs/ui/stage23b_production_ui_consolidation.md`;
+- **23B — ACTIVE/PARTIAL** — navigation/search/inspectors, v5 player persistence and existing-player NPC contract commands/settlement are implemented; independent-pilot start, exact local control, physical docking/trade, direct travel, reserve progression and own-faction/treasury composition are implemented slices; remaining physical/strategic command loops remain mandatory (#412), with final graphical/B18 acceptance (#370) open; evidence: `docs/ui/stage23b_production_ui_consolidation.md`;
 - **23C** — resolution/aspect matrix, accessibility, input rebinding and RU/EN localization;
 - **23D** — onboarding/tutorial over ordinary authoritative state;
 - **23E** — final art, VFX, animation and audio replacement;

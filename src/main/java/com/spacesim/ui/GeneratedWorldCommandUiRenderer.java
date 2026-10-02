@@ -602,6 +602,8 @@ public final class GeneratedWorldCommandUiRenderer {
     private boolean pilotStartConfirmation;
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
+    private boolean physicalPilotJump;
+    private String physicalPilotAssetAction = "";
     private boolean physicalPilotConfirmation;
     private int physicalPilotKilograms;
 
@@ -617,14 +619,28 @@ public final class GeneratedWorldCommandUiRenderer {
         physicalPilotConfirmation = confirmation; physicalPilotKilograms = kilograms;
     }
 
+    /**
+     * Selects jump departure controls for an existing personal route row.
+     * @param jump whether the selected physical action is a direct departure
+     */
+    public void bindPilotJumpAction(boolean jump) { physicalPilotJump = jump; }
+
+    /**
+     * Binds an existing-asset purchase or personal control handover.
+     * @param action PURCHASE, SWITCH, FOUNDATION, FINANCE, or empty for other actions
+     */
+    public void bindPilotAssetAction(String action) { physicalPilotAssetAction = action; }
+
     private void drawPhysicalPilotActions() {
         float scale = metrics.scale();
         float width = (inspectorRect.width() - 40f * scale) / 3f;
-        String[] ids = physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
+        boolean foundation = physicalPilotAssetAction.equals("FOUNDATION");
+        boolean finance = physicalPilotAssetAction.equals("FINANCE");
+        String[] ids = foundation ? new String[]{"faction.preview"} : finance ? new String[]{"faction.capitalize", "faction.withdraw"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "pilot.purchase" : "pilot.switch", "focus"} : physicalPilotJump ? new String[]{"pilot.jump"} : physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
                 : new String[]{"pilot.dock", "pilot.undock", "focus"};
-        String[] labels = physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
+        String[] labels = foundation ? new String[]{"ОСНОВАТЬ"} : finance ? new String[]{"ВНЕСТИ 1 000", "ВЕРНУТЬ 1 000"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "КУПИТЬ" : "УПРАВЛЕНИЕ", "НА КАРТЕ"} : physicalPilotJump ? new String[]{"ВЫЛЕТ"} : physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
                 : new String[]{"СТЫКОВКА", "ОТСТЫКОВКА", "НА КАРТЕ"};
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < ids.length; i++) {
             Rect r = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
                     inspectorRect.y() + 106f * scale, width, 36f * scale);
             button(r, labels[i], true); hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, r));
@@ -637,7 +653,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
         button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
-        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.physical-confirm", null, confirm));
+        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, foundation ? "faction.confirm" : "pilot.physical-confirm", null, confirm));
     }
 
     /**
