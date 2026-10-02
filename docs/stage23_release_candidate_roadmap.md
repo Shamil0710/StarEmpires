@@ -195,6 +195,8 @@ Exit criteria:
 
 Цель: заменить остаточные prototype assets при неизменной simulation authority.
 
+Canonical detailed execution contract: [Stage 23E — Final Presentation Production Plan](stage23e_final_presentation_plan.md).
+
 Art closure:
 
 - production sprite packages для всех release hull/station/location roles;
