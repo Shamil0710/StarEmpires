@@ -141,6 +141,26 @@ Process:
 
 This mode is mandatory for the six carrier small-craft fits.
 
+
+### 3.4 Generator multi-candidate normalization exception
+
+The production target remains one separate image per candidate. However, if the connected image
+backend returns several **physically disjoint candidates on a genuinely transparent canvas despite a
+separate-image request**, the following deterministic normalization is allowed **for candidate review
+only**:
+
+1. archive/record the source generation ID;
+2. segment only disconnected alpha components;
+3. do not redraw, repaint, inpaint or merge candidate geometry;
+4. place each component on its own transparent production-aspect canvas;
+5. preserve relative pixels inside the extracted component apart from uniform scaling/padding;
+6. mark the extracted images as review candidates;
+7. the source multi-object canvas itself can never become a canonical reference;
+8. the selected candidate still requires an independent clean final master before status may become
+   `FROZEN`.
+
+This exception exists to handle tool-output packaging, not to permit sprite-sheet-style art direction.
+
 ## 4. Canonical reference output lock
 
 Use for all GENERATE_5_SELECT_1 world-object reference candidates.
@@ -1358,3 +1378,15 @@ Current recorded run:
 
 This execution log does not waive the Stage-23E implementation gate. It prepares and validates the
 art-production process only.
+
+### Run 001 — Imperial naval ordnance depot candidate selection
+
+- reference: `ref.empire.station.naval_ordnance_depot.v1`;
+- five candidate designs generated and normalized into separate transparent review candidates;
+- 192x192 repository previews committed under the reference candidate directory;
+- candidates 01, 03, 04 and 05 rejected for detached generator debris;
+- candidate 02 scored **83/100** and is `SELECTED`;
+- geometry remains **not frozen**;
+- mandatory next pass: preserve candidate-02 primary geometry while making the stowed loading arm and
+  protected magazine door/track explicit, then create full-resolution master + silhouette + anchor QA.
+- review record: `docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_batch_001.md`.
