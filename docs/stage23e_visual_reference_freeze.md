@@ -1425,3 +1425,25 @@ art-production process only.
 - candidate 05 hard-rejected for wing/fin-like geometry;
 - geometry remains **not frozen** until the canonical normalized master is persisted in the repository;
 - no interceptor/defence/strike overlay generation may begin before that freeze.
+
+
+### Run 004 — Major-ship promoted-reference freeze gate
+
+- scope: all 18 `PROMOTE_EXISTING` major-ship base references;
+- no base PNG geometry regenerated or modified;
+- added `Stage23EMajorShipReferenceFreezeTest` as the executable Stage-23E reference gate;
+- gate covers alpha/padding, grayscale readability, 25% and 12.5% downscale readability, silhouette
+  uniqueness/near-duplicate detection and engineering-derived anchor projection;
+- manifest rows move from `SELECTED` to `FROZEN` in the same acceptance batch;
+- exact-head required CI remains mandatory before this freeze batch is accepted;
+- review: `docs/art/reference_freeze/reviews/stage23e_major_ship_reference_freeze_qa.md`.
+
+### Run 005 — Industrial Union small-craft backend drift
+
+- reference: `ref.industrial_union.small_craft.base.v1`;
+- generation ID: `af37623a-c4c0-4a60-9ac9-088a2ea75fd2`;
+- requested a strict top-down Union spacecraft base candidate;
+- backend returned an unrelated Imperial medic character sheet;
+- output hard-rejected before candidate numbering/scoring;
+- manifest remains `PLANNED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_generation_attempt_001.md`.
