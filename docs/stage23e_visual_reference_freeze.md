@@ -1413,3 +1413,15 @@ art-production process only.
 - clean-master attempt `dee4b31f-9980-42b1-a5b4-3ae0d2974a20` was rejected because it generated a new five-object board instead of preserving selected geometry;
 - next gate: clean transparent candidate-01 master + grayscale/downscale/silhouette/anchor QA;
 - review: `docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_batch_001.md`.
+
+
+### Run 003 — Empire carrier small-craft base selection
+
+- reference: `ref.empire.small_craft.base.v1`;
+- five separate single-object candidates successfully generated;
+- candidate 03 scored **91/100** and is `SELECTED`;
+- normalized 512x256 draft matches authoritative 28x12 m L/W within 7.8%;
+- grayscale, 25%, 12.5%, silhouette and review-anchor checks passed locally;
+- candidate 05 hard-rejected for wing/fin-like geometry;
+- geometry remains **not frozen** until the canonical normalized master is persisted in the repository;
+- no interceptor/defence/strike overlay generation may begin before that freeze.
