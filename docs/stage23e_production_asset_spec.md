@@ -1357,7 +1357,7 @@ The following is the **minimum unique-file budget**, not the maximum.
 
 Subtotal: **28**.
 
-### 22.2 Ship/system — 23 files
+### 22.2 Ship/system — 26 files
 
 - light engine loop variants: 3;
 - medium engine loop variants: 3;
