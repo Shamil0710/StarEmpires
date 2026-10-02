@@ -32,6 +32,8 @@ public final class GeneratedCampaignFactionUi {
         if(player==null||!player.affiliated())return List.of();
         var world=c.coordinator().runtime().world();String own=player.factionContentId();
         var rows=new ArrayList<ProductionUiSnapshot.Row>();
+        rows.add(row("affiliation", "Регистрация моих активов", "Моя фракция", "Существующие личные активы",
+                InfoSection.of("Явное решение о регистрации", "Последствие", "Правовая регистрация уже принадлежащих кораблей и станций переходит в собственную фракцию", "Сохраняются", "Личное владение, происхождение корпусов, груз, деньги, физическое положение и часы", "Ресурсы и территории", "Не выдаются", "Ограничение", "Только личные неназначенные грузовики; без захвата чужих активов"), null, world.getAuthoritativeWorldTick()));
         long[] doctrine=doctrine(world.findFactionStrategicState(own).orElseThrow().doctrine());
         long[] fiscal=fiscal(world.findFactionFiscalPolicy(own).orElseThrow());
         for(int i=0;i<DOCTRINE.length;i++)rows.add(row("doctrine|"+i,DOCTRINE[i],"Моя доктрина",Long.toString(doctrine[i]),
@@ -78,6 +80,7 @@ public final class GeneratedCampaignFactionUi {
     public static List<Action> actions(String id) {
         if(!id.startsWith(PREFIX))return List.of();String kind=id.substring(PREFIX.length()).split("\\|",-1)[0];
         return switch(kind) {
+            case "affiliation" -> List.of(new Action("affiliate","ЗАРЕГИСТРИРОВАТЬ"));
             case "doctrine","fiscal" -> List.of(new Action("less","УМЕНЬШИТЬ"),new Action("more","УВЕЛИЧИТЬ"));
             case "embargo" -> List.of(new Action("impose","ЭМБАРГО"),new Action("revoke","ОТМЕНИТЬ"));
             case "offer" -> List.of(new Action("mutual","ВЗАИМНО"),new Action("give","МЫ ДАЁМ"),new Action("receive","НАМ ДАЮТ"));
@@ -100,6 +103,7 @@ public final class GeneratedCampaignFactionUi {
         if(actions(id).stream().noneMatch(v->v.id().equals(action)))throw new IllegalArgumentException("Unknown faction presentation action");
         String[] p=id.substring(PREFIX.length()).split("\\|",-1);String own=c.playerState().orElseThrow().factionContentId();var world=c.coordinator().runtime().world();
         return switch(p[0]) {
+            case "affiliation" -> c.previewPlayerAssetAffiliation();
             case "doctrine" -> {
                 long[] v=doctrine(world.findFactionStrategicState(own).orElseThrow().doctrine());int index=Integer.parseInt(p[1]);v[index]+=action.equals("less")?-5:5;
                 yield c.previewPlayerFactionPolicy(new FactionPolicyCommand.UpdateDoctrine(new FactionDoctrineState((int)v[0],(int)v[1],(int)v[2],(int)v[3],(int)v[4],(int)v[5],(int)v[6])));

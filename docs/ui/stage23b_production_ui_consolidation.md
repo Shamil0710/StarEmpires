@@ -489,3 +489,31 @@ legal affiliation, established territorial control, physical mining/fitting/cons
 fleet strategic/carrier commands, production NPC offers and genuine B18 acceptance remain open.
 No owning schema, content or new-game resource profile changes. Full exact-head clean CI is still
 required for this next command commit; 23B remains ACTIVE/PARTIAL with no merge or 23C.
+
+
+### Explicit registration of existing personal assets
+
+The own-faction inspector now offers a pure preview and exact single-use confirmation for explicit
+legal registration. Faction foundation alone still does not affiliate the purchased hulls. The
+shared service changes the actual World faction of existing owned assets; owning freight schema 3
+persists its separately validated legal mirror while preserving the immutable bootstrap origin.
+Only personally owned IDLE freight is supported by this integration. A real transit entity can
+register without teleporting, replacing IDs, losing cargo or altering funds. Assigned bootstrap
+freight is rejected. Carrier affiliation is not claimed by this slice.
+
+Five new composed tests verify preview purity, origin/resources/IDs, genuine schema-2 adoption,
+world-only/freight-only mismatch rejection, real transit affiliation/reload/arrival and the required
+persisted personal owner even for an empty hold. Together with existing ordinary affiliation,
+scheduler and mid-approach regressions, the final group passed 18 tests without failures/errors.
+Strict Javadoc and desktop packaging passed, coverage skipped locally. The packaged-JAR graphical
+journey passed two-hull registration and reload, all eleven surfaces, policy/diplomacy/claim commands,
+then an actual jump and physical water sale with the same conserved 4.82-credit profit. The
+registration confirmation screen was visually inspected; labelled geometry fixtures remain
+engineering evidence, not human B18 acceptance.
+
+The previous market commit `f26b59f81eeaa36ee9665c423ab4a1fa09e001fb` passed full CI **#7815**:
+2375 tests, zero failures/errors, one skip; coverage, Javadoc, desktop packaging and B18 tooling
+passed. The separate policy commit `644a28fe032303054baf833b6f6ea359c09146b4` is under full CI
+**#7827**; this registration/schema batch must wait for that gate before advancing the branch.
+Stock/production policy, established territorial control, mining/fitting/construction/supply,
+strategic/carrier commands, production NPC offers and genuine human B18 remain open.

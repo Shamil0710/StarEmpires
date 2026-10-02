@@ -401,8 +401,32 @@ public final class Stage228CampaignAuthority {
         });
     }
 
+    /**
+     * Previews explicit affiliation of already-owned assets through the existing shared service.
+     * Only idle personally owned freight can change its legal mirror; no bootstrap slot is reassigned.
+     * @return pure exact-state confirmation preserving IDs, resources and bootstrap provenance
+     */
+    public PlayerFactionCommandPreview previewPlayerAssetAffiliation() {
+        return previewFactionCommand((service, isolated) -> {
+            var runtime = isolated.coordinator.runtime();
+            var player = isolated.playerState;
+            for (var id : player.ownedFleetIds()) runtime.freight().findFreighter(id).ifPresent(f -> {
+                if (f.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
+                    throw new IllegalStateException("Only personally controlled idle freight can affiliate");
+            });
+            service.affiliateOwnedAssets();
+            for (var id : player.ownedFleetIds()) if (runtime.freight().findFreighter(id).isPresent())
+                runtime.freight().synchronizeLegalAffiliation(id, player.factionContentId());
+        });
+    }
+
     private PlayerFactionCommandPreview previewFactionCommand(
             java.util.function.Consumer<com.spacesim.player.PlayerFactionManagementService> command) {
+        return previewFactionCommand((service, isolated) -> command.accept(service));
+    }
+
+    private PlayerFactionCommandPreview previewFactionCommand(
+            java.util.function.BiConsumer<com.spacesim.player.PlayerFactionManagementService, Stage228CampaignAuthority> command) {
         var baseline = captureState();
         com.spacesim.persistence.Stage228GeneratedCampaignPersistentState candidate = null;
         try {
@@ -411,7 +435,7 @@ public final class Stage228CampaignAuthority {
                 throw new IllegalStateException("No personal faction authority");
             var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(
                     isolated.coordinator.runtime().world(), isolated.coordinator.content(), isolated.playerState);
-            command.accept(new com.spacesim.player.PlayerFactionManagementService(adapter));
+            command.accept(new com.spacesim.player.PlayerFactionManagementService(adapter), isolated);
             isolated.playerState = adapter.player();
             candidate = isolated.captureState();
             restore(candidate).captureState();

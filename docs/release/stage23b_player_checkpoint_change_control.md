@@ -127,3 +127,36 @@ Party-to-party rights retain their direction when counteroffers/renewals change 
 existing saved treaties remain unchanged. Unknown personal territorial targets and impersonated
 actors reject. The same v5 envelope and opening profile are retained. Asset legal affiliation and
 physical/strategic player loops remain separate outstanding work with their owning validation gates.
+
+
+## Explicit personal asset registration: freight schema 3
+
+The accepted freight origin and its ownership ordinal previously doubled as the required live
+legal faction. A genuine shared affiliation changed WorldState but could not restore because the
+freight sidecar still required the original faction. The owning freight schema advances **2 → 3**
+with one `legalFactionId` mirror. WorldState remains the canonical legal affiliation; immutable
+`stableFactionId`, original slot, hull/fit, IDs, exact geometry and cargo provenance are retained.
+Binary freight file format 1 and the outer campaign v5 envelope are unchanged. No opening profile,
+content identity, resource amount or accepted bootstrap allocation changes.
+
+Schemas 1/2 adopt legal affiliation equal to their original faction without grants; current schema 3
+roundtrips explicitly. Future schemas and falsely labelled old states with divergent legal mirrors
+reject. Capture and restore require exact agreement with live World faction or the transit entity's
+faction. Divergent freight affiliation also requires the actual persisted personal owner and the
+same player faction, even with an empty hold. No silent correction of a one-sided affiliation is
+allowed. The command delegates to PlayerFactionManagementService, then synchronizes only existing
+owned IDLE freight mirrors in the isolated confirmation candidate; bootstrap routes reject.
+
+`stage23b-freight-v2.s20f.gz` is the exact embedded S20F payload extracted from the genuine ancestor
+campaign at commit `8444116936399a0d1975337f69a66661a287bd2e`. Its raw/compressed SHA-256 and
+provenance are recorded in `stage23b-pilot-opening-v1.json`. The original campaign fixture is not
+rewritten. The separate schema-1 compatibility test explicitly uses a synthetic schema-1 header
+over the identical historical 1/2 layout; it is not presented as a genuine schema-1 save.
+
+Local validation: 22 physical/travel/market/faction/materializer tests passed before the new owner
+proof, followed by 18 affiliation/local/transit/station/player/scheduler/mid-approach tests, zero
+failures/errors. Strict Java-17 Javadoc and desktop packaging passed with local coverage skipped.
+The packaged llvmpipe UI journey registered two owned hulls, saved/reloaded, then completed policy,
+actual hop, conserved profitable physical trade and another reload. Geometry fixtures are labelled.
+A separate full exact-head CI is mandatory for this owning-schema batch; no 23B-completion claim,
+merge, 23C or human B18 PASS follows from this engineering evidence.

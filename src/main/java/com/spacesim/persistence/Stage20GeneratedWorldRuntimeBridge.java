@@ -325,6 +325,29 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
     }
 
+    private static void validateFreightLegalFaction(WorldSimulation world, FreighterState fleet) {
+        var placement = world.findFleet(fleet.fleetId()).orElse(null);
+        if (fleet.phase() == FreightPhase.DESTROYED) {
+            if (placement != null) throw new IllegalArgumentException("Destroyed freight still has world placement");
+            return;
+        }
+        if (placement == null) throw new IllegalArgumentException("Freight legal mirror has no world fleet");
+        int expected = world.findFactionRuntimeId(fleet.legalFactionId()).orElseThrow(
+                () -> new IllegalArgumentException("Unknown freight legal faction"));
+        int actual;
+        if (placement.locationKind() == FleetLocationKind.IN_TRANSIT) {
+            var faction = placement.transitState().entityState().faction();
+            if (faction == null) throw new IllegalArgumentException("Transit freight lacks legal faction");
+            actual = faction.factionId();
+        } else {
+            var faction = world.findSession(placement.systemId()).orElseThrow().getEntityRegistry()
+                    .require(placement.localEntityId()).getComponent(FactionComponent.class);
+            if (faction == null) throw new IllegalArgumentException("Local freight lacks legal faction");
+            actual = faction.factionId;
+        }
+        if (actual != expected) throw new IllegalArgumentException("Freight legal mirror differs from canonical world affiliation");
+    }
+
     private static void validateAndRegisterRestoredFreight(
             WorldSimulation world,
             Stage20FreightPersistentState freight,
@@ -340,6 +363,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             if (placement == null) {
                 throw new IllegalArgumentException("operational freighter is absent from restored world");
             }
+            validateFreightLegalFaction(world, fleet);
             if (placement.locationKind() == FleetLocationKind.IN_TRANSIT) {
                 continue;
             }
@@ -351,7 +375,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 // Explicit migration for historical generated-freight saves that predate finite propulsion.
                 entity.add(freightEngineering(fleet));
             }
-            Integer expectedFaction = world.findFactionRuntimeId(fleet.stableFactionId()).orElseThrow();
+            Integer expectedFaction = world.findFactionRuntimeId(fleet.legalFactionId()).orElseThrow();
             if (archetype == null || !archetype.contentId.equals(fleet.hullId())
                     || faction == null || faction.factionId != expectedFaction) {
                 throw new IllegalArgumentException(
@@ -803,6 +827,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             Stage20FreightPersistentState freightState = rebindFreightFingerprint(
                     freight.capture(), campaign.materializedWorld().worldFingerprint());
             freightState = synchronizeFreightPhysicalMirrors(freightState, localPhysical);
+            for (var fleet : freightState.freighters()) validateFreightLegalFaction(world, fleet);
             return new Stage20GeneratedWorldRuntimePersistentState(
                     Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                     CURRENT_VERSION,
@@ -873,7 +898,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         fleetState.phase(),
                         fleetState.activeOrderId(),
                         fleetState.routeIndex(),
-                        fleetState.cargoStorage()));
+                        fleetState.cargoStorage(),
+                        fleetState.legalFactionId()));
                 changed = true;
             }
             if (!changed) {

@@ -167,6 +167,16 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(campaign(game).coordinator().runtime().world().findFactionEconomicState("faction.player").orElseThrow().treasuryMilliCredits()!=1_000_000L)throw new AssertionError("Capitalization failed");
   keyboardAction(renderer,game,"pilot.faction-withdraw");keyboardAction(renderer,game,"pilot.physical-confirm");
   if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=personalBefore)throw new AssertionError("Treasury return failed");
+  // Explicit own registration updates world legal affiliation and the versioned freight mirror together.
+  processor.keyDown(Input.Keys.F3);game.render();selectRow(workspace,game,"player-government|affiliation");
+  var beforeAffiliation=campaign(game).captureState();
+  keyboardAction(renderer,game,"pilot.government-affiliate");screenshot("stage23b-own-registration-preview");
+  if(!beforeAffiliation.equals(campaign(game).captureState()))throw new AssertionError("Affiliation preview mutated world");
+  keyboardAction(renderer,game,"pilot.government-confirm");
+  for(var owned:campaign(game).playerState().orElseThrow().ownedFleetIds())if(!campaign(game).coordinator().runtime().freight().findFreighter(owned).orElseThrow().legalFactionId().equals("faction.player"))throw new AssertionError("UI legal affiliation mirror failed");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=personalBefore)throw new AssertionError("Affiliation changed money on reload");
+  System.out.println("Explicit two-hull world/freight legal affiliation preview, confirmation and reload passed without assets or funds");
   // Personal political decisions use shared persistent rules; no fixture faction authority is supplied.
   processor.keyDown(Input.Keys.F3);game.render();selectRow(workspace,game,"player-government|doctrine|0");
   keyboardAction(renderer,game,"pilot.government-more");screenshot("stage23b-own-policy-preview");

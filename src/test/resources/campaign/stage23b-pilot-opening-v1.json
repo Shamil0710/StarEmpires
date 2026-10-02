@@ -9,5 +9,13 @@
   "markets": 2,
   "physicalEndpoints": 72,
   "playerWalletMilliCredits": 75000000,
-  "reproduction": "Run tools/qa/Stage23BLegacyOpeningFixture.java against a packaged sourceCommit JAR. This is an ordinary confirmed opening, not a constructed or migrated player."
+  "reproduction": "Run tools/qa/Stage23BLegacyOpeningFixture.java against a packaged sourceCommit JAR. This is an ordinary confirmed opening, not a constructed or migrated player.",
+  "embeddedFreightFixture": {
+    "file": "stage23b-freight-v2.s20f.gz",
+    "schema": 2,
+    "uncompressedBytes": 16439,
+    "rawSha256": "6dc3fce927245d8b15ae96d168e28c7912a7df0263fc4845f294273f8a805221",
+    "compressedSha256": "99e6002a8bc78475e55f88eb06d5ae3348d3e8501133ce5c0a26bd51b1e7c797",
+    "provenance": "Exact embedded S20F payload extracted from this genuine ancestor campaign; no current-code serialization or field removal."
+  }
 }

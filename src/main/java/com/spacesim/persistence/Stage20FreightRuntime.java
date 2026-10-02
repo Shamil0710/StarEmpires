@@ -338,6 +338,22 @@ public final class Stage20FreightRuntime {
     }
 
     /**
+     * Mirrors an explicit ordinary world affiliation for a personally controlled idle hull.
+     * Bootstrap pool origin, allocator slot, physical placement and cargo remain exact.
+     * Capture/restore verifies this mirror against the canonical world faction.
+     * @param fleetId existing idle hull
+     * @param legalFactionId actually committed ordinary world affiliation
+     * @return updated redundant freight mirror
+     */
+    public FreighterState synchronizeLegalAffiliation(FleetId fleetId, String legalFactionId) {
+        var f = requireFreighter(fleetId); requirePhase(f, FreightPhase.IDLE);
+        var updated = new FreighterState(f.fleetId(), f.stableFactionId(), f.ownershipOrdinal(), f.hullId(),
+                f.fitId(), f.cargoCapacityKg(), f.currentSystemId(), f.physicalState(), f.phase(),
+                f.activeOrderId(), f.routeIndex(), requireHold(fleetId).snapshot(), legalFactionId);
+        freighters.put(fleetId, updated); return updated;
+    }
+
+    /**
      * Completes exactly the next persisted outbound neighbor hop using caller-supplied physical
      * arrival kinematics. Stage-20.5D supplies that edge-authoritative state.
      *
@@ -772,7 +788,8 @@ public final class Stage20FreightRuntime {
                 phase,
                 source.activeOrderId(),
                 routeIndex,
-                storage);
+                storage,
+                source.legalFactionId());
     }
 
     private static TransportOrderState copyOrder(

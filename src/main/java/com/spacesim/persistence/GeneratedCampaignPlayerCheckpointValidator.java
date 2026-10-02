@@ -26,6 +26,12 @@ final class GeneratedCampaignPlayerCheckpointValidator {
                     && (player == null || !player.ownedFleetIds().contains(lot.fleetId())))
                 throw new IllegalArgumentException("Manual cargo must belong to a persisted personal fleet");
         }
+        for (var fleet : stage20.freight().freighters()) {
+            if (!fleet.legalFactionId().equals(fleet.stableFactionId())
+                    && (player == null || !player.ownedFleetIds().contains(fleet.fleetId())
+                    || !fleet.legalFactionId().equals(player.factionContentId())))
+                throw new IllegalArgumentException("Explicit freight affiliation requires its persisted personal owner and faction");
+        }
         if (player == null) return;
         var world = stage20.worldState();
         var content = ContentCatalogLoader.loadDefault();
