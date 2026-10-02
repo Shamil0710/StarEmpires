@@ -1,0 +1,20 @@
+{
+  "reference_id": "ref.industrial_union.station.industrial_station.v1",
+  "asset_id": "industrial_union.station.industrial_station",
+  "batch": "001",
+  "status": "SELECTED_FOR_CLEAN_MASTER",
+  "source_type": "model_generated_presentation_board_normalized_for_review",
+  "source_generation_id": "47c6c305-f2f3-4ae3-981b-bdc12212ad15",
+  "rejected_clean_master_generation_id": "dee4b31f-9980-42b1-a5b4-3ae0d2974a20",
+  "prompt_authority": [
+    "docs/stage23e_visual_reference_freeze.md#1414-union-industrial-station-reference-prompt",
+    "docs/stage23e_generation_prompt_catalog.md#104-industrial_unionstationindustrial_station",
+    "docs/factions/industrial_union_visual_bible.md"
+  ],
+  "candidate_count": 5,
+  "selected_candidate": "candidate_01",
+  "selected_score": 92,
+  "geometry_frozen": false,
+  "review": "docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_batch_001.md",
+  "notes": "Candidate 01 selected after deterministic review normalization. A separate clean transparent geometry-preserving master with explicit stowed gantry and assembly rig is still required before freeze."
+}
