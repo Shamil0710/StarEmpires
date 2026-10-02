@@ -37,7 +37,7 @@ ref.empire.station.high_tech_hub.v1	empire.station.high_tech_hub	GENERATE_5_SELE
 ref.industrial_union.station.high_tech_hub.v1	industrial_union.station.high_tech_hub	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.15				false	
 ref.empire.station.trade_logistics_hub.v1	empire.station.trade_logistics_hub	GENERATE_5_SELECT_1	empire	station	PLANNED	14.8				false	
 ref.industrial_union.station.trade_logistics_hub.v1	industrial_union.station.trade_logistics_hub	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.16				false	
-ref.empire.station.naval_ordnance_depot.v1	empire.station.naval_ordnance_depot	GENERATE_5_SELECT_1	empire	station	PLANNED	14.9		stage23e_reference_generation_run_000.md		false	
+ref.empire.station.naval_ordnance_depot.v1	empire.station.naval_ordnance_depot	GENERATE_5_SELECT_1	empire	station	SELECTED	14.9		docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_batch_001.md	candidate_02	false	score=83; selected for constrained refinement; explicit loading arm and armored magazine door/track required before geometry freeze
 ref.industrial_union.station.naval_ordnance_depot.v1	industrial_union.station.naval_ordnance_depot	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.17				false	
 ref.empire.station.frontier_multipurpose.v1	empire.station.frontier_multipurpose	GENERATE_5_SELECT_1	empire	station	PLANNED	14.10				false	
 ref.industrial_union.station.frontier_multipurpose.v1	industrial_union.station.frontier_multipurpose	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.18				false	
