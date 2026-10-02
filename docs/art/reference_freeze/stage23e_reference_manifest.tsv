@@ -1,0 +1,50 @@
+reference_id	asset_id	mode	faction	domain	status	prompt_section	base_reference	latest_review	selected_candidate	geometry_frozen	notes
+ref.empire.ship.corvette.v1	empire.ship.corvette	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.1				false	Audit current production master before any regeneration
+ref.empire.ship.frigate.v1	empire.ship.frigate	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.2				false	Audit current production master before any regeneration
+ref.empire.ship.destroyer.v1	empire.ship.destroyer	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.3				false	Audit current production master before any regeneration
+ref.empire.ship.cruiser.v1	empire.ship.cruiser	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.4				false	Audit current production master before any regeneration
+ref.empire.ship.battleship.v1	empire.ship.battleship	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.5				false	Audit current production master before any regeneration
+ref.empire.ship.carrier.v1	empire.ship.carrier	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.6				false	Audit current production master before any regeneration
+ref.empire.ship.freight.v1	empire.ship.freight	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.7				false	Audit current production master before any regeneration
+ref.empire.ship.tanker.v1	empire.ship.tanker	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.8				false	Audit current production master before any regeneration
+ref.empire.ship.fleet_support.v1	empire.ship.fleet_support	PROMOTE_EXISTING	empire	major_ship	PLANNED	6.9				false	Audit current production master before any regeneration
+ref.industrial_union.ship.corvette.v1	industrial_union.ship.corvette	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.1				false	Audit current production master before any regeneration
+ref.industrial_union.ship.frigate.v1	industrial_union.ship.frigate	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.2				false	Audit current production master before any regeneration
+ref.industrial_union.ship.destroyer.v1	industrial_union.ship.destroyer	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.3				false	Audit current production master before any regeneration
+ref.industrial_union.ship.cruiser.v1	industrial_union.ship.cruiser	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.4				false	Audit current production master before any regeneration
+ref.industrial_union.ship.battleship.v1	industrial_union.ship.battleship	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.5				false	Audit current production master before any regeneration
+ref.industrial_union.ship.carrier.v1	industrial_union.ship.carrier	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.6				false	Audit current production master before any regeneration
+ref.industrial_union.ship.freight.v1	industrial_union.ship.freight	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.7				false	Audit current production master before any regeneration
+ref.industrial_union.ship.tanker.v1	industrial_union.ship.tanker	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.8				false	Audit current production master before any regeneration
+ref.industrial_union.ship.fleet_support.v1	industrial_union.ship.fleet_support	PROMOTE_EXISTING	industrial_union	major_ship	PLANNED	7.9				false	Audit current production master before any regeneration
+ref.empire.small_craft.base.v1	empire.small_craft.base	GENERATE_5_SELECT_1	empire	small_craft	PLANNED	13.2				false	
+ref.industrial_union.small_craft.base.v1	industrial_union.small_craft.base	GENERATE_5_SELECT_1	industrial_union	small_craft	PLANNED	13.3				false	
+ref.empire.small_craft.interceptor.v1	empire.small_craft.fit_interceptor	DERIVE_FROM_REFERENCE	empire	small_craft_fit	PLANNED	8.2	ref.empire.small_craft.base.v1			false	
+ref.empire.small_craft.defence.v1	empire.small_craft.fit_defence	DERIVE_FROM_REFERENCE	empire	small_craft_fit	PLANNED	8.3	ref.empire.small_craft.base.v1			false	
+ref.empire.small_craft.strike.v1	empire.small_craft.fit_strike	DERIVE_FROM_REFERENCE	empire	small_craft_fit	PLANNED	8.4	ref.empire.small_craft.base.v1			false	
+ref.industrial_union.small_craft.interceptor.v1	industrial_union.small_craft.fit_interceptor	DERIVE_FROM_REFERENCE	industrial_union	small_craft_fit	PLANNED	8.6	ref.industrial_union.small_craft.base.v1			false	
+ref.industrial_union.small_craft.defence.v1	industrial_union.small_craft.fit_defence	DERIVE_FROM_REFERENCE	industrial_union	small_craft_fit	PLANNED	8.7	ref.industrial_union.small_craft.base.v1			false	
+ref.industrial_union.small_craft.strike.v1	industrial_union.small_craft.fit_strike	DERIVE_FROM_REFERENCE	industrial_union	small_craft_fit	PLANNED	8.8	ref.industrial_union.small_craft.base.v1			false	
+ref.empire.station.mining_outpost.v1	empire.station.mining_outpost	GENERATE_5_SELECT_1	empire	station	PLANNED	14.3				false	
+ref.industrial_union.station.mining_outpost.v1	industrial_union.station.mining_outpost	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.11				false	
+ref.empire.station.volatile_depot.v1	empire.station.volatile_depot	GENERATE_5_SELECT_1	empire	station	PLANNED	14.4				false	
+ref.industrial_union.station.volatile_depot.v1	industrial_union.station.volatile_depot	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.12				false	
+ref.empire.station.refinery_complex.v1	empire.station.refinery_complex	GENERATE_5_SELECT_1	empire	station	PLANNED	14.5				false	
+ref.industrial_union.station.refinery_complex.v1	industrial_union.station.refinery_complex	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.13				false	
+ref.empire.station.industrial_station.v1	empire.station.industrial_station	GENERATE_5_SELECT_1	empire	station	PLANNED	14.6				false	
+ref.industrial_union.station.industrial_station.v1	industrial_union.station.industrial_station	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.14		stage23e_reference_generation_run_000.md		false	
+ref.empire.station.high_tech_hub.v1	empire.station.high_tech_hub	GENERATE_5_SELECT_1	empire	station	PLANNED	14.7				false	
+ref.industrial_union.station.high_tech_hub.v1	industrial_union.station.high_tech_hub	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.15				false	
+ref.empire.station.trade_logistics_hub.v1	empire.station.trade_logistics_hub	GENERATE_5_SELECT_1	empire	station	PLANNED	14.8				false	
+ref.industrial_union.station.trade_logistics_hub.v1	industrial_union.station.trade_logistics_hub	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.16				false	
+ref.empire.station.naval_ordnance_depot.v1	empire.station.naval_ordnance_depot	GENERATE_5_SELECT_1	empire	station	PLANNED	14.9		stage23e_reference_generation_run_000.md		false	
+ref.industrial_union.station.naval_ordnance_depot.v1	industrial_union.station.naval_ordnance_depot	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.17				false	
+ref.empire.station.frontier_multipurpose.v1	empire.station.frontier_multipurpose	GENERATE_5_SELECT_1	empire	station	PLANNED	14.10				false	
+ref.industrial_union.station.frontier_multipurpose.v1	industrial_union.station.frontier_multipurpose	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.18				false	
+ref.world.special.energetic_anomaly.v1	world.special.energetic_anomaly	GENERATE_5_SELECT_1	shared	special_location	PLANNED	15.1				false	
+ref.world.special.escort_hull_derelict.v1	world.special.escort_hull_derelict	PROMOTE_EXISTING	shared	special_location	PLANNED	15.2				false	Promote current derelict if quality passes; otherwise generate five
+ref.world.special.resonant_resource_phenomenon.v1	world.special.resonant_resource_phenomenon	GENERATE_5_SELECT_1	shared	special_location	PLANNED	15.3				false	
+ref.world.resource.carbonaceous.v1	world.resource.carbonaceous	PROMOTE_EXISTING	shared	resource_body	PLANNED	12.1				false	Audit Stage-20.5 resource art and knowledge-leak safety
+ref.world.resource.water_ice.v1	world.resource.water_ice	PROMOTE_EXISTING	shared	resource_body	PLANNED	12.2				false	Audit Stage-20.5 resource art and knowledge-leak safety
+ref.world.resource.metallic.v1	world.resource.metallic	PROMOTE_EXISTING	shared	resource_body	PLANNED	12.3				false	Audit Stage-20.5 resource art and knowledge-leak safety
+ref.world.resource.mineral_silicate.v1	world.resource.mineral_silicate	PROMOTE_EXISTING	shared	resource_body	PLANNED	12.4				false	Audit Stage-20.5 resource art and knowledge-leak safety
