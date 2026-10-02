@@ -7,6 +7,7 @@
 **Primary release feature:** final_presentation / MUST_SHIP  
 **Known mandatory release blocker:** GitHub issue #375 — explicit guided-ordnance detonation event seam.
 **Canonical production asset specification:** [Stage 23E — Production Asset and Animation Specification](stage23e_production_asset_spec.md).
+**Canonical visual-reference freeze:** [Stage 23E — Visual Reference Freeze Catalog](stage23e_visual_reference_freeze.md).
 **Canonical generation/authoring catalog:** [Stage 23E — Generation Prompt Catalog](stage23e_generation_prompt_catalog.md).
 
 ## 1. Purpose
