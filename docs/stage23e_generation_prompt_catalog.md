@@ -4,6 +4,7 @@
 **Parent execution contract:** docs/stage23e_final_presentation_plan.md  
 **Technical production spec:** docs/stage23e_production_asset_spec.md  
 **Visual-reference freeze:** docs/stage23e_visual_reference_freeze.md  
+**Reference registry:** docs/art/reference_freeze/stage23e_reference_manifest.tsv  
 **Faction authorities:** docs/factions/empire_visual_bible.md and docs/factions/industrial_union_visual_bible.md  
 **Character authority:** docs/characters/character_master_prompt.md  
 **Scope:** production prompts and authoring briefs for every currently known Stage-23E release-facing visual family.
