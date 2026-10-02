@@ -167,6 +167,32 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(campaign(game).coordinator().runtime().world().findFactionEconomicState("faction.player").orElseThrow().treasuryMilliCredits()!=1_000_000L)throw new AssertionError("Capitalization failed");
   keyboardAction(renderer,game,"pilot.faction-withdraw");keyboardAction(renderer,game,"pilot.physical-confirm");
   if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=personalBefore)throw new AssertionError("Treasury return failed");
+  // Personal political decisions use shared persistent rules; no fixture faction authority is supplied.
+  processor.keyDown(Input.Keys.F3);game.render();selectRow(workspace,game,"player-government|doctrine|0");
+  keyboardAction(renderer,game,"pilot.government-more");screenshot("stage23b-own-policy-preview");
+  if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().doctrine().tradeOpenness()!=50)throw new AssertionError("Policy preview mutated live doctrine");
+  keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().doctrine().tradeOpenness()!=55)throw new AssertionError("Doctrine UI command failed");
+  selectRow(workspace,game,"player-government|fiscal|0");keyboardAction(renderer,game,"pilot.government-more");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionFiscalPolicy("faction.player").orElseThrow().stationTaxBasisPoints()!=100)throw new AssertionError("Fiscal UI command failed");
+  selectRow(workspace,game,"player-government|embargo|faction.alpha");keyboardAction(renderer,game,"pilot.government-impose");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionDiplomacyState("faction.player").orElseThrow().embargoes().isEmpty())throw new AssertionError("Embargo UI command failed");
+  keyboardAction(renderer,game,"pilot.government-revoke");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(!campaign(game).coordinator().runtime().world().findFactionDiplomacyState("faction.player").orElseThrow().embargoes().isEmpty())throw new AssertionError("Embargo UI revocation failed");
+  selectRow(workspace,game,"player-government|offer|faction.alpha|MARKET_ACCESS|");keyboardAction(renderer,game,"pilot.government-mutual");screenshot("stage23b-own-treaty-preview");keyboardAction(renderer,game,"pilot.government-confirm");
+  var ownTreaty=campaign(game).coordinator().runtime().world().findFactionDiplomacyState("faction.player").orElseThrow().treaties().get(0);
+  if(ownTreaty.status()!=com.spacesim.world.DiplomaticTreatyState.Status.PROPOSED)throw new AssertionError("Offer was not merely proposed");
+  var home=campaign(game).playerState().orElseThrow().homeSystemId();
+  var beforeController=campaign(game).coordinator().runtime().world().controllingFaction(home);
+  selectRow(workspace,game,"player-government|territory|"+home.value());keyboardAction(renderer,game,"pilot.government-claim");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().claimFor(home)==null
+          ||!beforeController.equals(campaign(game).coordinator().runtime().world().controllingFaction(home)))throw new AssertionError("Claim UI command granted sovereignty or lost claim");
+  keyboardAction(renderer,game,"pilot.government-withdraw");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().claimFor(home)!=null)throw new AssertionError("Claim UI withdrawal failed");
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=personalBefore)throw new AssertionError("Political commands changed personal money");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+  if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().doctrine().tradeOpenness()!=55)throw new AssertionError("Policy lost on reload");
+  System.out.println("Personal doctrine/fiscal, actual embargo/revocation, proposed treaty, claim/withdrawal and unchanged resources/reload UI commands passed");
   // Return control to the original cargo-bearing hull; the purchased reserve remains at home.
   ships(renderer,game);selectRow(workspace,game,"personal-ship:"+pilotFleet.fleetId().value());
   keyboardAction(renderer,game,"pilot.switch");keyboardAction(renderer,game,"pilot.physical-confirm");

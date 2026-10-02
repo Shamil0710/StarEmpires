@@ -41,6 +41,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private Stage228CampaignAuthority.MissionCommandPreview pendingMissionPreview;
     private Stage228CampaignAuthority.PilotStartPreview pendingPilotStart;
     private Stage228CampaignAuthority.PlayerPhysicalPreview pendingPilotPhysical;
+    private Stage228CampaignAuthority.PlayerFactionCommandPreview pendingGovernment;
+    private String pendingGovernmentSelection = "";
     private Stage228CampaignAuthority.PlayerFactionFoundationPreview pendingFactionFoundation;
     private String pendingPilotSelection = "";
     private int pilotKilograms = 1;
@@ -74,6 +76,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private void bindCampaign() {
+        pendingGovernment = null;
         var coordinator = campaign.coordinator();
         model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content());
         snapshot = model.capture();
@@ -223,6 +226,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean action(String id) {
+        if (id.startsWith("pilot.government-")) return governmentAction(id.substring("pilot.government-".length()));
         return switch (id) {
             case "back" -> workspace.goBack();
             case "search" -> {
@@ -305,6 +309,28 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "exit" -> { Gdx.app.exit(); yield true; }
             default -> false;
         };
+    }
+
+    private boolean governmentAction(String action) {
+        String selected=workspace.view().selection().stableId();
+        if(workspace.tab()!=Tab.FACTIONS || production.find(Tab.FACTIONS,workspace.view().selection()).isEmpty()
+                || com.spacesim.ui.GeneratedCampaignFactionUi.actions(selected).isEmpty())return false;
+        if(action.equals("confirm")) {
+            var preview=pendingGovernment;pendingGovernment=null;
+            if(preview==null||!selected.equals(pendingGovernmentSelection))return false;
+            try {
+                campaign=campaign.submitPlayerFactionCommand(preview);
+                pendingPilotPhysical=null;pendingMissionPreview=null;pendingFactionFoundation=null;
+                bindCampaign();status="Собственное решение выполнено. Ресурсы не предоставляются; Пробел — продолжить время.";
+            } catch(IllegalStateException exception){status="Условия изменились. Проверьте решение заново.";}
+        } else {
+            campaign.coordinator().setPaused(true);pendingGovernmentSelection=selected;pendingGovernment=null;
+            try {
+                pendingGovernment=com.spacesim.ui.GeneratedCampaignFactionUi.preview(campaign,selected,action);
+                status=pendingGovernment.allowed()?com.spacesim.ui.GeneratedCampaignFactionUi.explanation(campaign,selected,action)+" Подтвердите решение.":"Решение отклонено: нужны полномочия, действующий договор, претензия или контроль. Проверьте условия в сведениях.";
+            } catch(IllegalArgumentException | ArithmeticException exception){status="Изменение вне допустимых границ. Проверьте значение и направление.";}
+        }
+        snapshot=model.capture();refreshProjection();return true;
     }
 
     private boolean selectedPilotStart() {
@@ -520,6 +546,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             pendingPilotStart = null;
             pendingPilotPhysical = null;
             pendingFactionFoundation = null;
+            pendingGovernment = null;
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
@@ -565,6 +592,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindPhysicalPilotActions(foundation || finance || selectedJump || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
                 selectedPilot.startsWith("pilot-market|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
                         : pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
+        if (!selectedPilot.equals(pendingGovernmentSelection)) pendingGovernment = null;
+        renderer.bindFactionActions(workspace.tab() == Tab.FACTIONS ? com.spacesim.ui.GeneratedCampaignFactionUi.actions(selectedPilot) : List.of(),
+                pendingGovernment != null && pendingGovernment.allowed());
         renderer.bindSaveAvailability(!campaign.canStartIndependentPilot());
         renderer.bindWorkspace(production, workspace);
         renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),

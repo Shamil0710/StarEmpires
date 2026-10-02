@@ -348,6 +348,103 @@ public final class Stage228CampaignAuthority {
         return adopted;
     }
 
+    /**
+     * Previews shared policy authoring/application for the actual player faction.
+     * @param command ordinary immutable policy intent
+     * @return pure exact-state confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerFactionPolicy(com.spacesim.world.FactionPolicyCommand command) {
+        return previewFactionCommand(service -> service.submitPolicy(Objects.requireNonNull(command)));
+    }
+
+    /**
+     * Previews the ordinary treaty lifecycle without impersonating a foreign actor.
+     * @param command shared treaty command
+     * @return pure exact-state confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerFactionTreaty(com.spacesim.world.DiplomaticTreatyCommand command) {
+        return previewFactionCommand(service -> service.submitTreaty(Objects.requireNonNull(command)));
+    }
+
+    /**
+     * Previews shared market-access embargo changes for the actual player faction.
+     * @param command shared embargo command
+     * @return pure exact-state confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerFactionEmbargo(com.spacesim.world.DiplomaticEmbargoCommand command) {
+        return previewFactionCommand(service -> service.submitEmbargo(Objects.requireNonNull(command)));
+    }
+
+    /**
+     * Previews existing territorial rules at a personally discovered system.
+     * @param action CLAIM, WITHDRAW, RELINQUISH, RECOGNIZE_CLAIM, RECOGNIZE_CONTROL, GRANT_RIGHT or REVOKE_RIGHT
+     * @param system discovered target system
+     * @param targetFaction target of recognition/concession, otherwise ignored
+     * @param expiresTick ordinary concession expiry, otherwise ignored
+     * @return pure exact-state confirmation; claims never grant immediate control
+     */
+    public PlayerFactionCommandPreview previewPlayerFactionTerritory(String action,
+            com.spacesim.world.StarSystemId system, String targetFaction, long expiresTick) {
+        return previewFactionCommand(service -> {
+            if (playerState == null || !playerState.discoveredSystemIds().contains(system))
+                throw new IllegalStateException("Territorial target has not been personally discovered");
+            switch (action) {
+                case "CLAIM" -> service.declareClaim(system);
+                case "WITHDRAW" -> { if (!service.withdrawClaim(system)) throw new IllegalStateException("No withdrawable own claim"); }
+                case "RELINQUISH" -> { if (!service.relinquishControl(system)) throw new IllegalStateException("No own control"); }
+                case "RECOGNIZE_CLAIM" -> service.recognizeClaim(targetFaction, system);
+                case "RECOGNIZE_CONTROL" -> service.recognizeControl(targetFaction, system);
+                case "GRANT_RIGHT" -> service.grantConstructionRight(targetFaction, system, expiresTick);
+                case "REVOKE_RIGHT" -> { if (!service.revokeConstructionRight(targetFaction, system)) throw new IllegalStateException("No own concession"); }
+                default -> throw new IllegalArgumentException("Unknown territorial command");
+            }
+        });
+    }
+
+    private PlayerFactionCommandPreview previewFactionCommand(
+            java.util.function.Consumer<com.spacesim.player.PlayerFactionManagementService> command) {
+        var baseline = captureState();
+        com.spacesim.persistence.Stage228GeneratedCampaignPersistentState candidate = null;
+        try {
+            var isolated = restore(baseline);
+            if (isolated.playerState == null || !isolated.playerState.affiliated())
+                throw new IllegalStateException("No personal faction authority");
+            var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(
+                    isolated.coordinator.runtime().world(), isolated.coordinator.content(), isolated.playerState);
+            command.accept(new com.spacesim.player.PlayerFactionManagementService(adapter));
+            isolated.playerState = adapter.player();
+            candidate = isolated.captureState();
+            restore(candidate).captureState();
+        } catch (IllegalStateException | IllegalArgumentException exception) { candidate = null; }
+        return new PlayerFactionCommandPreview(this, baseline, candidate);
+    }
+
+    /** Exact-state single-use confirmation of shared faction rules, never a faction impersonation token. */
+    public static final class PlayerFactionCommandPreview {
+        private final Stage228CampaignAuthority owner;
+        private final com.spacesim.persistence.Stage228GeneratedCampaignPersistentState baseline, candidate;
+        private boolean used;
+        private PlayerFactionCommandPreview(Stage228CampaignAuthority owner,
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState baseline,
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState candidate) {
+            this.owner = owner; this.baseline = baseline; this.candidate = candidate;
+        }
+        /** @return whether the shared command and composed checkpoint validation accepted */
+        public boolean allowed() { return candidate != null && !used; }
+    }
+
+    /**
+     * Adopts the validated policy/diplomatic/territorial transition without advancing any clock.
+     * @param preview current single-use confirmation owned by this campaign
+     * @return replacement binding preserving all adjacent physical and campaign owners
+     */
+    public Stage228CampaignAuthority submitPlayerFactionCommand(PlayerFactionCommandPreview preview) {
+        var p = Objects.requireNonNull(preview);
+        if (p.owner != this || !p.allowed() || !p.baseline.equals(captureState()))
+            throw new IllegalStateException("Faction command is stale or unauthorized");
+        var adopted = restore(p.candidate); p.used = true; return adopted;
+    }
+
     private void initializePilotMarkets() {
         var runtime = coordinator.runtime();
         for (var endpoint : runtime.infrastructure().endpoints()) {

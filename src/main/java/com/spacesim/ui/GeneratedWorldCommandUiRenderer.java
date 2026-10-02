@@ -543,10 +543,11 @@ public final class GeneratedWorldCommandUiRenderer {
             batch.begin();
             fonts.body().setColor(ImperialUiPalette.IVORY);
             fonts.body().draw(batch, item.name(), row.x() + 14f * metrics.scale(), row.top() - 10f * metrics.scale(),
-                    row.width() - 28f * metrics.scale(), Align.left, false);
+                    0, item.name().length(), row.width() - 28f * metrics.scale(), Align.left, false, "…");
             fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-            fonts.small().draw(batch, item.category() + " • " + item.summary(), row.x() + 14f * metrics.scale(),
-                    row.y() + 20f * metrics.scale(), row.width() - 28f * metrics.scale(), Align.left, false);
+            String summary = item.category() + " • " + item.summary();
+            fonts.small().draw(batch, summary, row.x() + 14f * metrics.scale(),
+                    row.y() + 20f * metrics.scale(), 0, summary.length(), row.width() - 28f * metrics.scale(), Align.left, false, "…");
             batch.end();
             HitKind kind = switch (item.selection().kind()) {
                 case FACTION -> HitKind.FACTION; case FREIGHT -> HitKind.FREIGHT;
@@ -569,7 +570,7 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
         } else {
             boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
-            Rect details = physicalPilotActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
+            Rect details = physicalPilotActions || !factionActions.isEmpty() ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 156f * metrics.scale()) : missionActions || pilotStartActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
@@ -579,8 +580,9 @@ public final class GeneratedWorldCommandUiRenderer {
                     selected.explainedSections(), workspace.view().detailScroll());
             if (missionActions) drawMissionActions();
             if (pilotStartActions) drawPilotStartActions();
-            if (physicalPilotActions) drawPhysicalPilotActions();
-            if (navigable && !physicalPilotActions) {
+            if (!factionActions.isEmpty()) drawFactionActions();
+            else if (physicalPilotActions) drawPhysicalPilotActions();
+            if (navigable && !physicalPilotActions && factionActions.isEmpty()) {
                 Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
                         inspectorRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
                 boolean available = selected.focusSystem() != null;
@@ -600,6 +602,16 @@ public final class GeneratedWorldCommandUiRenderer {
     private boolean missionConfirmation;
     private boolean pilotStartActions;
     private boolean pilotStartConfirmation;
+    private List<GeneratedCampaignFactionUi.Action> factionActions = List.of();
+    private boolean factionConfirmation;
+    /**
+     * Binds the current row's presentation intents without granting faction authority.
+     * @param actions selected personal faction intents
+     * @param confirmation current exact preview
+     */
+    public void bindFactionActions(List<GeneratedCampaignFactionUi.Action> actions, boolean confirmation) {
+        factionActions = List.copyOf(actions); factionConfirmation = confirmation;
+    }
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
     private boolean physicalPilotJump;
@@ -630,6 +642,18 @@ public final class GeneratedWorldCommandUiRenderer {
      * @param action PURCHASE, SWITCH, FOUNDATION, FINANCE, or empty for other actions
      */
     public void bindPilotAssetAction(String action) { physicalPilotAssetAction = action; }
+
+    private void drawFactionActions() {
+        float scale=metrics.scale();float width=(inspectorRect.width()-40f*scale)/3f;
+        for(int i=0;i<factionActions.size();i++) {
+            var action=factionActions.get(i);
+            Rect r=new Rect(inspectorRect.x()+16f*scale+i*(width+4f*scale),inspectorRect.y()+106f*scale,width,36f*scale);
+            button(r,action.label(),true);hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-"+action.id(),null,r));
+        }
+        Rect confirm=new Rect(inspectorRect.x()+16f*scale,inspectorRect.y()+12f*scale,inspectorRect.width()-32f*scale,36f*scale);
+        button(confirm,"ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ РЕШЕНИЕ",factionConfirmation);
+        if(factionConfirmation)hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-confirm",null,confirm));
+    }
 
     private void drawPhysicalPilotActions() {
         float scale = metrics.scale();

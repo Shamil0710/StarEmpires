@@ -115,3 +115,15 @@ alias `se-gen-3` records the changed opening profile; saved underlying generatio
 The default explicitly founded player faction is now a governed PLAYER_CREATED identity, preserving
 existing WorldState identity allocation/save/collision rules without creating it at generation/load.
 Full evidence and incomplete stage scope remain in the production UI document and profile v2.
+
+
+## Subsequent personal faction policy/diplomatic/territorial commands
+
+Shared PlayerFactionManagementService policy, treaty, embargo and territorial transitions are
+previewed on an isolated current checkpoint and confirmed via exact-state replacement. Existing
+WorldState strategic/diplomatic fields own every result; no new persistent owner, save field or
+clock is added. Doctrine/fiscal settings and legal claim intent persist without economic grants.
+Party-to-party rights retain their direction when counteroffers/renewals change directory owner;
+existing saved treaties remain unchanged. Unknown personal territorial targets and impersonated
+actors reject. The same v5 envelope and opening profile are retained. Asset legal affiliation and
+physical/strategic player loops remain separate outstanding work with their owning validation gates.

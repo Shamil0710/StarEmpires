@@ -445,3 +445,47 @@ Full clean CI on the next exact commit remains required. **23B remains ACTIVE/PA
 fitting, physical construction/supply, strategic/policy/territorial/affiliation/carrier commands,
 production NPC offers and final human B18 acceptance remain mandatory. No merge or 23C follows
 from this market slice.
+
+
+### Personal faction policy, diplomacy and territorial intent
+
+The actual player faction now exposes doctrine, fiscal limits, treaty lifecycle, market embargo and
+territorial intents through the existing PlayerFactionManagementService. Each pure preview restores
+an isolated composed checkpoint and delegates to ordinary validators. Confirmation adopts the
+validated replacement only for the exact source authority/checkpoint and consumes its token once.
+Independent players and foreign-actor treaty/embargo impersonation fail without live mutations.
+The policy controls do not grant money, goods, sovereignty, production output or assets.
+
+| Production control | Shared behavior | Disclosed scope |
+| --- | --- | --- |
+| Seven doctrine axes | bounded FactionPolicyCommand.UpdateDoctrine | 5-point steps, exact before/after, 0–100 |
+| Six fiscal values | bounded FactionPolicyCommand.UpdateFiscalPolicy | 1-percentage-point rates / 1,000-credit limits |
+| Embargo / revoke | ordinary unilateral legal access transition | selected public counterparty, indefinite until revoked |
+| Treaty offers | all five clause kinds / three directions | selected counterparty, personally discovered scope for construction, indefinite; requires consent |
+| Treaty lifecycle | accept/reject, 20-tick notice, breach, renewal, counterproposal | actual related saved treaty; ordinary validators decide eligibility |
+| Claims / withdrawal / relinquishment | ordinary territorial stabilization and ownership rules | personally discovered system; declaration does not grant control |
+| Recognition / construction concession | shared existing claim/control/right rules | explicit counterparty/system; no free construction resources |
+
+Counterproposals retaining an incoming one-way grant reverse its owner-relative representation so
+the same actual party remains grantor. The shared renewal owner also preserves party-to-party rights
+when a different party originates renewal. Existing saved treaties are not rewritten. A regression
+checks both changes with ordinary incoming/acceptance fixtures and preserved personal money.
+New row names/summaries are ellipsized within the list; the inspector retains full values, avoiding
+long treaty/territorial names drawing over unrelated detail text. No navigation state or authority
+is encoded by those display truncations.
+
+The final local Java-17 verify passed **16 tests, zero failures/errors**, including seven composed
+faction-command methods, original production projection, repository faction-ID audit, Stage-17E
+treaty lifecycle and Stage-21C mid-lifecycle persistence. Strict Javadoc and desktop packaging passed;
+local coverage was skipped. The final packaged-JAR llvmpipe journey passed every previous market/
+travel/asset surface plus real keyboard doctrine/fiscal changes, embargo/revocation, a proposed
+market-access treaty, claim/withdrawal and exact policy/resource save/load. Final policy/treaty
+screens were visually inspected after the list overflow fix. Incoming-offer acceptance, counteroffer
+and renewal integration cases use labelled ordinary foreign-authority fixtures; the UI smoke does
+not claim an autonomous production NPC issued those offers or accepted an outgoing treaty.
+
+This is another implemented command slice. Stock/production-policy authoring/application, asset
+legal affiliation, established territorial control, physical mining/fitting/construction/supply,
+fleet strategic/carrier commands, production NPC offers and genuine B18 acceptance remain open.
+No owning schema, content or new-game resource profile changes. Full exact-head clean CI is still
+required for this next command commit; 23B remains ACTIVE/PARTIAL with no merge or 23C.
