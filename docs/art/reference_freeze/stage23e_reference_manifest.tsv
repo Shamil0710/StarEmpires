@@ -32,7 +32,7 @@ ref.industrial_union.station.volatile_depot.v1	industrial_union.station.volatile
 ref.empire.station.refinery_complex.v1	empire.station.refinery_complex	GENERATE_5_SELECT_1	empire	station	PLANNED	14.5				false	
 ref.industrial_union.station.refinery_complex.v1	industrial_union.station.refinery_complex	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.13				false	
 ref.empire.station.industrial_station.v1	empire.station.industrial_station	GENERATE_5_SELECT_1	empire	station	PLANNED	14.6				false	
-ref.industrial_union.station.industrial_station.v1	industrial_union.station.industrial_station	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.14		stage23e_reference_generation_run_000.md		false	
+ref.industrial_union.station.industrial_station.v1	industrial_union.station.industrial_station	GENERATE_5_SELECT_1	industrial_union	station	SELECTED	14.14		docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_batch_001.md	candidate_01	false	score=92; clean geometry-preserving master with explicit stowed gantry and assembly rig required before freeze
 ref.empire.station.high_tech_hub.v1	empire.station.high_tech_hub	GENERATE_5_SELECT_1	empire	station	PLANNED	14.7				false	
 ref.industrial_union.station.high_tech_hub.v1	industrial_union.station.high_tech_hub	GENERATE_5_SELECT_1	industrial_union	station	PLANNED	14.15				false	
 ref.empire.station.trade_logistics_hub.v1	empire.station.trade_logistics_hub	GENERATE_5_SELECT_1	empire	station	PLANNED	14.8				false	
