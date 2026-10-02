@@ -522,6 +522,1063 @@ Production feedback is required for ordinary state transitions where they are vi
 
 Effects end when the authoritative operation ends.
 
+
+### 11.5 Global object animation contract
+
+Every release-facing physical object receives an explicit presentation contract. "Animated" does not
+mean that the whole sprite must be redrawn continuously. The preferred stack is:
+
+    static base/albedo
+    + emissive/status layer
+    + optional local mechanical layer
+    + state-specific damage/emergency layer
+    + transient event VFX
+    + semantic audio cue
+    + distant marker/LOD
+
+Use full-frame sprite-sheet animation only when the visible geometry itself changes and a local
+layer cannot represent the motion cleanly.
+
+For all animated packages:
+
+- every frame/layer keeps the same declared pivot and physical orientation;
+- animation never changes physical dimensions, collision, hardpoints or fitting authority;
+- base geometry remains pixel-stable unless an authoritative mechanical state changes it;
+- idle animation is asynchronous between objects using a stable phase offset derived from persistent
+  object identity so identical stations do not blink in perfect unison;
+- deterministic capture mode derives animation phase from simulation/presentation tick + stable
+  object ID rather than wall-clock randomness;
+- damage/emergency state may suppress ordinary idle loops;
+- power loss suppresses non-emergency emissive and motorized presentation where authoritative state
+  exposes such a condition;
+- a hidden/undiscovered object produces no world-space presentation cue merely because an asset
+  exists;
+- animation state is reconstructed from current authoritative state after save/load and does not
+  replay old transient actions.
+
+Recommended visual cadence, subject to final profiling and accessibility:
+
+- slow navigation/service beacons: roughly 0.3–1.5 Hz;
+- scanner/sensor presentation: roughly 1–4 s per sweep/cycle;
+- idle machinery that is legitimately running: roughly 2–6 visible state changes per second;
+- doors/arms/clamps: event-duration animation, not an endless loop;
+- weapon/reaction animation: event-driven, normally faster than idle loops;
+- reduced-motion mode may replace mechanical loops with static state poses while preserving
+  functional meaning.
+
+### 11.6 Faction motion language
+
+Animation must reinforce faction identity in addition to silhouette and palette.
+
+#### 11.6.1 Empire
+
+Imperial motion language is:
+
+- deliberate;
+- ordered;
+- hierarchical;
+- relatively slow;
+- mechanically weighty;
+- redundant rather than flashy.
+
+Typical presentation:
+
+- sequential service-light checks rather than rapid decorative chasing lights;
+- slow synchronized docking beacon groups;
+- protected doors/armor shutters moving with visible mass;
+- sensor activity concentrated around command/citadel structures;
+- machinery that appears maintained and controlled;
+- emergency lighting that is strict and localized.
+
+Avoid:
+
+- frenetic blinking;
+- neon strips used as decoration;
+- light patterns that resemble entertainment signage;
+- ornate ceremonial movement on ordinary operational hardware.
+
+#### 11.6.2 Industrial Union
+
+Industrial Union motion language is:
+
+- modular;
+- rhythmic;
+- throughput-oriented;
+- repeated;
+- workshop/yard-like;
+- visibly tied to material handling.
+
+Typical presentation:
+
+- repeating status lights across equivalent production modules;
+- berth-by-berth work-state indication;
+- gantry, clamp and cargo-system motion when active;
+- standardized hazard-light sequences;
+- processing/service cycles that communicate machine flow.
+
+Avoid:
+
+- aristocratic/ceremonial pacing;
+- Imperial central-citadel animation grammar;
+- random factory noise with no operational meaning;
+- permanently moving cranes or doors when no job exists.
+
+### 11.7 Large ship animation contracts
+
+The following contracts apply to both sovereign factions. Faction visual/motion language changes the
+presentation style, not the underlying event semantics.
+
+#### 11.7.1 Corvette
+
+Base package:
+
+- base hull;
+- emissive/service layer;
+- damage layer;
+- main-engine idle/thrust;
+- RCS anchors;
+- weapon/sensor anchors actually present on the hull.
+
+Idle:
+
+- sparse navigation/service lights;
+- restrained sensor status pulse;
+- no constant RCS firing;
+- no decorative weapon movement.
+
+Active movement:
+
+- main plume follows actual thrust;
+- short local RCS bursts only from authoritative maneuver/attitude state;
+- high acceleration may increase engine emissive/plume intensity without enlarging the physical hull.
+
+Combat:
+
+- weapon cues are anchored to real hardpoints;
+- rapid corvette reactions should remain visually compact;
+- damage effects must not obscure the small silhouette.
+
+Audio:
+
+- light/compact propulsion signature;
+- short weapon transients;
+- minimal machinery layer;
+- warning cues prioritized over engine bed.
+
+LOD:
+
+- close: full sprite/lights/thrust;
+- medium: preserve engine direction, faction silhouette, damage severity;
+- distant: semantic marker + only major thrust/destruction cue.
+
+#### 11.7.2 Frigate / recon-EW frigate
+
+Idle:
+
+- sparse hull/service lights;
+- low-intensity sensor/communications activity on real sensor locations;
+- no visible EW pulse merely because the ship is an EW class.
+
+Active recon/EW:
+
+- sensor sweep, datalink or EW cue only when an allowed observed state exposes that activity;
+- EW visuals may use restrained directional/pulsed overlays but cannot expose hidden target location;
+- antenna/array mechanical movement is permitted only if the production art actually contains a
+  moving structure and runtime state supports it.
+
+Combat:
+
+- preserve sensor-role readability even during weapons fire;
+- effects must not turn the hull into a generic combat glow source.
+
+Audio:
+
+- restrained electronics/comms texture;
+- EW cue must be subtle and non-positional if exact hidden target information is not known.
+
+LOD:
+
+- medium/distant presentation prioritizes recon/EW role iconography over minor surface animation.
+
+#### 11.7.3 Destroyer / escort / missile-PD destroyer
+
+Idle:
+
+- protected VLS/launcher status lights;
+- PD readiness/service lights at actual mounts;
+- sparse sensor activity.
+
+Weapon state:
+
+- VLS door/cover animation only if represented as a visible moving component and tied to an actual
+  launch sequence;
+- missile launch flash/plume comes from real launch anchors;
+- PD animation is event-driven and may aggregate under saturation;
+- spinal/axial weapon cues remain aligned with physical firing direction.
+
+Damage:
+
+- localized weapon/launcher disable presentation only where subsystem authority supports it;
+- generic damage must not falsely indicate loss of a specific VLS/PD mount.
+
+Audio:
+
+- strong short PD events;
+- missile launch family;
+- compact kinetic/beam family according to fit;
+- launcher machinery may be represented only during actual launch/reload-like state that exists in
+  authority.
+
+#### 11.7.4 Cruiser
+
+Idle:
+
+- larger distributed service-light network;
+- slow engineering-zone status cycle;
+- restrained command/sensor activity around protected core.
+
+Movement:
+
+- multiple engine nozzles/groups may vary intensity only if runtime propulsion data can map them
+  lawfully; otherwise use a coherent shared thrust fraction.
+
+Combat:
+
+- multiple independent weapon blocks may produce simultaneous anchored events;
+- saturation policy preserves selected/targeted cruiser events before background minor sparks.
+
+Damage:
+
+- damage/emissive failure may be spatially richer than smaller ships;
+- severe-damage hotspots remain bounded and tied to accepted damage regions;
+- no invented compartment labels from art alone.
+
+Audio:
+
+- deeper machinery bed than escort classes;
+- multiple impact voices aggregate by importance;
+- critical system alarms duck ordinary machinery.
+
+#### 11.7.5 Battleship
+
+Idle:
+
+- very restrained large-scale motion;
+- slow service-light sequences emphasizing huge mass;
+- command/citadel status remains visually stable.
+
+Movement:
+
+- engine response should feel heavy through plume growth/decay timing, but this is presentation only;
+- no fake acceleration lag in simulation.
+
+Combat:
+
+- large weapon events may use stronger but still bounded flashes;
+- simultaneous secondary batteries/PD aggregate without hiding axial/main-battery events;
+- shield/armor/penetration hierarchy must remain especially clear.
+
+Damage:
+
+- progressive emissive loss;
+- larger localized heat/scorch regions;
+- bounded vent/fire presentation if supported;
+- destruction may use the richest current destruction VFX budget, still capped.
+
+Audio:
+
+- low-frequency heavy machinery and weapon transients;
+- dynamic compression/ducking prevents battleship events from masking critical UI warnings.
+
+LOD:
+
+- silhouette and damage state remain visible at farther distance than small ships due to physical size;
+- decorative micro-lights disappear early.
+
+#### 11.7.6 Carrier
+
+Idle:
+
+- hangar/service-zone illumination;
+- approach/docking beacons;
+- restrained command/sensor lights.
+
+Carrier operations:
+
+- hangar door/shutter animation only when a launch/recovery state exists;
+- deck/approach lights change to launch/recovery pattern during the actual operation;
+- launch/recovery VFX and audio bind to small-craft events;
+- service lights may mark occupied/active bays only from lawful state;
+- never show "busy deck" traffic when no craft operation exists.
+
+Combat:
+
+- PD/defensive weapon effects remain separate from carrier operations;
+- carrier small craft remain their own authoritative entities.
+
+Damage:
+
+- damaged hangar presentation only where state supports a hangar/bay impairment;
+- generic damage cannot visually close a specific bay and imply lost capacity without authority.
+
+Audio:
+
+- launch/recovery machinery;
+- berth/traffic cue;
+- muted flight-control/handling ambience for selected carrier;
+- no continuous "air traffic" loop if operations are idle.
+
+#### 11.7.7 Freight transport
+
+Idle:
+
+- cargo-module/service lights;
+- docking readiness indicators;
+- almost no decorative animation.
+
+Docking/cargo transfer:
+
+- berth/clamp status lights;
+- local cargo handling/transfer cue;
+- gantry/arm motion only when a corresponding visible handling device exists;
+- cargo flow is represented abstractly unless the simulation exposes individual moved units.
+
+Movement:
+
+- engine/plume follows real thrust;
+- loaded vs unloaded visual difference is allowed only if the physical/content model supports a
+  corresponding external module/state.
+
+Damage:
+
+- do not show cargo venting or container loss unless such loss/event exists.
+
+Audio:
+
+- machinery/handling emphasis;
+- restrained engine family;
+- transfer/clamp sounds when actual operations begin/end.
+
+#### 11.7.8 Fleet tanker
+
+Idle:
+
+- manifold/service lights;
+- safety beacons;
+- restrained thermal/engineering indicators.
+
+Transfer operation:
+
+- docking/transfer link presentation only while an actual propellant/volatile transfer exists;
+- hose/boom animation is allowed only if such external hardware is part of the accepted sprite;
+- flow indication must not imply quantity beyond the authoritative transfer state;
+- emergency/safety presentation may override ordinary idle lights.
+
+Audio:
+
+- pumps/compressors represented as interface ambience during active transfer;
+- clamp/valve/state transition cues;
+- no looping transfer sound when no transfer is active.
+
+#### 11.7.9 Fleet support / replenishment / repair support
+
+Idle:
+
+- service-module readiness;
+- workshop/repair-bay lights;
+- no permanently active welding or cranes.
+
+Repair/refit/replenishment:
+
+- local work lights;
+- welding/cutting/repair VFX;
+- articulated service arms/gantries only during a real operation;
+- cargo/ammunition/maintenance transfer presentation matches the actual operation family;
+- cease immediately when job pauses/cancels/completes.
+
+Audio:
+
+- service machinery;
+- intermittent tool/welding cues;
+- transfer family;
+- completion/abort transition.
+
+#### 11.7.10 Utility/player craft compatibility role
+
+If this Stage-20.5 role remains release-facing after the 23E.0 inventory:
+
+- promote it to an explicit production hull/role binding or map it to an accepted production hull;
+- provide basic emissive, thrust, damage and docking presentation;
+- preserve player-selected readability at all camera scales;
+- do not let the generic compatibility sprite survive as an unreviewed MUST_SHIP fallback.
+
+#### 11.7.11 Mining/industrial craft compatibility role
+
+If this Stage-20.5 role remains release-facing:
+
+Idle:
+
+- tool-head/service readiness lights;
+- industrial work lamps only at low intensity.
+
+Mining:
+
+- contact/tool beam or mechanical work cue at the real interaction location;
+- bounded particulate/ejecta cue;
+- extraction/progress indication only while actual extraction runs;
+- no ore stream or cargo count implied by art alone.
+
+Movement:
+
+- normal propulsion contract.
+
+Audio:
+
+- mining machinery/contact family;
+- transfer/storage feedback only when real transfer state exists.
+
+### 11.8 Carrier small-craft animation contracts
+
+Production authority currently consists of two physical faction hulls and six fits. Close-range art
+must preserve the two physical hull identities and differentiate fit through lawful equipment/role
+presentation.
+
+#### 11.8.1 Empire interceptor
+
+- compact Imperial base hull;
+- minimal idle lights;
+- high-readability engine plume;
+- beam/weapon cue from actual fit;
+- no shield visual because the current interceptor fit does not carry one;
+- fast, sparse visual language rather than decorative animation.
+
+#### 11.8.2 Empire defence craft
+
+- same Imperial physical hull envelope;
+- fit-specific defensive/beam overlay where physically justified;
+- shield presentation only because the current defence fit includes shield capability;
+- defensive readiness/status cue must not imply global invulnerability;
+- interception/escort cues remain event-driven.
+
+#### 11.8.3 Empire strike craft
+
+- same Imperial physical hull envelope;
+- kinetic/strike fit overlay;
+- no shield presentation if the current fit has none;
+- heavier launch/weapon transient than interceptor, still bounded.
+
+#### 11.8.4 Industrial Union interceptor
+
+- Union hull with standardized modular construction language;
+- fit-specific beam/weapon cue;
+- rhythmic but minimal instrumentation;
+- no shield cue for the current interceptor fit.
+
+#### 11.8.5 Industrial Union defence craft
+
+- Union base hull + lawful defence equipment overlay;
+- shield state presentation;
+- standardized readiness/status lights;
+- no decorative production-line animation while in flight.
+
+#### 11.8.6 Industrial Union strike craft
+
+- Union base hull + kinetic strike equipment overlay;
+- strong role-readability at close range;
+- weapon cue from actual hardpoint;
+- no shield cue where not fitted.
+
+Small-craft LOD:
+
+- close: production hull + fit overlay + thrust/weapon/shield state;
+- medium: simplified silhouette + engine + major state;
+- distant: role marker (INTERCEPTOR / DEFENCE / STRIKE) with faction/selection semantics;
+- screen-space marker never alters physical world dimensions.
+
+### 11.9 Station animation contracts
+
+Every current Stage-18 station archetype receives a production presentation path. The same functional
+archetype may have Empire and Industrial Union art variants, but its operational animation is driven
+by the same authoritative facility/capability state.
+
+#### 11.9.1 Mining outpost
+
+Base visual:
+
+- extraction-oriented structure;
+- ore handling/storage interfaces;
+- service/docking connection;
+- sensor/survey equipment where actually present.
+
+Idle:
+
+- sparse navigation and safety lights;
+- slow survey/status cycle;
+- stationary extraction hardware unless work is active.
+
+Active extraction:
+
+- mining tool/contact cue at real work location;
+- conveyor/handling/gantry motion if visible hardware supports it;
+- work lights activate by zone;
+- bounded particulate/debris presentation;
+- transfer/storage indicators follow actual operation state.
+
+Empire motion language:
+
+- slower protected machinery;
+- deliberate sequential bay lights;
+- armored service housings.
+
+Union motion language:
+
+- repeated extractor/handling status rhythm;
+- more visibly modular gantries;
+- throughput-zone lighting.
+
+Audio:
+
+- low industrial bed only while selected/near enough;
+- extraction/contact/transfer layers during active work.
+
+#### 11.9.2 Volatile / water depot
+
+Base visual:
+
+- storage tanks/modules;
+- protected transfer interfaces;
+- safety isolation zones;
+- docking/transfer hardware.
+
+Idle:
+
+- low-intensity safety beacons;
+- manifold status indicators;
+- no visible fluid motion required.
+
+Active transfer:
+
+- clamp/connection state;
+- pump/transfer status lighting;
+- optional hose/boom mechanical animation only if the sprite contains one;
+- transfer progress conveyed by UI/state, not by inventing visible quantity.
+
+Emergency:
+
+- localized warning lighting when a relevant fault state exists;
+- no flames/explosions without an authoritative damage event.
+
+Empire:
+
+- armored tank housings, slower lock/unlock sequence.
+
+Union:
+
+- repeated standardized tanks, sequential manifold indicators.
+
+Audio:
+
+- pump/compressor interface layer;
+- connection/disconnection cue;
+- warning hierarchy.
+
+#### 11.9.3 Refinery complex
+
+Base visual:
+
+- distinct intake, process and output zones;
+- thermal/radiator structures where installed;
+- service access and cargo interfaces.
+
+Idle:
+
+- low steady process indicators only if the refinery is operational;
+- thermal/emissive activity restrained.
+
+Active processing:
+
+- zone-by-zone process lights;
+- radiator/thermal presentation only from available state;
+- material handling cues at real input/output interfaces;
+- no arbitrary smoke, flames or atmospheric exhaust.
+
+Empire:
+
+- processing sections protected inside heavier service shells;
+- slower staged process-light sequence.
+
+Union:
+
+- visible repeated processing trains;
+- rhythmic parallel module activity.
+
+Audio:
+
+- low machinery/process layer;
+- pump/valve/handling accents;
+- critical alarms override process ambience.
+
+#### 11.9.4 Industrial station
+
+Base visual:
+
+- production/assembly blocks;
+- loading/storage interfaces;
+- utility/service spine.
+
+Idle:
+
+- workshop/service readiness;
+- restrained work-zone indicators.
+
+Active production:
+
+- active production modules illuminate independently where state permits;
+- gantry/crane/assembly motion only on actual work;
+- cargo input/output handling cue;
+- construction-completion transition if this station performs the relevant authoritative work.
+
+Empire:
+
+- production modules subordinate to protected central administration/service core.
+
+Union:
+
+- this is a signature asset: repeated bays, parallel work cells, visible logistics flow;
+- animation should emphasize modular throughput without becoming a decorative conveyor show.
+
+Audio:
+
+- machinery/workshop family;
+- intermittent tool impacts;
+- transfer/completion cue.
+
+#### 11.9.5 High-tech manufacturing hub
+
+Base visual:
+
+- precision manufacturing blocks;
+- denser sensor/communications and clean service geometry;
+- controlled material interfaces.
+
+Idle:
+
+- restrained high-frequency instrumentation;
+- small cyan/teal status cues;
+- fewer large mechanical movements than a heavy industrial yard.
+
+Active production/research-like work:
+
+- localized clean-room/process light changes;
+- precision tool/assembly activity where visible;
+- no holographic spectacle unrelated to a real process.
+
+Empire:
+
+- high-quality, carefully maintained modules with restrained command accents.
+
+Union:
+
+- standardized precision cells and diagnostic/status cadence.
+
+Audio:
+
+- quieter, higher-detail machinery/electronics layer;
+- no loud generic factory roar by default.
+
+#### 11.9.6 Trade / logistics hub
+
+Base visual:
+
+- many berths/docking faces;
+- cargo staging/storage;
+- traffic-control/sensor structures;
+- administration/service core.
+
+Idle:
+
+- berth availability lights;
+- navigation beacons;
+- sparse traffic-control indicators.
+
+Docking/cargo activity:
+
+- only occupied/active berths animate;
+- approach lights change by docking state;
+- clamps/doors/gantries move only during real operations;
+- cargo handling cue is local to active berth;
+- background decorative ships are not baked into the sprite.
+
+Empire:
+
+- orderly, hierarchical berth-light sequencing;
+- command core visually dominant but not ornamental.
+
+Union:
+
+- berth-by-berth modular status rhythm;
+- strong freight-flow identity.
+
+Audio:
+
+- docking/handling bed;
+- traffic/comms ambience only within allowed player information scope;
+- critical warning priority preserved.
+
+#### 11.9.7 Naval ordnance depot
+
+Base visual:
+
+- protected magazines/arsenal modules;
+- separated handling paths;
+- reinforced docking/loading areas;
+- military sensor/security structures.
+
+Idle:
+
+- strict safety/status lights;
+- very restrained animation;
+- red/amber safety cues used semantically, not decoratively.
+
+Active loading/supply:
+
+- loading-arm/gantry motion only during actual ordnance/ammunition service;
+- berth warning pattern changes during active handling;
+- no visible ammunition count beyond known state;
+- no weapon firing just because the station stores weapons.
+
+Empire:
+
+- ideal showcase for slow armored doors, deliberate safety sequencing, citadel-like protected core.
+
+Union:
+
+- standardized magazine modules, repeated safe-handling interfaces, procedural work-light cadence.
+
+Audio:
+
+- clamp/handling machinery;
+- safety confirmation/warning cues;
+- no random weapon sounds.
+
+#### 11.9.8 Frontier multipurpose station
+
+Base visual:
+
+- mixed but coherent modules;
+- visible evidence of multiple installed roles;
+- no fake capability that is not installed.
+
+Idle:
+
+- modest navigation/service cycle;
+- different modules may be dark/inactive according to state.
+
+Active:
+
+- only the module currently performing work animates;
+- docking, transfer, repair, production or extraction reuse their shared operation language;
+- avoid turning the station into a permanently busy "everything hub".
+
+Empire:
+
+- retrofit/legacy-module continuity is acceptable and desirable.
+
+Union:
+
+- modular expansion blocks and standardized add-ons should be readable.
+
+Audio:
+
+- compose ambience from active module families rather than one universal loop.
+
+### 11.10 Resource-body animation contracts
+
+The minimum playable pack currently exposes four deterministic resource-body atlas roles. Resource
+visuals must not reveal reserve truth, grade or hidden composition beyond the information scope already
+available to the player.
+
+#### 11.10.1 Carbonaceous body
+
+- mostly static base silhouette;
+- optional extremely slow cosmetic light/rotation phase only if it cannot be confused with physical
+  movement authority;
+- muted dark material response;
+- mining contact VFX only while extraction occurs;
+- no sparkling resource-value cue.
+
+#### 11.10.2 Water / ice body
+
+- mostly static base;
+- restrained specular/ice glint cycle at close zoom;
+- extraction cue may use pale particulate/crystal fragments, bounded;
+- no blue glow implying magical/energy resource.
+
+#### 11.10.3 Metallic body
+
+- static physical silhouette;
+- occasional restrained metallic highlight at inspection zoom;
+- mining impact may use brighter spark/fragment response than carbonaceous material;
+- no exaggerated glowing ore veins unless the underlying information model explicitly exposes them.
+
+#### 11.10.4 Mineral / silicate body
+
+- static rock silhouette;
+- subtle surface-light variation only;
+- dusty/rock-fragment extraction response;
+- no color-coded reserve quantity embedded in the asteroid sprite.
+
+For all resource bodies:
+
+- distant mode should favor shape/material class readability only if that classification is known;
+- extraction animation attaches to actual mining interaction, not to the body simply existing;
+- cosmetic rotation may be disabled entirely if it harms deterministic readability.
+
+### 11.11 Special-location animation contracts
+
+#### 11.11.1 Energetic anomaly
+
+Authority:
+
+- current kind has passive thermal signature and passive classification;
+- no resource or salvage value.
+
+Before discovery:
+
+- no world-space cue.
+
+Detected/classified:
+
+- restrained pulse/distortion/field visualization may represent known sensor evidence;
+- animation intensity must not encode hidden "value";
+- no salvage/resource particles;
+- no security implication.
+
+Audio:
+
+- optional low restrained diagnostic/phenomenon cue only after knowledge permits it;
+- must not reveal the anomaly from outside allowed information scope.
+
+#### 11.11.2 Escort-hull derelict
+
+Base:
+
+- production-identity wreck/derelict presentation;
+- largely static;
+- no normal navigation lights by default.
+
+Residual state:
+
+- dim heat/emissive residue only if supported by current wreck presentation policy;
+- no fresh explosion when first materialized.
+
+Salvage operation:
+
+- cutting/work lights;
+- localized fragment/recovery VFX;
+- finite operation feedback;
+- no visual recovery amount beyond known state.
+
+Audio:
+
+- salvage tool/structure cue during active work;
+- otherwise mostly quiet.
+
+#### 11.11.3 Resonant resource phenomenon
+
+Authority:
+
+- references an existing finite Stage-20E resource occurrence;
+- does not create a second deposit.
+
+Before discovery:
+
+- no cue.
+
+After classification/survey:
+
+- restrained resonance/pulse pattern around the existing occurrence;
+- visual language must remain distinct from the energetic anomaly;
+- no duplicate "resource node" sprite implying extra mass;
+- extraction uses the ordinary linked resource-body mining feedback.
+
+Audio:
+
+- subtle resonance/diagnostic cue only after allowed discovery state.
+
+### 11.12 Ordnance and projectile animation contracts
+
+The current production ordnance catalog contains ten release-facing sprites. Their runtime animation is
+primarily event/motion/VFX driven; projectile base art should not become a tiny looping cartoon.
+
+#### 11.12.1 Fragmentation shell
+
+- rigid projectile body in flight;
+- optional spin highlight only if useful at close inspection;
+- no fragment burst until an authoritative fragmentation/detonation event exists;
+- disappearance alone is not a burst.
+
+#### 11.12.2 Guided micro-missile
+
+- compact motor plume while authoritative motor/thrust state is active;
+- no decorative seeker blinking that leaks target direction;
+- terminal flash only from explicit detonation/intercept event.
+
+#### 11.12.3 Guided missile A
+
+- launch transient;
+- motor-phase plume;
+- coast/no-plume if the authority distinguishes that phase;
+- terminal detonation only from explicit event;
+- stable event ID prevents duplicate presentation.
+
+#### 11.12.4 Guided rocket A
+
+- shorter/stronger launch-motor presentation than long-range missile where the physical profile
+  supports that distinction;
+- no invented guidance behavior from sprite wobble;
+- terminal event contract identical to guided ordnance rules.
+
+#### 11.12.5 Guided rocket B
+
+- visually distinct production sprite may have a distinct plume shape/brightness;
+- event semantics remain the same as its authoritative propulsion/guidance profile;
+- do not communicate hidden damage superiority through VFX alone.
+
+#### 11.12.6 Guided torpedo
+
+- heavier/larger guided-ordnance presentation;
+- restrained persistent motor trail if actual thrust persists;
+- larger terminal VFX may scale from physical/authoritative energy input;
+- still bounded and event-driven.
+
+#### 11.12.7 Interceptor missile
+
+- very high-readability short-lived motor cue;
+- interception terminal VFX only from explicit physical interception/destruction event;
+- no "success" explosion from interceptor disappearance.
+
+#### 11.12.8 Kinetic penetrator A
+
+- rigid high-speed projectile;
+- no flame-like exhaust;
+- optional restrained streak is a camera/readability effect, not propulsion;
+- penetration response belongs to impact event, not projectile loop.
+
+#### 11.12.9 Kinetic penetrator B
+
+- same rules as penetrator A;
+- sprite/form may communicate a different physical design but VFX intensity follows authoritative
+  event data rather than arbitrary art ranking.
+
+#### 11.12.10 Kinetic shell
+
+- rigid shell;
+- optional roll/specular cue at close zoom;
+- material-specific impact VFX on authoritative collision;
+- no persistent glowing tracer unless presentation policy deliberately uses a bounded visibility aid.
+
+### 11.13 Wreck and destroyed-object animation contracts
+
+Ship and station wrecks are persistent states, not endlessly replaying destruction animations.
+
+On alive -> wreck transition:
+
+- one bounded destruction event;
+- primary flash/structural failure presentation;
+- deterministic bounded secondary detonations where already allowed;
+- cosmetic fragments only;
+- transition into persistent wreck sprite/layer.
+
+Persistent wreck:
+
+- mostly static;
+- dim residual heat;
+- intermittent small electrical/emissive failure only for a bounded post-destruction interval;
+- no repeated large explosion loop;
+- no functional engine/service animation;
+- salvage VFX only during actual salvage.
+
+First materialization/load of an already-existing wreck:
+
+- show only the persistent wreck state;
+- never replay the original destruction.
+
+### 11.14 Station/ship animation package layout
+
+Preferred logical asset layout:
+
+    assets/<faction>/<domain>/<stable_role>/
+        base.png
+        damage.png
+        emissive.png
+        optional_idle_sheet.png
+        optional_mechanical_<operation>.png
+        engine_idle.png
+        engine_thrust.png
+        marker.png
+        presentation.json
+        provenance.json
+
+Stations generally omit engine layers and may add:
+
+    berth_status.png
+    operation_<type>.png
+    alert_emissive.png
+    mechanical_<door_or_arm>.png
+
+Do not require a full-frame sheet for simple light animation. A single emissive mask + runtime phase
+is preferred when it produces the same result with less memory and perfect base alignment.
+
+### 11.15 Per-object presentation state model
+
+Where applicable, runtime binding should map each object into a bounded presentation state set:
+
+    HIDDEN
+    DISCOVERED_STATIC
+    IDLE
+    ACTIVE_OPERATION
+    ALERT
+    DAMAGED
+    CRITICAL
+    WRECK
+
+Not every object uses every state. For example:
+
+- resource bodies normally use DISCOVERED_STATIC / ACTIVE_OPERATION;
+- anomalies use HIDDEN / DISCOVERED_STATIC;
+- ordnance uses flight phases + explicit terminal event rather than station-style states;
+- wrecks use WRECK + optional ACTIVE_OPERATION when salvaged.
+
+The presentation layer may simplify or merge states for performance, but it may not invent a state
+that contradicts authority.
+
+### 11.16 Object-level acceptance matrix
+
+Each release-facing object/role must have an entry in the Stage-23E gap matrix with explicit answers
+to the following:
+
+1. What is the stable authoritative content/role ID?
+2. What is the close-range production sprite?
+3. What is the distant marker/LOD?
+4. Which idle animation, if any, is justified?
+5. Which operational animations exist?
+6. Which events/states trigger them?
+7. Which damage/emergency layers exist?
+8. Which VFX families attach to the object?
+9. Which audio families attach to the object?
+10. What information must never be leaked?
+11. What happens when power/operation stops?
+12. What happens after save/load/materialization?
+13. What is the Reduced VFX/Reduced Motion behavior?
+14. What is the provenance/license source?
+15. What deterministic capture proves the implementation?
+
+An object is not accepted merely because it has a visually appealing sprite sheet. It is accepted
+only when its runtime animation, VFX, audio, LOD and state transitions all agree with the authoritative
+object lifecycle.
+
+
 ## 12. 23E.7 — Tactical VFX final pass
 
 Reuse and extend docs/tactical_vfx_foundation.md rather than creating a competing VFX authority.
