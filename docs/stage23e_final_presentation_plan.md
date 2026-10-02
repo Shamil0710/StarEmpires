@@ -6,6 +6,7 @@
 **Implementation gate:** do not begin 23E implementation before 23B, 23C and 23D are accepted unless a narrowly scoped release-blocking prerequisite must be prepared without changing presentation scope.  
 **Primary release feature:** final_presentation / MUST_SHIP  
 **Known mandatory release blocker:** GitHub issue #375 — explicit guided-ordnance detonation event seam.
+**Canonical production asset specification:** [Stage 23E — Production Asset and Animation Specification](stage23e_production_asset_spec.md).
 
 ## 1. Purpose
 
