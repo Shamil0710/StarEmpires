@@ -197,6 +197,7 @@ Exit criteria:
 
 Canonical detailed execution contract: [Stage 23E — Final Presentation Production Plan](stage23e_final_presentation_plan.md).
 Production asset/animation specification: [Stage 23E — Production Asset and Animation Specification](stage23e_production_asset_spec.md).
+Visual-reference freeze: [Stage 23E — Visual Reference Freeze Catalog](stage23e_visual_reference_freeze.md).
 Generation/authoring catalog: [Stage 23E — Generation Prompt Catalog](stage23e_generation_prompt_catalog.md).
 
 Art closure:
