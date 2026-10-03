@@ -1590,3 +1590,30 @@ art-production process only.
   unauthored fit differences;
 - fit rows remain `PLANNED` until real aligned visual masters exist;
 - review: `docs/art/reference_freeze/reviews/stage23e_union_small_craft_fit_authority_audit.md`.
+
+
+### Run 016 — Industrial Union technical fit-reference selection
+
+The image edit backend remains unsuitable for exact aligned craft edits, so the three Union fit rows
+advance only to **SELECTED**, not `FROZEN`, using deterministic technical geometry overlays on the
+already frozen base master.
+
+Selected reference composites:
+
+- interceptor:
+  `art_sources/stage23e/references/ref.industrial_union.small_craft.interceptor.v1/selected/reference_composite.svg`;
+- defence:
+  `art_sources/stage23e/references/ref.industrial_union.small_craft.defence.v1/selected/reference_composite.svg`;
+- strike:
+  `art_sources/stage23e/references/ref.industrial_union.small_craft.strike.v1/selected/reference_composite.svg`.
+
+All three overlays:
+
+- preserve the 512x256 frozen base geometry;
+- keep the common reactor/drive/sensor/radiator visually unchanged;
+- use the single `weapon_primary` review anchor at approximately `x=0.80, y=0.50`;
+- represent only the authored beam / shield / kinetic fit differences;
+- remain presentation/reference authority only;
+- require a final painted aligned pass before `geometry_frozen=true`.
+
+This reduces ambiguity without falsely treating a technical overlay as finished production art.
