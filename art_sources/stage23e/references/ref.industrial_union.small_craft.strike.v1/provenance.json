@@ -1,0 +1,18 @@
+{
+  "reference_id": "ref.industrial_union.small_craft.strike.v1",
+  "mode": "DERIVE_FROM_REFERENCE",
+  "status": "SELECTED_TECHNICAL_DERIVATION",
+  "base_reference": "ref.industrial_union.small_craft.base.v1",
+  "base_master": "art_sources/stage23e/references/ref.industrial_union.small_craft.base.v1/selected/reference_master.png",
+  "base_master_git_blob_sha": "fd1d719bf4b8b77119f30306ffc7df8232ca142a",
+  "fit_id": "fit.industrial_union.small_craft.strike_v1",
+  "visible_fit_modules": [
+    "module.small_craft_kinetic_v1"
+  ],
+  "weapon_primary_review_anchor": [
+    0.8,
+    0.5
+  ],
+  "geometry_frozen": false,
+  "notes": "Technical fit overlay selected while image edit backend is drifting to unrelated station sheets. Final painted pass remains required before FROZEN."
+}
