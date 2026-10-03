@@ -198,6 +198,9 @@ Exit criteria:
 broad production-layer generation remains gated by the full visual-reference freeze.
 Current blockers and exact unblock conditions are recorded in
 [Stage 23E — Visual Reference Blocker Ledger](art/reference_freeze/stage23e_reference_blockers.md).
+ Four selected station masters (Empire refinery/high-tech/frontier and Union industrial station) now
+have exact accepted byte contracts; their remaining blocker is repository persistence, not art
+selection.
 
 Цель: заменить остаточные prototype assets при неизменной simulation authority.
 

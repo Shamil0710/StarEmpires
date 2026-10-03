@@ -63,9 +63,9 @@ context. Do not treat those outputs as partial success.
 These references are **not freezeable** yet:
 
 - `ref.empire.small_craft.base.v1`;
-- `ref.empire.station.refinery_complex.v1`;
+- `ref.empire.station.refinery_complex.v1` — accepted clean master recovered; blocker is repository persistence only;
 - `ref.industrial_union.station.industrial_station.v1` — clean master is now accepted; blocker is repository persistence only;
-- `ref.empire.station.high_tech_hub.v1`;
+- `ref.empire.station.high_tech_hub.v1` — accepted clean master recovered; blocker is repository persistence only;
 - `ref.empire.station.naval_ordnance_depot.v1`;
 - `ref.empire.station.frontier_multipurpose.v1`.
 
@@ -160,3 +160,29 @@ Accepted clean-master identity:
 
 Remaining blocker is purely transport/persistence: commit the exact accepted PNG bytes under the
 canonical reference package, then run final committed-byte QA and exact-head CI.
+
+
+### B2. Empire refinery / high-tech / frontier — reduced to persistence-only blockers
+
+The exact selected 1024x1024 working masters have been recovered from persistent Library storage and
+passed clean-master/readability review.
+
+Pinned identities:
+
+- refinery `candidate_02`: SHA-256
+  `2b5fbf5d23262c6d2bac619b106495ca16d33c37de1637bfbb2b0faa80ee9fe8`;
+- high-tech `candidate_05`: SHA-256
+  `2f59e3d89d97ec14ce0bcc3de93204aad367fe6686cc7a047dc61524bbe7395c`;
+- frontier `candidate_03`: SHA-256
+  `8a57860f9e6bb8aa273d30966d64a1d6428e493048cb2debef01cd45dc1fafd2`.
+
+No further candidate generation/reselection is required for these three references.
+
+Mechanical decisions are now explicit:
+
+- Empire refinery: radiator-shutter sheet = **N/A** for this accepted geometry; do not invent hardware;
+- Empire high-tech: central precision rig = **REQUIRED**;
+- Empire frontier: service arm + module door = **REQUIRED**.
+
+Remaining blocker for all three is exact PNG persistence under the canonical reference packages,
+followed by committed-byte QA and exact-head CI.

@@ -98,3 +98,22 @@ Filename: `union_industrial_station_candidate01_clean_master_1024.png`
 Unlike the older preview entry above, this file has passed the clean-master geometry-preservation review.
 If recovered later with the exact SHA-256, do **not** regenerate or reselect the station: persist these
 exact bytes into the canonical reference package and execute the remaining repository-byte QA/freeze gate.
+
+
+## Acceptance-state upgrade for recovered Empire station masters
+
+The previously recorded refinery/high-tech/frontier SHA-256 values are no longer merely historical
+recovery hints. Their corresponding 1024x1024 files were recovered from persistent Library storage and
+reviewed again.
+
+Disposition:
+
+- refinery `candidate_02`: **clean master accepted / persistence pending**;
+- high-tech `candidate_05`: **clean master accepted / persistence pending**;
+- frontier `candidate_03`: **clean master accepted / persistence pending**.
+
+Machine-readable byte/bounds contracts now live in
+`docs/art/reference_freeze/stage23e_pending_master_contracts.tsv`.
+
+These statuses do not change the manifest rows beyond `SELECTED`; absence of the exact PNG in Git
+continues to block `FROZEN`.

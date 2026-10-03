@@ -1807,3 +1807,48 @@ Blocker ledger:
 - promoted selected/frozen rows must point at a real source path/SHA/review;
 - only `FROZEN` rows may set `geometry_frozen=true`;
 - reference modes/status values and explicit prompt sections are CI-pinned.
+
+
+### Run 031 — Empire refinery clean-master acceptance
+
+- reference: `ref.empire.station.refinery_complex.v1`;
+- selected `candidate_02`, 94/100;
+- recovered exact 1024x1024 master SHA-256:
+  `2b5fbf5d23262c6d2bac619b106495ca16d33c37de1637bfbb2b0faa80ee9fe8`;
+- alpha bounds 148..875 x 92..931; transparent corners pass;
+- 25% and 12.5% readability pass;
+- accepted art has no unambiguous radiator-shutter hardware, so
+  `mechanical_radiator_shutter` is intentionally **N/A** rather than invented;
+- status remains `SELECTED`, `geometry_frozen=false` until exact PNG persistence + committed-byte QA.
+
+### Run 032 — Empire high-tech clean-master acceptance
+
+- reference: `ref.empire.station.high_tech_hub.v1`;
+- selected `candidate_05`, 94/100;
+- recovered exact 1024x1024 master SHA-256:
+  `2f59e3d89d97ec14ce0bcc3de93204aad367fe6686cc7a047dc61524bbe7395c`;
+- alpha bounds 92..931 x 298..725; transparent corners pass;
+- 25% and 12.5% readability pass;
+- central precision/instrument assembly is the required `mechanical_precision_rig` anchor;
+- status remains `SELECTED`, `geometry_frozen=false` until exact PNG persistence + committed-byte QA.
+
+### Run 033 — Empire frontier clean-master acceptance
+
+- reference: `ref.empire.station.frontier_multipurpose.v1`;
+- selected `candidate_03`, 95/100;
+- recovered exact 1024x1024 master SHA-256:
+  `8a57860f9e6bb8aa273d30966d64a1d6428e493048cb2debef01cd45dc1fafd2`;
+- alpha bounds 92..931 x 104..919; transparent corners pass;
+- 25% and 12.5% readability pass;
+- service-arm and module-door roots are explicit and retained for later local animation;
+- status remains `SELECTED`, `geometry_frozen=false` until exact PNG persistence + committed-byte QA.
+
+### Run 034 — Pending-master byte contract gate
+
+- added `stage23e_pending_master_contracts.tsv`;
+- currently pins four accepted but not yet repository-persisted 1024x1024 masters:
+  Empire refinery, Empire high-tech, Empire frontier and Union industrial station;
+- added `Stage23EPendingReferenceMasterContractTest`;
+- while a pending master is absent, manifest must remain `SELECTED` / `geometry_frozen=false`;
+- once the intended PNG path exists, CI automatically verifies exact byte size, SHA-256, canvas,
+  alpha bounds and transparent corners before any freeze promotion.

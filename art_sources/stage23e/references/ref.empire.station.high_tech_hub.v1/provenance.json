@@ -1,0 +1,32 @@
+{
+  "reference_id": "ref.empire.station.high_tech_hub.v1",
+  "asset_id": "empire.station.high_tech_hub",
+  "mode": "GENERATE_5_SELECT_1",
+  "status": "CLEAN_MASTER_ACCEPTED_PENDING_REPOSITORY_PERSISTENCE",
+  "source_generation_id": "101b50b6-ca78-46ed-9308-5b3b9e03bf3c",
+  "selected_candidate": "candidate_05",
+  "selected_score": 94,
+  "geometry_frozen": false,
+  "accepted_clean_master": {
+    "intended_path": "art_sources/stage23e/references/ref.empire.station.high_tech_hub.v1/selected/reference_master.png",
+    "filename": "hightech_candidate_05_master.png",
+    "byte_size": 458750,
+    "sha256": "2f59e3d89d97ec14ce0bcc3de93204aad367fe6686cc7a047dc61524bbe7395c",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "visible_bounds_alpha_gt_16": [
+      92,
+      298,
+      932,
+      726
+    ],
+    "repository_persisted": false
+  },
+  "mechanism_disposition": {
+    "mechanical_precision_rig": "REQUIRED at approximately (512,515); subtle bounded motion only"
+  },
+  "review": "docs/art/reference_freeze/reviews/ref.empire.station.high_tech_hub.v1_clean_master_acceptance.md",
+  "notes": "Exact recovered clean-master bytes accepted. Persistence + committed-byte QA + exact-head CI still block FROZEN."
+}
