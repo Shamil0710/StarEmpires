@@ -5,10 +5,9 @@ import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -17,14 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Stage23EEmpireMiningOutpostReferenceFreezeTest {
-    private static final String PATH =
-            "art_sources/stage23e/references/ref.empire.station.mining_outpost.v1/selected/reference_master.png";
+    private static final Path MASTER = Path.of(
+            "art_sources/stage23e/references/ref.empire.station.mining_outpost.v1/selected/reference_master.png");
     private static final String SHA256 =
             "160f5d5779eb762a43feb43109619a14260e587ee068512860a4154eb1863811";
 
     @Test
     void selectedMiningOutpostMasterPassesFreezeGate() throws Exception {
-        assertTrue(Files.isRegularFile(MASTER), MASTER.toString());\n        byte[] bytes = Files.readAllBytes(MASTER);
+        assertTrue(Files.isRegularFile(MASTER), MASTER.toString());
+        byte[] bytes = Files.readAllBytes(MASTER);
         assertEquals(SHA256, sha256(bytes));
 
         BufferedImage image = ImageIO.read(MASTER.toFile());
@@ -86,7 +86,8 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
                 label + " spanHeight=" + stats.spanHeight());
         assertTrue(stats.visibleCells() >= stats.canvasWidth() * stats.canvasHeight() * minVisibleFraction,
                 label + " visibleCells=" + stats.visibleCells());
-        assertTrue(stats.lumaBins() >= minLumaBins, label + " lumaBins=" + stats.lumaBins());
+        assertTrue(stats.lumaBins() >= minLumaBins,
+                label + " lumaBins=" + stats.lumaBins());
         assertTrue(stats.maxLuma() - stats.minLuma() >= minLumaRange,
                 label + " lumaRange=" + (stats.maxLuma() - stats.minLuma()));
     }
@@ -112,7 +113,7 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
                     for (int sx = dx * factor; sx < (dx + 1) * factor; sx++) {
                         int rgba = source.getRGB(sx, sy);
                         int alpha = (rgba >>> 24) & 0xff;
-                        if (alpha == 0) {
+                        if (alpha <= 16) {
                             continue;
                         }
                         occupied = true;
@@ -141,7 +142,9 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
 
         int lumaBins = 0;
         for (boolean present : bins) {
-            if (present) lumaBins++;
+            if (present) {
+                lumaBins++;
+            }
         }
         assertTrue(maxX >= minX && maxY >= minY);
         return new ScaleStats(
@@ -162,7 +165,9 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
         int maxY = -1;
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                if (alpha(image, x, y) <= alphaThreshold) continue;
+                if (alpha(image, x, y) <= alphaThreshold) {
+                    continue;
+                }
                 minX = Math.min(minX, x);
                 minY = Math.min(minY, y);
                 maxX = Math.max(maxX, x);
@@ -185,7 +190,9 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
             for (int x = Math.max(0, centerX - radius);
                  x <= Math.min(image.getWidth() - 1, centerX + radius); x++) {
                 int dx = x - centerX;
-                if (dx * dx + dy * dy <= r2 && alpha(image, x, y) > 16) return true;
+                if (dx * dx + dy * dy <= r2 && alpha(image, x, y) > 16) {
+                    return true;
+                }
             }
         }
         return false;
@@ -198,12 +205,8 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
         assertEquals(0, alpha(image, image.getWidth() - 1, image.getHeight() - 1));
     }
 
-    private static String sha256(byte[] bytes) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
+    private static String sha256(byte[] bytes) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 
     private static int alpha(BufferedImage image, int x, int y) {
@@ -211,10 +214,12 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
     }
 
     private record Anchor(String id, int x, int y) { }
+
     private record Bounds(int minX, int minY, int maxX, int maxY) {
         int width() { return maxX - minX + 1; }
         int height() { return maxY - minY + 1; }
     }
+
     private record ScaleStats(
             int canvasWidth,
             int canvasHeight,
