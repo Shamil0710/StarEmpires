@@ -1514,3 +1514,17 @@ art-production process only.
 - manifest status becomes `FROZEN`, `geometry_frozen=true` in the same acceptance batch;
 - no simulation authority is inferred from the review anchors or sprite pixels;
 - review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_freeze_recheck.md`.
+
+
+### Run 009 — Empire carrier small-craft missing-master recovery attempt
+
+- reference: `ref.empire.small_craft.base.v1`;
+- reason for reopening: batch-001 candidate 03 is documented as selected but no canonical/source PNG
+  is present in the repository;
+- requested a fresh five-independent-image small-craft batch using the accepted 28 x 12 x 6 m
+  physical envelope and Imperial small-craft constraints;
+- generation ID `c14b4992-9723-4a6e-8704-f3a2fc16bd10` returned a five-object **station** sheet;
+- attempt hard-rejected for object-class and output-format drift;
+- no candidate number or score assigned;
+- row remains `SELECTED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_generation_attempt_002.md`.
