@@ -118,7 +118,7 @@ class Stage23EReferenceManifestIntegrityTest {
 
     private static String gitBlobSha(Path path) throws IOException, NoSuchAlgorithmException {
         byte[] bytes = Files.readAllBytes(path);
-        byte[] prefix = ("blob " + bytes.length + "\\0").getBytes(StandardCharsets.UTF_8);
+        byte[] prefix = ("blob " + bytes.length + "\0").getBytes(StandardCharsets.UTF_8);
 
         MessageDigest digest = MessageDigest.getInstance("SHA-1");
         digest.update(prefix);
