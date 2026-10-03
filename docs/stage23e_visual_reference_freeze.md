@@ -1734,3 +1734,14 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - original selected candidate remains preferred;
 - row remains `SELECTED`, `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_clean_master_attempt_002.md`.
+
+
+### Run 026 — Empire mining + volatile station freeze accepted
+
+- exact-head commit: `455ebed0cc7e8686b1c9ba097bf3f295ad4e6869`;
+- CI run `37120429027`: **SUCCESS**;
+- `ref.empire.station.mining_outpost.v1` -> `FROZEN`;
+- `ref.empire.station.volatile_depot.v1` -> `FROZEN`;
+- both references have repository-persisted 1024x1024 canonical master PNGs;
+- SHA-256, alpha/padding, grayscale, 25%/12.5%, anchor and physical-authority tests passed;
+- source pixels remain presentation authority only and do not redefine simulation capacities, reserves or collision.

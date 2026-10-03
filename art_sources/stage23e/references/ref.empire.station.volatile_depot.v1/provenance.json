@@ -2,7 +2,7 @@
   "reference_id": "ref.empire.station.volatile_depot.v1",
   "asset_id": "empire.station.volatile_depot",
   "mode": "GENERATE_5_SELECT_1",
-  "status": "SELECTED_PENDING_FREEZE_CI",
+  "status": "FROZEN",
   "generation_id": "958326e2-a119-4402-916c-129f18f7aadc",
   "selected_candidate": "candidate_04",
   "selected_score": 95,
@@ -19,7 +19,9 @@
     932,
     794
   ],
-  "geometry_frozen": false,
+  "geometry_frozen": true,
   "review": "docs/art/reference_freeze/reviews/ref.empire.station.volatile_depot.v1_batch_001.md",
-  "authority_boundary": "Reference art does not define inventory, tank fullness, resource quantity, transfer rate, collision or station physical footprint."
+  "authority_boundary": "Reference art does not define inventory, tank fullness, resource quantity, transfer rate, collision or station physical footprint.",
+  "freeze_ci_commit": "455ebed0cc7e8686b1c9ba097bf3f295ad4e6869",
+  "freeze_ci_run_id": 37120429027
 }

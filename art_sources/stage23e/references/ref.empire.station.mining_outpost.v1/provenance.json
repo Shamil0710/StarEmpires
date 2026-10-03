@@ -2,7 +2,7 @@
   "reference_id": "ref.empire.station.mining_outpost.v1",
   "asset_id": "empire.station.mining_outpost",
   "mode": "GENERATE_5_SELECT_1",
-  "status": "SELECTED_PENDING_FREEZE_CI",
+  "status": "FROZEN",
   "generation_id": "4798a103-b990-4594-a7fe-1bf42d13dbb1",
   "selected_candidate": "candidate_03",
   "selected_score": 92,
@@ -19,7 +19,7 @@
     932,
     841
   ],
-  "geometry_frozen": false,
+  "geometry_frozen": true,
   "review": "docs/art/reference_freeze/reviews/ref.empire.station.mining_outpost.v1_batch_001.md",
   "normalization": [
     "candidate board-cell isolation",
@@ -34,5 +34,7 @@
     "silhouette": "art_sources/stage23e/references/ref.empire.station.mining_outpost.v1/selected/reference_silhouette.svg",
     "anchors": "art_sources/stage23e/references/ref.empire.station.mining_outpost.v1/selected/reference_anchor_review.svg",
     "qa": "art_sources/stage23e/references/ref.empire.station.mining_outpost.v1/selected/reference_qa_sheet.svg"
-  }
+  },
+  "freeze_ci_commit": "455ebed0cc7e8686b1c9ba097bf3f295ad4e6869",
+  "freeze_ci_run_id": 37120429027
 }
