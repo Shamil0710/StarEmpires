@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640">
+<defs><mask id="a" maskUnits="userSpaceOnUse" x="0" y="0" width="640" height="640" style="mask-type:alpha"><image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png" width="640" height="640"/></mask></defs>
+<rect width="640" height="640" fill="#fff" mask="url(#a)"/></svg>

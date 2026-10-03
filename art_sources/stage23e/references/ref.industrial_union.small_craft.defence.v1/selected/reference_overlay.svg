@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="256" viewBox="0 0 512 256"><g id="beam-cassette" stroke="#171b1f" stroke-width="2">
+  <path d="M382 120 L425 120 L444 128 L425 136 L382 136 L374 128 Z" fill="#495259"/>
+  <rect x="386" y="123" width="37" height="10" rx="2" fill="#858b84"/>
+  <rect x="423" y="124" width="13" height="8" rx="1" fill="#b68a33"/>
+  <path d="M390 120 L397 116 L419 116 L425 120 Z" fill="#30373c"/>
+  <path d="M390 136 L397 140 L419 140 L425 136 Z" fill="#30373c"/>
+</g><g id="paired-shield-emitter-housings" stroke="#171b1f" stroke-width="2">
+  <path d="M286 67 L316 67 L326 74 L318 84 L288 84 L278 76 Z" fill="#4f585c"/>
+  <rect x="291" y="70" width="22" height="10" rx="3" fill="#78857d"/>
+  <rect x="314" y="72" width="7" height="6" rx="2" fill="#6aa99d"/>
+  <path d="M286 189 L316 189 L326 182 L318 172 L288 172 L278 180 Z" fill="#4f585c"/>
+  <rect x="291" y="176" width="22" height="10" rx="3" fill="#78857d"/>
+  <rect x="314" y="178" width="7" height="6" rx="2" fill="#6aa99d"/>
+</g></svg>
