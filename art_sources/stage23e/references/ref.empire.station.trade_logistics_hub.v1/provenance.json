@@ -1,0 +1,19 @@
+{
+  "reference_id": "ref.empire.station.trade_logistics_hub.v1",
+  "asset_id": "empire.station.trade_logistics_hub",
+  "mode": "PROMOTE_EXISTING",
+  "status": "SELECTED_PENDING_FREEZE_CI",
+  "canonical_source": "src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png",
+  "canonical_source_git_blob_sha": "79908fe3954eb972381d0809b14245432a08dd34",
+  "runtime_visual_role": "TRADE_DOCK_STATION",
+  "source_canvas": [
+    640,
+    640
+  ],
+  "geometry_frozen": false,
+  "review_artifacts": {
+    "silhouette": "art_sources/stage23e/references/ref.empire.station.trade_logistics_hub.v1/selected/reference_silhouette.svg",
+    "anchors": "art_sources/stage23e/references/ref.empire.station.trade_logistics_hub.v1/selected/reference_anchor_review.svg",
+    "qa": "art_sources/stage23e/references/ref.empire.station.trade_logistics_hub.v1/selected/reference_qa_sheet.svg"
+  }
+}
