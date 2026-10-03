@@ -180,3 +180,17 @@ Selection is not freeze.
 The reference pre-production gate closes only when all 49 manifest rows are `FROZEN`.
 
 Until then, broad Stage-23E production-layer generation remains blocked.
+
+
+## 8. Machine-readable current work queue
+
+The exact current unresolved-reference sequence is pinned in:
+
+`docs/art/reference_freeze/stage23e_reference_work_queue.tsv`.
+
+`Stage23EReferenceWorkQueueTest` requires that this queue contains every and only non-`FROZEN`
+manifest row exactly once, with the current status, a concrete next action, proof gate and done
+condition.
+
+Update the queue in the same commit whenever a reference transitions to `FROZEN` or its blocker/action
+changes.
