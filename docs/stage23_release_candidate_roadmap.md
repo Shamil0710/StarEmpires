@@ -193,6 +193,12 @@ Exit criteria:
 
 ### 23E — Final art, VFX, animation and audio replacement
 
+**Reference pre-production progress:** 27/49 visual references `FROZEN`, 10 `SELECTED`,
+12 `PLANNED` on the active Stage-23E reference branch. This is **not** Stage-23E completion:
+broad production-layer generation remains gated by the full visual-reference freeze.
+Current blockers and exact unblock conditions are recorded in
+[Stage 23E — Visual Reference Blocker Ledger](art/reference_freeze/stage23e_reference_blockers.md).
+
 Цель: заменить остаточные prototype assets при неизменной simulation authority.
 
 Canonical detailed execution contract: [Stage 23E — Final Presentation Production Plan](stage23e_final_presentation_plan.md).
