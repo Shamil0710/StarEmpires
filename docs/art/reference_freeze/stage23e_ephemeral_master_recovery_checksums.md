@@ -78,3 +78,23 @@ If any of these files re-enters a later session:
 4. do not mark `FROZEN` until the file is committed under the canonical reference package;
 5. run role-specific grayscale/downscale/silhouette/anchor QA;
 6. let `Stage23EReferenceManifestIntegrityTest` verify the final repository source.
+
+
+## Industrial Union industrial-station accepted clean master
+
+Reference: `ref.industrial_union.station.industrial_station.v1`  
+Selected candidate: `candidate_01`, 92/100  
+Filename: `union_industrial_station_candidate01_clean_master_1024.png`
+
+- size: 828,751 bytes
+- SHA-256: `1980e0faedc652f2ed8a243c02b1b2f7638a83c61165de8692be57b4673b0163`
+- dimensions: 1024x1024
+- alpha>16 bounds: x 106..916, y 96..933
+- visible span: 811x838
+- all four corner alpha values: 0
+- alpha-mask IoU versus retained selected 512x512 preview after clean-master downscale:
+  `0.9813522617901829`
+
+Unlike the older preview entry above, this file has passed the clean-master geometry-preservation review.
+If recovered later with the exact SHA-256, do **not** regenerate or reselect the station: persist these
+exact bytes into the canonical reference package and execute the remaining repository-byte QA/freeze gate.

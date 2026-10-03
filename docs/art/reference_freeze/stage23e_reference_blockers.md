@@ -64,7 +64,7 @@ These references are **not freezeable** yet:
 
 - `ref.empire.small_craft.base.v1`;
 - `ref.empire.station.refinery_complex.v1`;
-- `ref.industrial_union.station.industrial_station.v1`;
+- `ref.industrial_union.station.industrial_station.v1` — clean master is now accepted; blocker is repository persistence only;
 - `ref.empire.station.high_tech_hub.v1`;
 - `ref.empire.station.naval_ordnance_depot.v1`;
 - `ref.empire.station.frontier_multipurpose.v1`.
@@ -145,3 +145,18 @@ in:
 
 This allows a later session to prove file identity without pretending that an ephemeral/local file was
 already committed or frozen.
+
+
+### B1. Union industrial station — reduced to persistence-only blocker
+
+`ref.industrial_union.station.industrial_station.v1` no longer needs generation, reselection or geometric cleanup.
+
+Accepted clean-master identity:
+
+- SHA-256: `1980e0faedc652f2ed8a243c02b1b2f7638a83c61165de8692be57b4673b0163`;
+- 1024x1024 RGBA;
+- selected-preview alpha IoU: `0.9813522617901829`;
+- explicit stowed gantry and distinct assembly rig present.
+
+Remaining blocker is purely transport/persistence: commit the exact accepted PNG bytes under the
+canonical reference package, then run final committed-byte QA and exact-head CI.

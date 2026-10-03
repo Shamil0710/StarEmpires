@@ -1781,3 +1781,29 @@ Blocker ledger:
 - hard reject;
 - row remains `SELECTED`, `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.empire.station.refinery_complex.v1_clean_master_attempt_001.md`.
+
+
+### Run 029 — Union industrial-station clean-master acceptance
+
+- reference: `ref.industrial_union.station.industrial_station.v1`;
+- selected geometry remains batch-001 `candidate_01`, 92/100;
+- recovered 1024x1024 clean master SHA-256:
+  `1980e0faedc652f2ed8a243c02b1b2f7638a83c61165de8692be57b4673b0163`;
+- alpha-mask IoU against the retained selected preview after 512x512 comparison:
+  **0.9813522617901829**;
+- primary geometry is therefore accepted as preserved;
+- required stowed gantry and distinct assembly rig are explicitly readable;
+- no further generation or candidate selection is required for this reference;
+- row remains `SELECTED`, `geometry_frozen=false` because exact PNG bytes are not yet persisted in Git;
+- pre-authored silhouette/anchor/QA SVGs are committed and will bind to the accepted master once the PNG
+  is physically present;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_clean_master_acceptance.md`.
+
+### Run 030 — Reference dependency lifecycle gate
+
+- added `Stage23EReferenceManifestDependencyTest`;
+- derived fit rows cannot advance beyond `PLANNED` before their base reference is `FROZEN`;
+- generated selected/frozen rows must name a selected candidate and review;
+- promoted selected/frozen rows must point at a real source path/SHA/review;
+- only `FROZEN` rows may set `geometry_frozen=true`;
+- reference modes/status values and explicit prompt sections are CI-pinned.
