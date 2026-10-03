@@ -134,3 +134,14 @@ the recorded Git blob SHA matches the bytes, the freeze review exists and
    - special-location proof -> anomaly + resonance;
    - geometry-preserving fit/derelict edits;
 6. never mark a row `FROZEN` merely because a design was selected.
+
+
+## F. Ephemeral selected-master recovery evidence
+
+Exact SHA-256/dimension/alpha facts for currently recoverable non-canonical working files are recorded
+in:
+
+`docs/art/reference_freeze/stage23e_ephemeral_master_recovery_checksums.md`.
+
+This allows a later session to prove file identity without pretending that an ephemeral/local file was
+already committed or frozen.
