@@ -24,10 +24,10 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
 
     @Test
     void selectedMiningOutpostMasterPassesFreezeGate() throws Exception {
-        byte[] bytes = readBytes(PATH);
+        assertTrue(Files.isRegularFile(MASTER), MASTER.toString());\n        byte[] bytes = Files.readAllBytes(MASTER);
         assertEquals(SHA256, sha256(bytes));
 
-        BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+        BufferedImage image = ImageIO.read(MASTER.toFile());
         assertNotNull(image);
         assertEquals(1024, image.getWidth());
         assertEquals(1024, image.getHeight());
@@ -196,15 +196,6 @@ class Stage23EEmpireMiningOutpostReferenceFreezeTest {
         assertEquals(0, alpha(image, image.getWidth() - 1, 0));
         assertEquals(0, alpha(image, 0, image.getHeight() - 1));
         assertEquals(0, alpha(image, image.getWidth() - 1, image.getHeight() - 1));
-    }
-
-    private static byte[] readBytes(String path) throws IOException {
-        try (InputStream input =
-                     Stage23EEmpireMiningOutpostReferenceFreezeTest.class
-                             .getClassLoader().getResourceAsStream(path)) {
-            assertNotNull(input, path);
-            return input.readAllBytes();
-        }
     }
 
     private static String sha256(byte[] bytes) {
