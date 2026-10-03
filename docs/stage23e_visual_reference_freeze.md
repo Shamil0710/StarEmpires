@@ -1745,3 +1745,26 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - both references have repository-persisted 1024x1024 canonical master PNGs;
 - SHA-256, alpha/padding, grayscale, 25%/12.5%, anchor and physical-authority tests passed;
 - source pixels remain presentation authority only and do not redefine simulation capacities, reserves or collision.
+
+
+### Run 027 — Image-context contamination proof
+
+Two additional calls establish that current failures are not isolated candidate-quality issues.
+
+Industrial Union mining outpost:
+
+- generation `e829d0e2-6bad-424a-85c8-9d8c6eedd64f`;
+- deliberately requested one candidate rather than a board;
+- explicitly prohibited Imperial palette/heraldry;
+- backend still returned seven Imperial station concepts;
+- hard reject; Union station generation is now blocked pending clean-context proof.
+
+Energetic anomaly:
+
+- generation `c0092715-d1f0-4c5e-b42d-1dcecd723ac4`;
+- requested transparent localized non-solid field/VFX candidates;
+- backend returned a Stage-23E status/dashboard infographic with text and station thumbnails;
+- hard reject; special-location generation is blocked in the same context.
+
+Blocker ledger:
+`docs/art/reference_freeze/stage23e_reference_blockers.md`.
