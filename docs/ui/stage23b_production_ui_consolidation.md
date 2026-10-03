@@ -517,3 +517,54 @@ passed. The separate policy commit `644a28fe032303054baf833b6f6ea359c09146b4` is
 **#7827**; this registration/schema batch must wait for that gate before advancing the branch.
 Stock/production policy, established territorial control, mining/fitting/construction/supply,
 strategic/carrier commands, production NPC offers and genuine human B18 remain open.
+
+
+### Durable personal fleet orders and exact physical execution
+
+The Military surface now exposes HOLD, MOVE, FOLLOW, ESCORT and continuous two-system PATROL for
+existing inactive personally owned IDLE freight. Independent players have the same personal order
+authority; the spectator faction is never the command actor. Target fleets are personally owned,
+destinations are personally discovered, and the active hull retains direct-control priority. The
+ordinary PlayerFleetOrderService persists each intent in existing PlayerState, with the same pure
+exact-checkpoint single-use confirmation as other personal commands. MOVE selects system arrival;
+legacy arbitrary float local targets and item-count economic orders are not reinterpreted as SI.
+
+The existing PlayerFleetOrderExecutor has an exact campaign adapter using the same fitted
+PlayerDirectControlSystem. HOLD consumes finite counter-thrust rather than snapping velocity to zero;
+empty reaction-mass stores leave real inertia. FOLLOW/ESCORT use actual local target kinematics,
+500/1,000-metre separation guidance and a relative approach envelope of 100 m/s, not guaranteed
+combat protection. MOVE/PATROL reuse PlayerFleetRoutePlanner and the ordinary jump FSM with onboard
+fuel preflight; no automatic station refuelling or remote resource settlement is authorized. Intent
+survives transit/load and is resumed when an inactive hull becomes delegated again.
+
+A real arrival-to-patrol regression exposed a rejected request during FTL cooldown. The adapter now
+reads the ordinary fitted readiness plan and waits. Current FTL readiness and its localized reason
+are shown in the inspector. The composed movement owner also excludes its physically controlled
+interval from the ordinary passive FTL-recovery pass. The jump FSM records which fleets it processed
+in that interval, preventing an additional player movement step on the arrival boundary. Both
+bindings are transient adapters rebuilt on restore, not another persisted clock or engineering state.
+Assigned freight remains under its existing transport owner. Ordinary reference reconciliation runs
+before attaching the order adapter after physical destruction, preserving the existing loss behavior
+without replacement hulls or resurrected ownership.
+
+An earlier 25-test composed/legacy group passed. Final Java-17 verify passed **32 tests, zero
+failures/errors**, covering five new personal-order methods, all fifteen existing generated player
+mission cases, ordinary jump lifecycle/engineering/persistence and core-pair fitted jump routing.
+Strict Javadoc and desktop packaging passed; local coverage was skipped. The physical regressions
+cover finite braking/coasting, real follow motion, actual MOVE transit/reload, patrol cooldown and
+exactly one cooldown interval, as well as stale/reused/foreign/active/unknown-target rejection.
+Dock/departure geometry and depleted stores are explicitly labelled fixtures. A separate full
+exact-head CI remains mandatory for this engineering-ownership batch.
+
+Mining/fitting/construction/supply, stock/production-policy application, established territorial
+control, carrier commands, production NPC offers and genuine B18 acceptance remain open. Existing
+NPC contract fixture coverage does not imply production offers have been installed. This remains
+23B ACTIVE/PARTIAL; no merge or 23C follows from the fleet-order slice.
+
+
+The final packaged-JAR llvmpipe journey passed all eleven existing surfaces plus independent-player
+keyboard preview/confirmation of FOLLOW, ESCORT and HOLD, actual finite inactive-hull movement and
+order save/load. It then passed existing registration, faction/policy commands, ordinary jump,
+conserved physical profit and reload. The personal-fleet confirmation was visually inspected: full
+control conditions remain readable; provenance uses the existing detail scroll and both actions and
+confirmation remain accessible. This is graphical engineering evidence, not human B18 PASS.

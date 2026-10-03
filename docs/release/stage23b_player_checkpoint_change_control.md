@@ -160,3 +160,34 @@ The packaged llvmpipe UI journey registered two owned hulls, saved/reloaded, the
 actual hop, conserved profitable physical trade and another reload. Geometry fixtures are labelled.
 A separate full exact-head CI is mandatory for this owning-schema batch; no 23B-completion claim,
 merge, 23C or human B18 PASS follows from this engineering evidence.
+
+
+## Personal fleet intent and one engineering interval
+
+HOLD/MOVE/FOLLOW/ESCORT/PATROL reuse the existing PlayerFleetOrderState serialization and the same
+campaign v5 envelope. No owning field/schema, profile, content identity or opening resource changes
+in this batch. Patrol progress is derived from actual saved fleet placement and its saved cycle;
+FTL readiness/cooldown and route fuel remain ordinary engineering/World state. No hidden patrol
+clock is introduced. Arbitrary legacy MOVE floats and item-count economic orders are not converted
+to exact SI targets. Assigned freight is excluded from personal physics, including default HOLD.
+
+A transient World binding excludes existing externally advanced personal engineering intervals from
+passive FTL recovery. A transient last-interval jump-participation marker prevents duplicate physical
+execution on the arrival boundary. Both are reconstructed by the same campaign composition root
+and preserve native World defaults elsewhere. Real post-arrival continuation/reload checks exactly
+one cooldown interval and delayed patrol departure; destruction references reconcile through the
+existing PlayerRuntime before delegation. Final local verify passed 32 tests with strict Javadoc
+and desktop packaging, coverage skipped. This execution-owner change receives its own full CI gate
+after the separately gated freight-schema-3 registration commit.
+
+The schema-3 registration gate passed on exact commit `47d5ca799c5287313b8e2192151d1364499a07b2`:
+CI #7829 ran 2387 tests, zero failures/errors, one skip, with coverage, strict Javadoc,
+desktop packaging and B18 tooling green. A subsequent real-destruction regression reproduced a
+save rejection in the personal cross-reference validator: reference reconciliation correctly
+removed the lost hull, while its historical registration still demanded live ownership.
+This fleet lifecycle batch permits a DESTROYED freight row to retain registration only with the
+same persisted player faction. World/freight validation still requires the destroyed hull to be
+absent; live empty-hold registration and removal of the persisted player still reject. No freight
+schema/layout or resource changes accompany this correction, and no replacement hull is granted.
+The final combined affiliation/NPC/personal-fleet regression gate passed 26 tests, zero
+failures/errors/skips, including actual registered-hull destruction and an exact codec roundtrip.

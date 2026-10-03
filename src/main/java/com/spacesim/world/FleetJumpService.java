@@ -57,6 +57,17 @@ final class FleetJumpService {
     private final Map<FleetId, FleetJumpState> jumpsByFleetId = new HashMap<>();
     private long lastEngineeringWorldTick;
     private FleetArrivalAuthority arrivalAuthority;
+    private java.util.function.Predicate<FleetId> externalRecoveryOwner = id -> false;
+    private java.util.Set<FleetId> processedJumpFleetIds = java.util.Set.of();
+
+    void setExternalRecoveryOwner(java.util.function.Predicate<FleetId> owner) {
+        externalRecoveryOwner = Objects.requireNonNull(owner);
+    }
+
+    boolean processedJumpInLastInterval(FleetId id) { return processedJumpFleetIds.contains(id); }
+
+    Optional<JumpPlan> previewFittedJump(FleetId id) { return fittedJump(id).map(FittedJump::plan); }
+
 
     FleetJumpService(
             GalaxyTopology topology,
@@ -187,6 +198,7 @@ final class FleetJumpService {
         if (worldTick < 0L) {
             throw new IllegalArgumentException("World tick не может быть отрицательным");
         }
+        processedJumpFleetIds = java.util.Set.copyOf(jumpsByFleetId.keySet());
         long previousWorldTick = lastEngineeringWorldTick;
         advanceRecoverableFittedState(worldTick);
         List<FleetId> order = new ArrayList<>(jumpsByFleetId.keySet());
@@ -402,7 +414,7 @@ final class FleetJumpService {
                         "Fleet placement references missing local entity: " + placement.id());
             }
             EngineeringComponent component = entity.getComponent(EngineeringComponent.class);
-            if (!requiresFittedRecovery(component)) {
+            if (externalRecoveryOwner.test(placement.id()) || !requiresFittedRecovery(component)) {
                 continue;
             }
             RuntimeState next = Objects.requireNonNull(

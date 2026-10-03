@@ -74,6 +74,34 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
     }
 
     /** Applies one fixed-tick movement step under finite acceleration/braking limits. */
+    /**
+     * Steers an inactive owned hull toward the exact moving target using the same finite propulsion.
+     * Separation is guidance only; the result never snaps to a target position or velocity.
+     * @param entity existing fitted ship
+     * @param physical current exact kinematics
+     * @param target current exact target kinematics
+     * @param standOffMeters non-negative desired separation
+     * @param deltaSeconds one completed authoritative interval
+     * @return physically integrated next kinematics
+     */
+    public com.spacesim.world.LocalPhysicalKinematics followExact(Entity entity,
+            com.spacesim.world.LocalPhysicalKinematics physical,
+            com.spacesim.world.LocalPhysicalKinematics target, double standOffMeters, double deltaSeconds) {
+        if (!Double.isFinite(standOffMeters) || standOffMeters < 0) throw new IllegalArgumentException("Invalid separation");
+        var fitted = entity.getComponent(EngineeringComponent.class);
+        var displacement = physical.position().displacementTo(target.position());
+        double distance = Math.hypot(displacement.deltaXM(), displacement.deltaYM());
+        double acceleration = engineering.derive(fitted).accelerationMps2();
+        double approach = Math.min(100d, Math.sqrt(2d * acceleration * Math.max(0d, distance - standOffMeters)));
+        double vx = target.velocityXMps() + (distance > 0 ? displacement.deltaXM() / distance * approach : 0);
+        double vy = target.velocityYMps() + (distance > 0 ? displacement.deltaYM() / distance * approach : 0);
+        double dx = vx - physical.velocityXMps(), dy = vy - physical.velocityYMps();
+        double deltaV = Math.hypot(dx, dy);
+        double throttle = engineering.throttleForDeltaV(fitted, deltaV, deltaSeconds);
+        return advanceExact(entity, physical, (float)(deltaV > 0 ? dx / deltaV * throttle : 0),
+                (float)(deltaV > 0 ? dy / deltaV * throttle : 0), false, deltaSeconds);
+    }
+
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
         PlayerControlledComponent control = controlMapper.get(entity);

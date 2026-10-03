@@ -145,6 +145,20 @@ public final class PlayerRuntime {
     }
 
     /**
+     * Executes inactive-fleet intent over existing campaign physical state without another clock.
+     * @param arrival existing exact physical/jump integration
+     * @param flight existing shared fitted movement executor
+     * @param controlled existing freight authority determines eligible IDLE fleets
+     * @param deltaSeconds one completed authoritative interval
+     */
+    public void advanceComposedFleetOrders(
+            com.spacesim.persistence.Stage20LiveArrivalAuthorityIntegration arrival,
+            PlayerDirectControlSystem flight, java.util.function.Predicate<FleetId> controlled, double deltaSeconds) {
+        if (!composed) throw new IllegalStateException("Exact campaign adapter required");
+        fleetOrderExecutor.advanceExact(arrival, Objects.requireNonNull(flight), Objects.requireNonNull(controlled), deltaSeconds);
+    }
+
+    /**
      * Advances the fixed-tick world pipeline and follows the active fleet after travel.
      *
      * <p>Before the world advances, Stage-15 delegated orders are translated into transient

@@ -69,6 +69,21 @@ class GeneratedCampaignPlayerAssetAffiliationTest {
         var arrived=c.coordinator().runtime().freight().findFreighter(id).orElseThrow();assertEquals(OWN,arrived.legalFactionId());
         assertEquals(original.stableFactionId(),arrived.stableFactionId());assertEquals(original.cargoStorage(),arrived.cargoStorage());roundtrip(c);
     }
+    @Test void destructionRetainsHistoricalRegistrationWithoutGrantingAReplacement() {
+        var c=founded();c=c.submitPlayerFactionCommand(c.previewPlayerAssetAffiliation());
+        var before=c.playerState().orElseThrow();
+        c.coordinator().runtime().destroyLocalFreighter(before.activeFleetId(),DestructionPolicy.destroyAll());
+        c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        var after=c.playerState().orElseThrow();
+        assertTrue(after.ownedFleetIds().isEmpty());assertNull(after.activeFleetId());
+        assertEquals(before.walletMilliCredits(),after.walletMilliCredits());
+        var lost=c.coordinator().runtime().freight().findFreighter(before.activeFleetId()).orElseThrow();
+        assertEquals(Stage20FreightPersistentState.FreightPhase.DESTROYED,lost.phase());
+        assertEquals(OWN,lost.legalFactionId());
+        var saved=roundtrip(c).captureState();
+        assertThrows(IllegalArgumentException.class,()->Stage228GeneratedCampaignPersistentState.compose(saved.stage21Runtime(),saved.smallCraft(),saved.hangars(),saved.flightDeck(),saved.operations(),null));
+    }
+
     @Test void explicitAffiliationCannotOutliveThePersistedPersonalOwnerEvenWithAnEmptyHold() {
         var c=founded();c=c.submitPlayerFactionCommand(c.previewPlayerAssetAffiliation());var saved=c.captureState();
         assertTrue(c.coordinator().runtime().freight().findFreighter(c.playerState().orElseThrow().activeFleetId()).orElseThrow().cargoStorage().commodityMassByIdKg().isEmpty());

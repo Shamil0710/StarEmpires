@@ -27,8 +27,11 @@ final class GeneratedCampaignPlayerCheckpointValidator {
                 throw new IllegalArgumentException("Manual cargo must belong to a persisted personal fleet");
         }
         for (var fleet : stage20.freight().freighters()) {
+            // Destruction removes live personal ownership; the registered wreck row is historical.
+            // The world/freight bridge independently requires every DESTROYED fleet to be absent.
             if (!fleet.legalFactionId().equals(fleet.stableFactionId())
-                    && (player == null || !player.ownedFleetIds().contains(fleet.fleetId())
+                    && (player == null || (fleet.phase() != Stage20FreightPersistentState.FreightPhase.DESTROYED
+                    && !player.ownedFleetIds().contains(fleet.fleetId()))
                     || !fleet.legalFactionId().equals(player.factionContentId())))
                 throw new IllegalArgumentException("Explicit freight affiliation requires its persisted personal owner and faction");
         }

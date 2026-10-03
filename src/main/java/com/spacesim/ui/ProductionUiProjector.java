@@ -97,6 +97,9 @@ public final class ProductionUiProjector {
         var factionCommands = new ArrayList<>(rows.get(Tab.FACTIONS));
         factionCommands.addAll(GeneratedCampaignFactionUi.rows(campaign, world));
         rows.put(Tab.FACTIONS, List.copyOf(factionCommands));
+        var personalFleet = new ArrayList<>(rows.get(Tab.MILITARY));
+        personalFleet.addAll(GeneratedCampaignFleetUi.rows(campaign, world));
+        rows.put(Tab.MILITARY, List.copyOf(personalFleet));
         var logistics = new ArrayList<>(rows.get(Tab.LOGISTICS));
         campaign.playerState().ifPresent(player -> {
             if (player.activeFleetId() == null) return;

@@ -72,6 +72,11 @@ public final class Stage228CampaignAuthority {
             PlayerState playerState) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.playerState = playerState;
+        this.coordinator.runtime().world().setExternalFittedRecoveryOwner(id ->
+                this.playerState != null && this.playerState.ownedFleetIds().contains(id)
+                && (!id.equals(this.playerState.activeFleetId()) || !this.playerState.docked())
+                && this.coordinator.runtime().world().findFleetJump(id).isEmpty()
+                && canAdvanceExactPersonalFleet(id));
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         this.flightDeck = Objects.requireNonNull(flightDeck, "flightDeck");
@@ -420,6 +425,65 @@ public final class Stage228CampaignAuthority {
         });
     }
 
+    /**
+     * Previews a durable order for an existing inactive personal fleet using ordinary player rules.
+     * @param order shared HOLD, MOVE, FOLLOW, ESCORT or PATROL intent
+     * @return pure single-use exact-checkpoint confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerFleetOrder(com.spacesim.player.PlayerFleetOrderState order) {
+        return previewPersonalCommand(isolated -> {
+            var player = isolated.playerState;
+            if (order.fleetId().equals(player.activeFleetId())) throw new IllegalStateException("Direct control takes priority");
+            if (!java.util.Set.of(com.spacesim.player.FleetOrderType.HOLD, com.spacesim.player.FleetOrderType.MOVE,
+                    com.spacesim.player.FleetOrderType.FOLLOW, com.spacesim.player.FleetOrderType.ESCORT,
+                    com.spacesim.player.FleetOrderType.PATROL).contains(order.type()))
+                throw new IllegalArgumentException("Unsupported exact fleet order");
+            if (order.type() == com.spacesim.player.FleetOrderType.MOVE
+                    && (order.targetX() != com.spacesim.world.LocalSystemCoordinates.ARRIVAL_X
+                    || order.targetY() != com.spacesim.world.LocalSystemCoordinates.ARRIVAL_Y))
+                throw new IllegalArgumentException("Generated MOVE selects system arrival, not legacy float coordinates");
+            var freight = isolated.coordinator.runtime().freight().findFreighter(order.fleetId()).orElseThrow(() -> new IllegalStateException("No existing personal freight"));
+            if (freight.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
+                throw new IllegalStateException("Assigned freight remains under its ordinary transport owner");
+            if (order.targetFleetId() != null && !player.ownedFleetIds().contains(order.targetFleetId()))
+                throw new IllegalStateException("Target must be personally owned");
+            var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(
+                    isolated.coordinator.runtime().world(), isolated.coordinator.content(), player);
+            if (!new com.spacesim.player.PlayerFleetOrderService(adapter).issue(order))
+                throw new IllegalStateException("Unknown target or unowned fleet");
+            if (order.type() == com.spacesim.player.FleetOrderType.MOVE || order.type() == com.spacesim.player.FleetOrderType.PATROL) {
+                var world = isolated.coordinator.runtime().world();
+                var placement = world.findFleet(order.fleetId()).orElseThrow();
+                if (placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                        && world.findFleetJump(order.fleetId()).isEmpty()) {
+                    var destination = order.type() == com.spacesim.player.FleetOrderType.MOVE ? order.targetSystemId()
+                            : order.patrolSystemIds().get(order.patrolSystemIds().indexOf(placement.systemId()) == 0 ? 1 : 0);
+                    var route = new com.spacesim.player.PlayerFleetRoutePlanner(adapter)
+                            .plan(order.fleetId(), placement.systemId(), destination).orElseThrow(
+                                    () -> new IllegalStateException("No personally known feasible route"));
+                    if (route.path().size() > 1) {
+                        var fuel = world.planFleetRouteFuel(order.fleetId(), route.path());
+                        if (!fuel.supported() || !fuel.feasible()) throw new IllegalStateException("Onboard fuel cannot complete the route");
+                    }
+                }
+            }
+            isolated.playerState = adapter.player();
+        });
+    }
+
+    private PlayerFactionCommandPreview previewPersonalCommand(java.util.function.Consumer<Stage228CampaignAuthority> command) {
+        var baseline = captureState();
+        com.spacesim.persistence.Stage228GeneratedCampaignPersistentState candidate = null;
+        try {
+            var isolated = restore(baseline);
+            if (isolated.playerState == null) throw new IllegalStateException("No personal authority");
+            command.accept(isolated);
+            candidate = isolated.captureState();
+            restore(candidate).captureState();
+        } catch (IllegalStateException | IllegalArgumentException exception) { candidate = null; }
+        return new PlayerFactionCommandPreview(this, baseline, candidate);
+    }
+
     private PlayerFactionCommandPreview previewFactionCommand(
             java.util.function.Consumer<com.spacesim.player.PlayerFactionManagementService> command) {
         return previewFactionCommand((service, isolated) -> command.accept(service));
@@ -748,12 +812,32 @@ public final class Stage228CampaignAuthority {
         braking = brake; return true;
     }
 
+    private boolean canAdvanceExactPersonalFleet(com.spacesim.world.FleetId id) {
+        var freight = coordinator.runtime().freight().findFreighter(id).orElse(null);
+        return freight == null ? playerState != null && id.equals(playerState.activeFleetId())
+                : freight.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE;
+    }
+
+    private void advancePersonalFleetOrdersAtTick() {
+        if (playerState == null) return;
+        var runtime = coordinator.runtime();
+        playerState = com.spacesim.player.PlayerRuntime.reconcileAuthorityReferences(runtime.world(), playerState);
+        if (playerState.ownedFleetIds().isEmpty()) return;
+        var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(runtime.world(), coordinator.content(), playerState);
+        adapter.advanceComposedFleetOrders(runtime.arrival(), playerFlight,
+                this::canAdvanceExactPersonalFleet,
+                coordinator.session().fixedStepSeconds());
+        playerState = adapter.player();
+    }
+
     private void advancePilotAtTick(long tick) {
-        if (playerState == null || playerState.activeFleetId() == null || playerState.docked()) return;
+        if (playerState == null || playerState.activeFleetId() == null || playerState.docked()
+                || !canAdvanceExactPersonalFleet(playerState.activeFleetId())) return;
         var runtime = coordinator.runtime();
         var placement = runtime.world().findFleet(playerState.activeFleetId()).orElse(null);
         if (placement == null || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
-                || runtime.world().findFleetJump(playerState.activeFleetId()).isPresent()) return;
+                || runtime.world().findFleetJump(playerState.activeFleetId()).isPresent()
+                || runtime.world().processedFleetJumpInLastInterval(playerState.activeFleetId())) return;
         var entity = runtime.world().findSession(placement.systemId()).orElseThrow()
                 .getEntityRegistry().require(placement.localEntityId());
         // Legacy checkpoint fixtures may have a non-fitted ship. They get no physical-control grant.
@@ -854,6 +938,7 @@ public final class Stage228CampaignAuthority {
                     "Active flight-deck work requires per-tick physical bay projection");
         }
         return coordinator.advanceFrame(realDeltaSeconds, tick -> {
+            advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
             reconcilePlayerMissionsAtTick(tick);
         });
@@ -880,6 +965,7 @@ public final class Stage228CampaignAuthority {
             Map<BayId, BayDefinition> bays =
                     Objects.requireNonNull(provider.apply(tick), "bay projection");
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
+            advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
             reconcilePlayerMissionsAtTick(tick);
         });

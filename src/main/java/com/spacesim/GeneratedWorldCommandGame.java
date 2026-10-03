@@ -313,8 +313,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private boolean governmentAction(String action) {
         String selected=workspace.view().selection().stableId();
-        if(workspace.tab()!=Tab.FACTIONS || production.find(Tab.FACTIONS,workspace.view().selection()).isEmpty()
-                || com.spacesim.ui.GeneratedCampaignFactionUi.actions(selected).isEmpty())return false;
+        boolean fleet = workspace.tab()==Tab.MILITARY && !com.spacesim.ui.GeneratedCampaignFleetUi.actions(selected).isEmpty();
+        if(production.find(workspace.tab(),workspace.view().selection()).isEmpty()
+                || (!fleet && (workspace.tab()!=Tab.FACTIONS || com.spacesim.ui.GeneratedCampaignFactionUi.actions(selected).isEmpty())))return false;
         if(action.equals("confirm")) {
             var preview=pendingGovernment;pendingGovernment=null;
             if(preview==null||!selected.equals(pendingGovernmentSelection))return false;
@@ -326,8 +327,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         } else {
             campaign.coordinator().setPaused(true);pendingGovernmentSelection=selected;pendingGovernment=null;
             try {
-                pendingGovernment=com.spacesim.ui.GeneratedCampaignFactionUi.preview(campaign,selected,action);
-                status=pendingGovernment.allowed()?com.spacesim.ui.GeneratedCampaignFactionUi.explanation(campaign,selected,action)+" Подтвердите решение.":"Решение отклонено: нужны полномочия, действующий договор, претензия или контроль. Проверьте условия в сведениях.";
+                pendingGovernment=fleet ? com.spacesim.ui.GeneratedCampaignFleetUi.preview(campaign,selected,action) : com.spacesim.ui.GeneratedCampaignFactionUi.preview(campaign,selected,action);
+                status=pendingGovernment.allowed()?(fleet ? "Личный приказ проверен. Топливо и ресурсы не выдаются; активный корабль остаётся под ручным управлением." : com.spacesim.ui.GeneratedCampaignFactionUi.explanation(campaign,selected,action))+" Подтвердите решение.":"Решение отклонено. Проверьте личное владение, известность цели и условия в сведениях.";
             } catch(IllegalArgumentException | ArithmeticException exception){status="Изменение вне допустимых границ. Проверьте значение и направление.";}
         }
         snapshot=model.capture();refreshProjection();return true;
@@ -593,7 +594,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 selectedPilot.startsWith("pilot-market|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
                         : pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
         if (!selectedPilot.equals(pendingGovernmentSelection)) pendingGovernment = null;
-        renderer.bindFactionActions(workspace.tab() == Tab.FACTIONS ? com.spacesim.ui.GeneratedCampaignFactionUi.actions(selectedPilot) : List.of(),
+        renderer.bindFactionActions(workspace.tab() == Tab.FACTIONS ? com.spacesim.ui.GeneratedCampaignFactionUi.actions(selectedPilot) : workspace.tab() == Tab.MILITARY ? com.spacesim.ui.GeneratedCampaignFleetUi.actions(selectedPilot) : List.of(),
                 pendingGovernment != null && pendingGovernment.allowed());
         renderer.bindSaveAvailability(!campaign.canStartIndependentPilot());
         renderer.bindWorkspace(production, workspace);
