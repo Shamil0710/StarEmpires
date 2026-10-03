@@ -1564,3 +1564,29 @@ art-production process only.
 - source production PNGs remain canonical geometry authority;
 - committed Stage-23E silhouette/anchor/QA review artifacts remain presentation-only;
 - no replacement five-candidate generation is required for these two references.
+
+
+### Run 014 — Special-location existing-asset audit and derelict cleanup failure
+
+- repository audit confirms only the escort-hull derelict has an existing special-location bitmap;
+- energetic anomaly and resonant resource phenomenon still require dedicated generation;
+- derelict cleanup generation `8e849311-ebbb-48cd-b571-6984c5ffd51a` returned an unrelated station sheet;
+- result hard-rejected; derelict remains `SELECTED`, `geometry_frozen=false`;
+- reviews:
+  - `docs/art/reference_freeze/reviews/stage23e_special_existing_asset_audit.md`;
+  - `docs/art/reference_freeze/reviews/ref.world.special.escort_hull_derelict.v1_cleanup_attempt_001.md`.
+
+### Run 015 — Industrial Union fit-reference authority lock
+
+- recovered retained Union candidate-04 source SHA-256 exactly matches frozen provenance:
+  `bca6d8404a6654c928ab5c04af29429e6a800fcf223205a1a39add233d29d423`;
+- M22.8 content confirms all three fits share reactor/drive/sensor/radiator;
+- interceptor difference: one beam mount;
+- defence difference: same beam mount plus shield emitter;
+- strike difference: one kinetic mount, no shield;
+- single weapon hardpoint projects to review anchor approximately `x=0.80, y=0.50`;
+- attempted aligned interceptor edit `59068005-bd36-4626-aa20-757734717d5d` returned an unrelated station sheet and is hard-rejected;
+- added `Stage23EUnionSmallCraftFitReferenceAuthorityTest` to prevent future reference art from inventing
+  unauthored fit differences;
+- fit rows remain `PLANNED` until real aligned visual masters exist;
+- review: `docs/art/reference_freeze/reviews/stage23e_union_small_craft_fit_authority_audit.md`.
