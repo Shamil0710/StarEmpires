@@ -1617,3 +1617,15 @@ All three overlays:
 - require a final painted aligned pass before `geometry_frozen=true`.
 
 This reduces ambiguity without falsely treating a technical overlay as finished production art.
+
+
+### Run 017 — Empire small-craft Library recovery audit
+
+- searched current conversation files and personal Library before spending another generation batch;
+- found `/Stage23E_tmp/batch002` with five previews and `candidate_03_selected_draft.png`;
+- historical context ties that folder to the Empire small-craft recovery attempt;
+- direct image inspection proves all recovered batch002 candidates are station geometry, not small craft;
+- broad Visual Reference Set thumbnails remain non-canonical rejected review material;
+- no provable batch-001 Empire candidate-03 source/master was recovered;
+- Empire base remains `SELECTED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_library_recovery_audit.md`.
