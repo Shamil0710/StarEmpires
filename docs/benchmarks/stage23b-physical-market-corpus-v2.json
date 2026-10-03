@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "profile": "se-pilot-start-2",
+  "releaseGeneratorProfile": "se-gen-3",
+  "corpus": "stage20e.representative-seed-corpus.v1",
+  "sourceStage20GeneratorChanged": false,
+  "requestedSeeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+  ],
+  "outcomes": [
+    {
+      "seed": 1,
+      "result": "PASS",
+      "markets": 72,
+      "marketWorkingCapitalMilliCredits": 720000000
+    },
+    {
+      "seed": 2,
+      "result": "PASS",
+      "markets": 76,
+      "marketWorkingCapitalMilliCredits": 760000000
+    },
+    {
+      "seed": 3,
+      "result": "PASS",
+      "markets": 74,
+      "marketWorkingCapitalMilliCredits": 740000000
+    },
+    {
+      "seed": 4,
+      "result": "GENERATION_REJECTED",
+      "exception": "IllegalArgumentException",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 5,
+      "result": "PASS",
+      "markets": 70,
+      "marketWorkingCapitalMilliCredits": 700000000
+    },
+    {
+      "seed": 6,
+      "result": "GENERATION_REJECTED",
+      "exception": "IllegalArgumentException",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 7,
+      "result": "PASS",
+      "markets": 72,
+      "marketWorkingCapitalMilliCredits": 720000000
+    },
+    {
+      "seed": 8,
+      "result": "GENERATION_REJECTED",
+      "exception": "IllegalArgumentException",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 9,
+      "result": "PASS",
+      "markets": 70,
+      "marketWorkingCapitalMilliCredits": 700000000
+    },
+    {
+      "seed": 10,
+      "result": "GENERATION_REJECTED",
+      "exception": "IllegalArgumentException",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 11,
+      "result": "PASS",
+      "markets": 76,
+      "marketWorkingCapitalMilliCredits": 760000000
+    },
+    {
+      "seed": 12,
+      "result": "PASS",
+      "markets": 68,
+      "marketWorkingCapitalMilliCredits": 680000000
+    },
+    {
+      "seed": 13,
+      "result": "PASS",
+      "markets": 74,
+      "marketWorkingCapitalMilliCredits": 740000000
+    },
+    {
+      "seed": 14,
+      "result": "PASS",
+      "markets": 70,
+      "marketWorkingCapitalMilliCredits": 700000000
+    },
+    {
+      "seed": 15,
+      "result": "PASS",
+      "markets": 70,
+      "marketWorkingCapitalMilliCredits": 700000000
+    },
+    {
+      "seed": 16,
+      "result": "PASS",
+      "markets": 78,
+      "marketWorkingCapitalMilliCredits": 780000000
+    }
+  ],
+  "openingPassCount": 12,
+  "generationRejectedCount": 4,
+  "pilotOpeningFailureCount": 0,
+  "overallCorpusPass": false,
+  "humanAcceptance": false
+}

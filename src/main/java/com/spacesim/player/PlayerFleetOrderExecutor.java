@@ -96,6 +96,79 @@ final class PlayerFleetOrderExecutor {
         this.threatObserver = new PlayerThreatObserver(runtime);
     }
 
+    /** Advances supported composed orders through the same finite fitted propulsion and jump FSM. */
+    void advanceExact(com.spacesim.persistence.Stage20LiveArrivalAuthorityIntegration arrival,
+            com.spacesim.systems.PlayerDirectControlSystem flight, java.util.function.Predicate<FleetId> controlled, double dt) {
+        if (!Double.isFinite(dt) || dt <= 0) throw new IllegalArgumentException("Invalid campaign interval");
+        PlayerState player = runtime.player();
+        for (FleetId id : player.ownedFleetIds()) {
+            if (id.equals(player.activeFleetId()) || !controlled.test(id)) continue;
+            var placement = world.findFleet(id).orElse(null);
+            if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || world.findFleetJump(id).isPresent() || world.processedFleetJumpInLastInterval(id)) continue;
+            var entity = resolveEntity(placement);
+            var fitted = entity.getComponent(com.spacesim.components.EngineeringComponent.class);
+            if (fitted == null) continue; // Historical assets receive no fitted-capability grant.
+            var materialization = arrival.materialization(placement.systemId());
+            var physical = materialization.physicalState(placement.localEntityId()).orElseThrow();
+            var order = player.fleetOrders().stream().filter(v -> v.fleetId().equals(id)).findFirst().orElse(null);
+            if (order == null || order.type() == FleetOrderType.HOLD) {
+                materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+                continue;
+            }
+            StarSystemId destination = null;
+            if (order.type() == FleetOrderType.MOVE) {
+                if (order.targetX() != LocalSystemCoordinates.ARRIVAL_X || order.targetY() != LocalSystemCoordinates.ARRIVAL_Y) {
+                    materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, false, dt));
+                    continue;
+                }
+                destination = order.targetSystemId();
+            }
+            else if (order.type() == FleetOrderType.PATROL) {
+                int index = order.patrolSystemIds().indexOf(placement.systemId());
+                destination = order.patrolSystemIds().get(index < 0 ? 0 : (index + 1) % order.patrolSystemIds().size());
+            } else if (order.type() == FleetOrderType.FOLLOW || order.type() == FleetOrderType.ESCORT) {
+                // Only personally known/owned targets may inform this command, never spectator truth.
+                var target = world.findFleet(order.targetFleetId()).orElse(null);
+                if (target == null || target.locationKind() != FleetLocationKind.IN_SYSTEM
+                        || !player.ownedFleetIds().contains(order.targetFleetId())) {
+                    materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+                    continue;
+                }
+                destination = target.systemId();
+                if (destination.equals(placement.systemId())) {
+                    var targetPhysical = arrival.materialization(destination).physicalState(target.localEntityId()).orElseThrow();
+                    materialization.updatePhysicalState(placement.localEntityId(), flight.followExact(entity,
+                            physical, targetPhysical, order.type() == FleetOrderType.ESCORT ? 1000d : 500d, dt));
+                    continue;
+                }
+            } else {
+                // Legacy item-count economic orders are not reinterpreted as SI commands.
+                materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, false, dt));
+                continue;
+            }
+            if (destination == null || !player.discoveredSystemIds().contains(destination)) {
+                materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+                continue;
+            }
+            if (destination.equals(placement.systemId())) {
+                materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+                continue;
+            }
+            var route = routePlanner.plan(id, placement.systemId(), destination).orElse(null);
+            if (route == null || route.path().size() < 2) {
+                materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+                continue;
+            }
+            var next = route.path().get(1);
+            var fuel = world.planFleetRouteFuel(id, List.of(placement.systemId(), next));
+            // Onboard preflight only: station servicing is not silently authorized by a route preview.
+            materialization.updatePhysicalState(placement.localEntityId(), flight.advanceExact(entity, physical, 0, 0, true, dt));
+            if (fuel.supported() && fuel.feasible() && world.previewFittedFleetJump(id).filter(plan -> plan.allowed()).isPresent())
+                world.requestFleetJump(id, next);
+        }
+    }
+
     /**
      * Reconciles delegated control before the next authoritative world update.
      *

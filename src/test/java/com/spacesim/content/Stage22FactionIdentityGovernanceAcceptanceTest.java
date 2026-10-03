@@ -39,9 +39,9 @@ class Stage22FactionIdentityGovernanceAcceptanceTest {
         assertEquals(3, authored.size());
         assertEquals(5, bootstrap.size());
         assertEquals(8, largeDemoIdentities.size());
-        assertEquals(Set.of("faction.alpha", "faction.beta"),
+        assertEquals(Set.of("faction.alpha", "faction.beta", "faction.player"),
                 governed.stream().filter(id -> !largeDemoIdentities.contains(id)).collect(Collectors.toSet()));
-        assertEquals(10, governed.size());
+        assertEquals(11, governed.size());
     }
 
     @Test

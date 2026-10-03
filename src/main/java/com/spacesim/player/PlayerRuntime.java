@@ -54,6 +54,7 @@ public final class PlayerRuntime {
     private final ContentCatalog content;
     private final PlayerFleetOrderExecutor fleetOrderExecutor;
     private PlayerState player;
+    private boolean composed;
 
     private PlayerRuntime(WorldSimulation world, ContentCatalog content, PlayerState player) {
         this.world = Objects.requireNonNull(world, "WorldSimulation not set");
@@ -77,6 +78,26 @@ public final class PlayerRuntime {
      */
     public static PlayerRuntime create(WorldSimulation world, ContentCatalog content, PlayerState player) {
         return new PlayerRuntime(world, content, player);
+    }
+
+    /**
+     * Attaches existing player services without installing legacy movement or another clock.
+     * @param world campaign-owned world
+     * @param content shared content
+     * @param player existing durable player
+     * @return service adapter whose time remains owned by the campaign
+     */
+    public static PlayerRuntime attachToCampaign(WorldSimulation world, ContentCatalog content, PlayerState player) {
+        return new PlayerRuntime(world, content, player, true);
+    }
+
+    private PlayerRuntime(WorldSimulation world, ContentCatalog content, PlayerState player, boolean composed) {
+        this.world = Objects.requireNonNull(world);
+        this.content = Objects.requireNonNull(content);
+        this.player = Objects.requireNonNull(player);
+        this.composed = composed;
+        validateReferences(world, content, player);
+        this.fleetOrderExecutor = new PlayerFleetOrderExecutor(this, content);
     }
 
     /**
@@ -124,6 +145,20 @@ public final class PlayerRuntime {
     }
 
     /**
+     * Executes inactive-fleet intent over existing campaign physical state without another clock.
+     * @param arrival existing exact physical/jump integration
+     * @param flight existing shared fitted movement executor
+     * @param controlled existing freight authority determines eligible IDLE fleets
+     * @param deltaSeconds one completed authoritative interval
+     */
+    public void advanceComposedFleetOrders(
+            com.spacesim.persistence.Stage20LiveArrivalAuthorityIntegration arrival,
+            PlayerDirectControlSystem flight, java.util.function.Predicate<FleetId> controlled, double deltaSeconds) {
+        if (!composed) throw new IllegalStateException("Exact campaign adapter required");
+        fleetOrderExecutor.advanceExact(arrival, Objects.requireNonNull(flight), Objects.requireNonNull(controlled), deltaSeconds);
+    }
+
+    /**
      * Advances the fixed-tick world pipeline and follows the active fleet after travel.
      *
      * <p>Before the world advances, Stage-15 delegated orders are translated into transient
@@ -134,6 +169,7 @@ public final class PlayerRuntime {
      * @return ordinary WorldSimulation advance report
      */
     public WorldSimulation.AdvanceReport advanceFrame(float realDeltaSeconds) {
+        if (composed) throw new IllegalStateException("Campaign owns the simulation clock");
         synchronizeDirectControlBinding();
         fleetOrderExecutor.prepare();
         WorldSimulation.AdvanceReport report = world.advanceFrame(realDeltaSeconds);
@@ -161,6 +197,7 @@ public final class PlayerRuntime {
      * @return true when an undocked local active ship accepted the intent
      */
     public boolean setMovementIntent(float axisX, float axisY) {
+        if (composed) return false;
         if (player.docked() || player.activeFleetId() == null
                 || world.findFleetJump(player.activeFleetId()).isPresent()) {
             return false;
@@ -368,8 +405,10 @@ public final class PlayerRuntime {
         player = checked;
         releaseRemovedOwnedFleets(previous, checked);
         reconcileOwnedStations();
-        synchronizePlayerLocationAndControl();
-        fleetOrderExecutor.prepare();
+        if (!composed) {
+            synchronizePlayerLocationAndControl();
+            fleetOrderExecutor.prepare();
+        }
     }
 
     private void installPlayerControlSystems() {
@@ -384,17 +423,30 @@ public final class PlayerRuntime {
         }
     }
 
+    /**
+     * Discovers only the active personally owned fleet's committed local system.
+     * Does not change the viewer, control bindings, world state or clock.
+     * @param world existing ordinary world
+     * @param state immutable personal authority
+     * @return original state, or state with the actually reached system discovered
+     */
+    public static PlayerState discoverActiveFleetLocation(WorldSimulation world, PlayerState state) {
+        Objects.requireNonNull(world); Objects.requireNonNull(state);
+        if (state.activeFleetId() == null) return state;
+        var placement = world.findFleet(state.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                || state.discoveredSystemIds().contains(placement.systemId())) return state;
+        return copyPlayer(state, state.walletMilliCredits(), state.ownedFleetIds(), state.activeFleetId(),
+                withSystem(state.discoveredSystemIds(), placement.systemId()), state.discoveredObjects(), null);
+    }
+
     private void synchronizePlayerLocationAndControl() {
         FleetId activeId = player.activeFleetId();
         if (activeId != null) {
             FleetPlacementState placement = world.findFleet(activeId).orElse(null);
             if (placement != null && placement.locationKind() == FleetLocationKind.IN_SYSTEM) {
                 world.activateSystem(placement.systemId());
-                if (!player.discoveredSystemIds().contains(placement.systemId())) {
-                    player = copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(), activeId,
-                            withSystem(player.discoveredSystemIds(), placement.systemId()),
-                            player.discoveredObjects(), null);
-                }
+                player = discoverActiveFleetLocation(world, player);
             }
         }
         synchronizeDirectControlBinding();
@@ -513,7 +565,27 @@ public final class PlayerRuntime {
                 ? Optional.empty() : Optional.of(new ActiveShip(placement, session, entity, transform));
     }
 
+    /**
+     * Reconciles durable ownership and docking against an externally advanced ordinary world.
+     * This reuses the same reference rules as the playable runtime without installing input systems,
+     * changing physical positions, switching the active system or advancing another clock.
+     *
+     * @param world existing authoritative world after a completed tick
+     * @param state current immutable player state
+     * @return surviving fleet/project/station ownership and valid docking; no replacement assets
+     */
+    public static PlayerState reconcileAuthorityReferences(WorldSimulation world, PlayerState state) {
+        WorldSimulation checkedWorld = Objects.requireNonNull(world, "WorldSimulation not set");
+        PlayerState checked = Objects.requireNonNull(state, "PlayerState not set");
+        return reconcileDocking(checkedWorld, reconcileOwnedStations(checkedWorld,
+                reconcileOwnedFleets(checkedWorld, checked)));
+    }
+
     private void reconcileOwnedFleets() {
+        player = reconcileOwnedFleets(world, player);
+    }
+
+    private static PlayerState reconcileOwnedFleets(WorldSimulation world, PlayerState player) {
         List<FleetId> survivors = new ArrayList<>();
         for (FleetId fleetId : player.ownedFleetIds()) {
             if (world.findFleet(fleetId).isPresent()) {
@@ -521,17 +593,21 @@ public final class PlayerRuntime {
             }
         }
         if (survivors.size() == player.ownedFleetIds().size()) {
-            return;
+            return player;
         }
         FleetId active = player.activeFleetId();
         if (active != null && !survivors.contains(active)) {
             active = survivors.isEmpty() ? null : survivors.get(0);
         }
-        player = copyPlayer(player, player.walletMilliCredits(), survivors, active,
+        return copyPlayer(player, player.walletMilliCredits(), survivors, active,
                 player.discoveredSystemIds(), player.discoveredObjects(), null);
     }
 
     private void reconcileOwnedStations() {
+        player = reconcileOwnedStations(world, player);
+    }
+
+    private static PlayerState reconcileOwnedStations(WorldSimulation world, PlayerState player) {
         List<ConstructionProjectId> activeProjects = new ArrayList<>();
         List<OwnedStationRef> stationCandidates = new ArrayList<>(player.ownedStations());
         for (ConstructionProjectId projectId : player.ownedConstructionProjectIds()) {
@@ -563,14 +639,19 @@ public final class PlayerRuntime {
         }
         if (!activeProjects.equals(player.ownedConstructionProjectIds())
                 || !liveStations.equals(player.ownedStations())) {
-            player = copyWithConstructionOwnership(player, activeProjects, liveStations);
+            return copyWithConstructionOwnership(player, activeProjects, liveStations);
         }
+        return player;
     }
 
     private void reconcileDocking() {
+        player = reconcileDocking(world, player);
+    }
+
+    private static PlayerState reconcileDocking(WorldSimulation world, PlayerState player) {
         DiscoveredObjectRef docked = player.dockedAt();
         if (docked == null) {
-            return;
+            return player;
         }
         FleetPlacementState placement = player.activeFleetId() == null
                 ? null : world.findFleet(player.activeFleetId()).orElse(null);
@@ -581,9 +662,10 @@ public final class PlayerRuntime {
                 || !docked.systemId().equals(placement.systemId())
                 || station == null
                 || station.getComponent(MarketComponent.class) == null) {
-            player = copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(),
+            return copyPlayer(player, player.walletMilliCredits(), player.ownedFleetIds(),
                     player.activeFleetId(), player.discoveredSystemIds(), player.discoveredObjects(), null);
         }
+        return player;
     }
 
     private void releaseRemovedOwnedFleets(PlayerState previous, PlayerState current) {

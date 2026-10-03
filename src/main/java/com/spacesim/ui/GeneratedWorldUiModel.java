@@ -173,7 +173,7 @@ public final class GeneratedWorldUiModel {
                                                 .toList())))));
             }
             result.add(new LocalObjectView(
-                    "station:" + endpoint.stationId(), ObjectKind.STATION, displayId(endpoint.stationId()),
+                    "station:" + endpoint.stationId(), ObjectKind.STATION, endpointDisplayName(endpoint),
                     yard ? "Орбитальная верфь" : endpoint.generatedIndustrial()
                             ? "Промышленная станция" : "Станция",
                     active, endpoint.position(), ownerId, factionName(ownerId), sprite.binding(), sections)
@@ -318,6 +318,8 @@ public final class GeneratedWorldUiModel {
         for (Entity entity : session.getEngine().getEntities()) {
             var idComponent = entity.getComponent(com.spacesim.components.EntityIdComponent.class);
             IdentityComponent identity = entity.getComponent(IdentityComponent.class);
+            // These ECS entities bind wallet/docking identity to an already displayed exact endpoint.
+            if (identity != null && identity.name.startsWith(com.spacesim.campaign.Stage228CampaignAuthority.PILOT_MARKET_IDENTITY_PREFIX)) continue;
             TransformComponent transform = entity.getComponent(TransformComponent.class);
             if (idComponent == null || identity == null || transform == null
                     || freightEntityIds.contains(idComponent.id)
@@ -486,7 +488,7 @@ public final class GeneratedWorldUiModel {
             StarSystemId displayedSystem = placement.locationKind() == FleetLocationKind.IN_SYSTEM
                     ? placement.systemId() : placement.transitState().destinationSystemId();
             String status = placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                    ? "Патруль системы " + systemName(displayedSystem, galaxy)
+                    ? "В системе " + systemName(displayedSystem, galaxy)
                     : "Перелёт " + systemName(placement.transitState().originSystemId(), galaxy)
                             + " → " + systemName(placement.transitState().destinationSystemId(), galaxy);
             DerivedShipState derived = MILITARY_CALCULATOR.derive(
@@ -507,6 +509,8 @@ public final class GeneratedWorldUiModel {
             sections.add(InfoSection.of("Корпус и фит",
                     "Корпус", engineering.fit.hullId(), "Фит", fitId, "Модули", modules,
                     "Масса", mass(derived.totalMassKg()),
+                    "Запас мощности", format(derived.continuousPowerMarginW()) + " Вт",
+                    "Тепловой запас", format(derived.continuousHeatMarginW()) + " Вт",
                     "Экипаж", derived.crewRequired() + " / " + derived.crewSupported()));
             sections.add(InfoSection.of("Боевая готовность",
                     "Структура", percent(structuralIntegrity),
@@ -516,11 +520,10 @@ public final class GeneratedWorldUiModel {
                     "Ускорение", format(derived.accelerationMps2()) + " м/с²",
                     "Delta-v", format(derived.deltaVMps()) + " м/с"));
             sections.add(InfoSection.of("Назначение",
-                    "Текущий приказ", placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                            ? "Охрана стартовой системы" : "Межсистемный переход",
+                    "Текущий приказ", "См. командную группу в разделе военных сил",
                     "Куда направляется", placement.locationKind() == FleetLocationKind.IN_SYSTEM
-                            ? "Локальный патруль" : systemName(placement.transitState().destinationSystemId(), galaxy),
-                    "Контент", "Временный Stage 17.5/19; замена доктрин в Stage 22"));
+                            ? "Нет межсистемного перехода" : systemName(placement.transitState().destinationSystemId(), galaxy),
+                    "Контент", "Точный сохранённый инженерный фит"));
             var carrierOperations = carrierUiSource.find(placement.id()).orElse(null);
             if (carrierOperations != null) {
                 sections.addAll(carrierSections(carrierOperations));
@@ -741,6 +744,21 @@ public final class GeneratedWorldUiModel {
     private static String joinIds(List<String> ids) {
         return ids.isEmpty() ? "Нет" : ids.stream().map(GeneratedWorldUiModel::displayId)
                 .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    /**
+     * Names ordinary station endpoints by their authored role rather than a system-ID suffix.
+     * @param endpoint existing infrastructure endpoint
+     * @return readable role label, stable across market and local-map surfaces
+     */
+    public static String endpointDisplayName(RuntimeEndpoint endpoint) {
+        return switch (endpoint.stationArchetypeId()) {
+            case "station.infrastructure.trade_logistics_hub" -> "Торговый узел";
+            case "station.infrastructure.high_tech_hub" -> "Научно-производственный узел";
+            case "station.infrastructure.refinery_complex" -> "Перерабатывающий комплекс";
+            case "station.infrastructure.frontier_multipurpose" -> "Многоцелевая станция";
+            default -> endpoint.generatedIndustrial() ? "Промышленная станция" : "Торговая станция";
+        };
     }
 
     private static String displayId(String id) {

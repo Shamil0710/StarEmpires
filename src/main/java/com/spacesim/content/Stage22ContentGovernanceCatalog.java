@@ -310,6 +310,8 @@ public final class Stage22ContentGovernanceCatalog {
         TRANSNATIONAL_NETWORK,
         /** Stable identity allocated by generated-world bootstrap/runtime. */
         WORLD_GENERATED,
+        /** Identity explicitly founded by a player and stored in ordinary world state. */
+        PLAYER_CREATED,
         /** Identity restricted to a bounded authored or acceptance scenario. */
         SCENARIO_ONLY,
         /** Identity reserved for deterministic test fixtures and never production sovereignty. */

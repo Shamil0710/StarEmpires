@@ -57,6 +57,18 @@ public record DiplomaticTreatyClauseState(
         }
     }
 
+    /**
+     * Expresses the same party-to-party right from the opposite directory owner's perspective.
+     * @return unchanged kind/scope with reversed one-way direction; mutual remains mutual
+     */
+    public DiplomaticTreatyClauseState relativeToOppositeParty() {
+        return new DiplomaticTreatyClauseState(kind, switch(direction) {
+            case OWNER_TO_COUNTERPARTY -> Direction.COUNTERPARTY_TO_OWNER;
+            case COUNTERPARTY_TO_OWNER -> Direction.OWNER_TO_COUNTERPARTY;
+            case MUTUAL -> Direction.MUTUAL;
+        }, systemId);
+    }
+
     @Override
     public int compareTo(DiplomaticTreatyClauseState other) {
         DiplomaticTreatyClauseState value = Objects.requireNonNull(other, "DiplomaticTreatyClauseState not set");

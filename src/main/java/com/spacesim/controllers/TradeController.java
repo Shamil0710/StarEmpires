@@ -67,6 +67,51 @@ public class TradeController {
     }
 
     /**
+     * Settles an ordinary conserved trade whose cargo authority is Stage-18 physical storage.
+     * Wallet/access/customs admission remains here; the callback atomically transfers existing
+     * cargo through its logistics owner and must not change financial state.
+     * @param station real counterparty with wallet
+     * @param participant transient proxy for the durable personal wallet and affiliation
+     * @param direction direction of the cargo trade
+     * @param grossMilliCredits positive content-priced gross amount
+     * @param cargoReason stable commodity/quantity/handling evidence for the ledger
+     * @param transfer physical transfer committing exactly the quoted cargo, or rejecting unchanged
+     * @return whether cargo, consideration and customs all committed
+     */
+    public boolean settlePhysicalCargo(Entity station, Entity participant,
+            TradeTransactionPolicy.Direction direction, long grossMilliCredits, String cargoReason,
+            java.util.function.BooleanSupplier transfer) {
+        Objects.requireNonNull(direction); Objects.requireNonNull(transfer);
+        if (!canTradeWithStation(participant, station) || grossMilliCredits <= 0
+                || cargoReason == null || cargoReason.isBlank()) return false;
+        WalletComponent counterparty = wm.get(station), personal = wm.get(participant);
+        if (counterparty == null || personal == null || counterparty == personal) return false;
+        boolean buying = direction == TradeTransactionPolicy.Direction.BUY_FROM_STATION;
+        var charge = transactionPolicy.quote(station, participant, direction, grossMilliCredits);
+        long duty = charge.amountMilliCredits();
+        long personalDebit = buying ? safeAdd(grossMilliCredits, duty) : grossMilliCredits - duty;
+        if (personalDebit <= 0 || duty > 0 && (charge.collectorWallet() == personal
+                || charge.collectorWallet() == counterparty || !charge.collectorWallet().canCredit(duty))) return false;
+        if (buying ? !personal.canDebit(personalDebit) || !counterparty.canCredit(grossMilliCredits)
+                : !counterparty.canDebit(grossMilliCredits) || !personal.canCredit(personalDebit)) return false;
+        if (ledger.snapshotState().nextSequence() > Long.MAX_VALUE - 3L) return false;
+        String stationName = entityName(station), personalName = entityName(participant);
+        if (!transfer.getAsBoolean()) return false;
+        // All capacities were checked above; cargo and settlement run on the same simulation thread.
+        boolean paid = buying ? personal.transferTo(counterparty, grossMilliCredits)
+                : counterparty.transferTo(personal, personalDebit);
+        if (!paid) throw new IllegalStateException("Prevalidated physical trade settlement changed during cargo commit");
+        ledger.recordMoneyTransfer(buying ? personalName : stationName, buying ? stationName : personalName,
+                buying ? grossMilliCredits : personalDebit, cargoReason);
+        if (duty > 0) {
+            if (!(buying ? personal : counterparty).transferTo(charge.collectorWallet(), duty))
+                throw new IllegalStateException("Prevalidated customs settlement changed during cargo commit");
+            ledger.recordMoneyTransfer(buying ? personalName : stationName, charge.collectorLedgerName(), duty, charge.reason());
+        }
+        return true;
+    }
+
+    /**
      * Покупает товар у станции и физически переводит деньги покупателя станции.
      *
      * @param station станция-продавец с рынком, складом и кошельком

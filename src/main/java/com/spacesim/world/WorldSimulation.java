@@ -1398,6 +1398,33 @@ public FactionEconomicDependenceDiagnostics analyzeEconomicDependence(
     }
 
     /**
+     * Binds an existing composed physical executor that advances fitted recovery in its own interval.
+     * The default ordinary FTL recovery remains owner of every fleet not selected by this adapter.
+     * @param owner transient predicate over existing fleets; it grants no capabilities or resources
+     */
+    public void setExternalFittedRecoveryOwner(java.util.function.Predicate<FleetId> owner) {
+        fleetJumpService.setExternalRecoveryOwner(owner);
+    }
+
+    /**
+     * Reports whether the ordinary jump FSM processed this fleet in the last world interval.
+     * @param id existing fleet identity
+     * @return true when approach/transit/arrival already owned its physical interval
+     */
+    public boolean processedFleetJumpInLastInterval(FleetId id) {
+        return fleetJumpService.processedJumpInLastInterval(id);
+    }
+
+    /**
+     * Reads the existing fitted FTL readiness without starting travel or consuming stores.
+     * @param id existing local fleet identity
+     * @return ordinary fitted plan, or empty for a historical non-fitted or transit asset
+     */
+    public Optional<com.spacesim.ship.ShipEngineeringRuntime.JumpPlan> previewFittedFleetJump(FleetId id) {
+        return fleetJumpService.previewFittedJump(id);
+    }
+
+    /**
      * Preflights a complete remaining fleet route against exact finite propulsion resources.
      *
      * @param fleetId stable physical fleet identity

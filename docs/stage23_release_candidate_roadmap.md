@@ -1,6 +1,6 @@
 # Stage 23 — Polish / Release Candidate roadmap
 
-> Статус: **IN PROGRESS — 23A COMPLETE; 23B NEXT**.
+> Статус: **IN PROGRESS — 23A COMPLETE; 23B ACTIVE/PARTIAL**.
 > Назначение: превратить принятую Content & Balance Alpha в воспроизводимый, понятный,
 > производительный и безопасно обновляемый release candidate без создания новой параллельной
 > симуляции.
@@ -84,7 +84,7 @@ Exit criteria:
 
 ### 23B — Information architecture and production UI consolidation
 
-**Status: NEXT.**
+**Status: ACTIVE/PARTIAL.** Presentation/navigation foundation, versioned v5 player checkpoint storage with non-granting historical adoption, ordinary diplomatic deadline reconciliation, and existing-player NPC contract commands/settlement are implemented in `docs/ui/stage23b_production_ui_consolidation.md`; independent-pilot purchase, exact local movement/docking/trade, direct travel, reserve progression, own-faction/treasury composition, personal doctrine/fiscal/diplomatic/territorial intents, explicit existing-asset legal registration, durable exact personal fleet orders, count-based own stock/recipe authoring and explicit ordinary application, and finite global markets with conserved profitable physical trade are additional implemented slices; the remaining generated-player command integration is a mandatory CRITICAL seam (#412), and graphical/B18 acceptance (#370) is open. No complete-stage claim or next-stage implementation is authorized by this status.
 
 Цель: сделать весь принятый мир управляемым без чтения debug state.
 
@@ -119,6 +119,8 @@ Exit criteria:
 - keyboard-only smoke path покрывает главное меню, карты, списки и dialog actions.
 
 ### 23C — Resolution, accessibility, controls and localization
+
+**Status: NEXT.** Implementation is blocked until all 23B acceptance/exit criteria are complete.
 
 Цель: обеспечить читаемость и управление на поддерживаемом desktop envelope.
 
