@@ -1528,3 +1528,28 @@ art-production process only.
 - no candidate number or score assigned;
 - row remains `SELECTED`, `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_generation_attempt_002.md`.
+
+
+### Run 010 — Empire small-craft recovery attempt 003
+
+- reference: `ref.empire.small_craft.base.v1`;
+- retry used the real Empire production corvette/carrier images as visual-DNA context;
+- generation ID `5dd5f188-9a21-4f1e-b37c-afb3c25d2827` again returned a station board;
+- hard-rejected for wrong object class and single-board packaging;
+- no candidate number/score assigned;
+- row remains `SELECTED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_generation_attempt_003.md`.
+
+### Run 011 — Existing Empire exact-role station promotion
+
+- direct repository visual audit found two Stage-20.5 assets that already satisfy the identity-discovery
+  purpose of Stage-23E base reference generation;
+- `ref.empire.station.industrial_station.v1` now uses
+  `src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png`;
+- `ref.empire.station.trade_logistics_hub.v1` now uses
+  `src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png`;
+- both rows change from `GENERATE_5_SELECT_1 / PLANNED` to
+  `PROMOTE_EXISTING / SELECTED`;
+- neither is frozen until canonical normalization plus grayscale/downscale/silhouette/anchor QA;
+- the existing shipyard asset is deliberately not reused for a mismatched Stage-23E station role;
+- review: `docs/art/reference_freeze/reviews/stage23e_existing_empire_station_promotion_audit.md`.
