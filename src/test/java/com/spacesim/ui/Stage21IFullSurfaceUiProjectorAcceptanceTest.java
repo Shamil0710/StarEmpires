@@ -82,6 +82,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Non-vacuous acceptance for every Stage-21I read-only presentation surface. */
+@org.junit.jupiter.api.Tag("slow")
 final class Stage21IFullSurfaceUiProjectorAcceptanceTest {
 
     @Test

@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * lifecycle and Stage-17 treaty/access authority, then lifted through the final Stage-21I checkpoint.
  * Nothing in this test grants a faction-only resource, combat modifier or scripted world result.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 final class Stage21IRepresentativeCooperationCorpusAcceptanceTest {
     private static final long PEACEFUL_TRADE_SEED = Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 41L;
     private static final long ALLIANCE_SEED = Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED + 43L;

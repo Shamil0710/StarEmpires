@@ -209,7 +209,8 @@ class ShipEngineeringCatalogLoaderTest {
             if (stream == null) {
                 throw new IllegalStateException("Missing test resource");
             }
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            // Keep multiline JSON mutations independent of checkout line endings.
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         } catch (IOException exception) {
             throw new IllegalStateException(exception);
         }

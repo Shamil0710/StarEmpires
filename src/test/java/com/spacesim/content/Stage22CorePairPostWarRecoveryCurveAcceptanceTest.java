@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.6 B14 recovery-curve evidence derived only from paid repair and replacement authorities. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPostWarRecoveryCurveAcceptanceTest {
     private static final double DECLARED_SURVIVOR_DAMAGE = 0.50d;
     private static final double BASELINE_CAPABILITY = 2d;

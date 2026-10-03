@@ -67,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * return with less physical ammunition and/or reaction mass than it carried before the exchange,
  * proving that operation supply is consumed from ordinary stores rather than hidden replenishment.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage21EGeneratedWorldStage19LossAcceptanceTest {
     private static final double CRITICAL_INTEGRITY = 1e-6d;
     private static final String LAST_LIVE_MOUNT = "utility_storage";

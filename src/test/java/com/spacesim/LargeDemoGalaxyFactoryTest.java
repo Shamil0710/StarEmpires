@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Acceptance for the pre-17.5 100-system manual-test galaxy. */
+@org.junit.jupiter.api.Tag("slow")
 class LargeDemoGalaxyFactoryTest {
 
     @Test

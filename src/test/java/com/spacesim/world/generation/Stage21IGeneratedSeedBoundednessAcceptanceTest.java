@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * duration. That keeps the acceptance deterministic while proving that repeated final-checkpoint
  * projection cannot append fleets, physical sidecars, generated infrastructure or living actors.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 final class Stage21IGeneratedSeedBoundednessAcceptanceTest {
     private static final List<Long> CORPUS = List.of(
             Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED,

@@ -79,6 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * become a Stage-21E consequence, Stage-21G loss record and replacement demand. The replacement is
  * built from finite Stage-18 hull/module stock and work.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPhysicalLossReplacementHandoffAcceptanceTest {
     private static final long OPERATION_ID = 22_613_001L;
     private static final long TACTICAL_TICKS = 1_200L;

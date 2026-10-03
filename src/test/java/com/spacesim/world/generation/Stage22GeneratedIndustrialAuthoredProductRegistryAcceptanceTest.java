@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * prove the baseline vocabulary fails closed, and prove the composed vocabulary restores and
  * re-captures the same canonical physical inventory without creating a second storage authority.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22GeneratedIndustrialAuthoredProductRegistryAcceptanceTest {
     private static final String AUTHORED_PRODUCT = "module.empire_cargo_secure_v1";
     private static volatile CadenceFixture sharedFixture;

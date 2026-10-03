@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignAuthorityCheckpointTest {
     private static final long ROOT_SEED = 0x227DCA11L;
 

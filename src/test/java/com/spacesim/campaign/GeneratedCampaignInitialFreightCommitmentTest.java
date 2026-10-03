@@ -10,6 +10,7 @@ import java.util.Comparator;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignInitialFreightCommitmentTest {
     private static final float ONE_AUTONOMOUS_PERIOD_AT_EIGHT_TIMES = 0.05f;
 

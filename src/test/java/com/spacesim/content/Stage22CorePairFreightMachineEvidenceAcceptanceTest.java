@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** B05 finite freight loss and surviving-route delivery through the common Stage-18/20 authorities. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairFreightMachineEvidenceAcceptanceTest {
     @Test
     void hubLossPreservesPhysicalCargoAccountingAcrossMirroringAndSaveContinuation() {

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Deterministic controls precede any normalization/tuning of the core pair. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairTacticalSensitivityAcceptanceTest {
     @Test
     void physicalStartRoundTripHasIdenticalContinuationInEveryMirroredControl() {

@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * scheduling, repeated physical encounter consequences and recovery curves remain coupled to the
  * wider B06/B13/B14 campaign evidence.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairDistributedRaidMachineEvidenceAcceptanceTest {
 
     @Test

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20RepresentativeFactionStartCorpusDiagnosticsTest {
     private static final String LOG_BEGIN = "STAGE20E_FACTION_START_CAUSAL_DIAGNOSTICS_BEGIN";
     private static final String LOG_END = "STAGE20E_FACTION_START_CAUSAL_DIAGNOSTICS_END";

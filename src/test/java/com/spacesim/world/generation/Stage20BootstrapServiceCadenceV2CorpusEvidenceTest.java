@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20BootstrapServiceCadenceV2CorpusEvidenceTest {
     private static final String EVIDENCE_BEGIN = "STAGE20E_BOOTSTRAP_SERVICE_CADENCE_V2_EVIDENCE_BEGIN";
     private static final String EVIDENCE_END = "STAGE20E_BOOTSTRAP_SERVICE_CADENCE_V2_EVIDENCE_END";

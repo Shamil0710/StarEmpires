@@ -20,6 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage21CRepresentativeOutcomeAcceptanceTest {
     private static final List<Long> PRODUCTION_WORLD_SEEDS = List.of(
             Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED,

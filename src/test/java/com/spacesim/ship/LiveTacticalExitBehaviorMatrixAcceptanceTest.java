@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class LiveTacticalExitBehaviorMatrixAcceptanceTest {
     private static final long PARTIAL_AMMO_ALPHA = 191_304L;
     private static final long WITHDRAW_ALPHA = 191_100L;

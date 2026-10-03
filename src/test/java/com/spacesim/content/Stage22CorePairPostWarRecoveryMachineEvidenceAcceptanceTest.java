@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * replacement authority is invalid or the authored Union replacement-throughput ordering disappears.
  * Continuous campaign capability curves remain required before B14 can close.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPostWarRecoveryMachineEvidenceAcceptanceTest {
     @Test
     void b14RunsEightPairedPaidReplacementCellsWithAuthoredThroughputContrast() {

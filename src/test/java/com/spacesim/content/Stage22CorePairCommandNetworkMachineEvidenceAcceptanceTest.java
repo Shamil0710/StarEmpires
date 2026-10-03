@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code utility_defense} mount. The canonical 30-seed mirrored tuning schedule advances a bounded
  * one-second ordinary control window; no track quality, fire state or survival decision is injected.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairCommandNetworkMachineEvidenceAcceptanceTest {
     private static final String SENSOR_MOUNT = "utility_sensor";
     private static final String NETWORK_MOUNT = "utility_defense";

@@ -39,6 +39,24 @@ jobs:
           set -o pipefail
           ./mvnw --batch-mode --no-transfer-progress clean verify 2>&1 | tee maven-verify.log
 
+      - name: Summarize test timings
+        if: always()
+        shell: pwsh
+        run: |
+          if (Get-ChildItem target/surefire-reports/TEST-*.xml -ErrorAction SilentlyContinue) {
+            ./tools/test-timings.ps1
+            Get-Content target/test-timings/summary.md >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Retain test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timings-${{ github.sha }}
+          path: target/test-timings/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Retain core-pair raw evidence
         if: always()
         uses: actions/upload-artifact@v4

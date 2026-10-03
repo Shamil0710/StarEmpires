@@ -49,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * operation state. No test serializer, synthetic fleet placement or strategic damage authority is
  * introduced.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairDistributedRaidPersistenceAcceptanceTest {
     private static final int CREW_AVAILABLE = 100_000;
     private static final int REQUIRED_SUPPLY_ACCESS_BPS = 5_000;

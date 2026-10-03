@@ -55,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * target mass and end in byte-identical generated-world checkpoints. No free refill, projection token
  * or faction-specific logistics modifier participates in continuation.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairOffensiveProjectionPersistenceContinuationAcceptanceTest {
     private static final String PROPELLANT_FEED = "propellant_feed";
     private static final String REPLENISHMENT_TRANSFER = "replenishment_transfer";

@@ -60,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * one exact Empire/Union core fit onto that physical fleet. Stage-21G recovery therefore records the
  * real generated owner while the paired experiment records which exact core package crossed the seam.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairGeneratedWorldReplacementPersistenceAcceptanceTest {
     private static final long OPERATION_ID = 22_613_500L;
     private static final int CREW_AVAILABLE = 100_000;

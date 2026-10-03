@@ -62,6 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage21EGeneratedWorldTacticalExecutionAcceptanceTest {
     private static final int ACCEPTANCE_TACTICAL_TICKS = 240;
 

@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * move it only through {@code Stage18LogisticsRuntime.transferProduct}, and preserve the resulting
  * physical inventory over another full generated-world save/load.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22GeneratedWorldAuthoredProductLogisticsAcceptanceTest {
     private static final String AUTHORED_PRODUCT = "module.empire_cargo_secure_v1";
 
