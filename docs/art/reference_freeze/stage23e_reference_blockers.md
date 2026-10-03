@@ -186,3 +186,14 @@ Mechanical decisions are now explicit:
 
 Remaining blocker for all three is exact PNG persistence under the canonical reference packages,
 followed by committed-byte QA and exact-head CI.
+
+
+## G. Clean image-context handoff
+
+Exact restart order, proof-image rules, non-regeneration rules for accepted masters and hard-reject
+criteria are recorded in:
+
+`docs/art/reference_freeze/stage23e_clean_context_generation_handoff.md`.
+
+Use that handoff when image generation resumes in a fresh context; do not reconstruct the sequence from
+chat history.
