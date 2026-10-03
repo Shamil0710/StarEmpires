@@ -53,8 +53,10 @@ Affected references include:
 - Union painted small-craft fit passes;
 - escort-hull derelict dead-state cleanup.
 
-Repeated edit requests have returned unrelated station sheets. Do not treat those outputs as partial
-success.
+Repeated edit requests have returned unrelated station sheets or project-status dashboards. The
+refinery clean-master attempt `bb73dadd-1e91-4f2a-b5cb-4cd7cf8fae67` explicitly targeted the selected
+candidate and still returned a dashboard, proving that target-preserving edits are unreliable in this
+context. Do not treat those outputs as partial success.
 
 ## B. Selected reference with no repository-persisted canonical master
 

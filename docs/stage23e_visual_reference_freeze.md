@@ -1768,3 +1768,16 @@ Energetic anomaly:
 
 Blocker ledger:
 `docs/art/reference_freeze/stage23e_reference_blockers.md`.
+
+
+### Run 028 — Empire refinery explicit-edit failure
+
+- reference: `ref.empire.station.refinery_complex.v1`;
+- selected geometry remains batch-001 `candidate_02` at 94/100;
+- clean-master edit generation `bb73dadd-1e91-4f2a-b5cb-4cd7cf8fae67` explicitly targeted the
+  selected candidate;
+- backend ignored the target and returned a Stage-23E dashboard containing text and multiple station
+  visuals;
+- hard reject;
+- row remains `SELECTED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.refinery_complex.v1_clean_master_attempt_001.md`.
