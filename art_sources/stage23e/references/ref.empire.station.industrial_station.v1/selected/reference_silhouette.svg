@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="512" viewBox="0 0 768 512">
+<defs><mask id="a" maskUnits="userSpaceOnUse" x="0" y="0" width="768" height="512" style="mask-type:alpha"><image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png" width="768" height="512"/></mask></defs>
+<rect width="768" height="512" fill="#fff" mask="url(#a)"/></svg>
