@@ -70,6 +70,9 @@ class Stage23EReferenceManifestIntegrityTest {
                 Path source = repositoryPath(sourceAssetPath);
                 assertTrue(Files.isRegularFile(source),
                         referenceId + " missing frozen source " + source);
+                assertTrue(source.getFileName().toString().endsWith(".png"),
+                        referenceId + " frozen artistic source must be PNG: " + source);
+                assertPngSignature(source, referenceId);
 
                 String actualBlobSha = gitBlobSha(source);
                 assertEquals(sourceGitBlobSha, actualBlobSha,
@@ -99,6 +102,18 @@ class Stage23EReferenceManifestIntegrityTest {
         int fragment = manifestPath.indexOf('#');
         String clean = fragment >= 0 ? manifestPath.substring(0, fragment) : manifestPath;
         return Path.of(clean);
+    }
+
+    private static void assertPngSignature(Path path, String referenceId) throws IOException {
+        byte[] bytes = Files.readAllBytes(path);
+        byte[] signature = new byte[] {
+                (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+        };
+        assertTrue(bytes.length >= signature.length, referenceId + " truncated PNG");
+        for (int i = 0; i < signature.length; i++) {
+            assertEquals(signature[i], bytes[i],
+                    referenceId + " invalid PNG signature at byte " + i);
+        }
     }
 
     private static String gitBlobSha(Path path) throws IOException, NoSuchAlgorithmException {
