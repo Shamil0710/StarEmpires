@@ -1663,3 +1663,50 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - added `Stage23EEmpireVolatileDepotReferenceFreezeTest`;
 - manifest `PLANNED -> SELECTED`, `geometry_frozen=false` pending exact-head CI;
 - review: `docs/art/reference_freeze/reviews/ref.empire.station.volatile_depot.v1_batch_001.md`.
+
+
+### Run 020 — Industrial Union mining-outpost faction drift
+
+- reference: `ref.industrial_union.station.mining_outpost.v1`;
+- generation ID `a2ab3446-7063-47da-ab82-9ff38c900bd5`;
+- requested Union standardized extraction/logistics construction language;
+- backend reproduced the Imperial cream/burgundy/heraldic station family;
+- entire batch hard-rejected before candidate scoring;
+- row remains `PLANNED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.station.mining_outpost.v1_generation_attempt_001.md`.
+
+### Run 021 — Empire refinery selection
+
+- reference: `ref.empire.station.refinery_complex.v1`;
+- generation ID `8bfb7e78-9299-411f-83d0-c797a893cce7`;
+- selected `candidate_02`, score **94/100**;
+- primary role evidence: repeated process towers, protected process/service trunks, intermediate
+  vessels, central service region and distinct input/output-side module masses;
+- row advances to `SELECTED`;
+- local normalized working master is not treated as authority until persisted in Git;
+- `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.refinery_complex.v1_batch_001.md`.
+
+### Run 022 — Empire high-tech hub selection
+
+- reference: `ref.empire.station.high_tech_hub.v1`;
+- generation ID `101b50b6-ca78-46ed-9308-5b3b9e03bf3c`;
+- selected `candidate_05`, score **94/100**;
+- primary role evidence: compact instrumented protected core, clean precision/thermal panels,
+  organized sensor/comms and controlled service interfaces;
+- row advances to `SELECTED`;
+- local normalized working master is not repository authority until persisted;
+- `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.high_tech_hub.v1_batch_001.md`.
+
+### Run 023 — Empire frontier multipurpose selection
+
+- reference: `ref.empire.station.frontier_multipurpose.v1`;
+- generation ID `39b5a286-e7bc-4ff8-b174-5969598dddf0`;
+- selected `candidate_03`, score **95/100**;
+- primary role evidence: mixed-generation modules, protected service core, compact cargo/utility,
+  service crane/arm, sensor mast and ordered retrofit history;
+- row advances to `SELECTED`;
+- local normalized working master is not repository authority until persisted;
+- `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.frontier_multipurpose.v1_batch_001.md`.
