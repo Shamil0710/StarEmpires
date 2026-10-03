@@ -1,0 +1,25 @@
+{
+  "reference_id": "ref.empire.station.volatile_depot.v1",
+  "asset_id": "empire.station.volatile_depot",
+  "mode": "GENERATE_5_SELECT_1",
+  "status": "SELECTED_PENDING_FREEZE_CI",
+  "generation_id": "958326e2-a119-4402-916c-129f18f7aadc",
+  "selected_candidate": "candidate_04",
+  "selected_score": 95,
+  "canonical_master": "art_sources/stage23e/references/ref.empire.station.volatile_depot.v1/selected/reference_master.png",
+  "canonical_master_git_blob_sha": "20ddc80eb2642a89d820d4d5fbbf810f7cc7fe41",
+  "canonical_master_sha256": "846c3cb4f27cc6c115b3959d6d18ee81b59222559c415a120ca8de98ae5e7090",
+  "source_canvas": [
+    1024,
+    1024
+  ],
+  "visible_bounds_alpha_gt_16": [
+    92,
+    229,
+    932,
+    794
+  ],
+  "geometry_frozen": false,
+  "review": "docs/art/reference_freeze/reviews/ref.empire.station.volatile_depot.v1_batch_001.md",
+  "authority_boundary": "Reference art does not define inventory, tank fullness, resource quantity, transfer rate, collision or station physical footprint."
+}

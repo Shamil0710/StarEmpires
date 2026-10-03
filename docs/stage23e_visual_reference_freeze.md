@@ -1647,3 +1647,19 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - manifest advances `PLANNED -> SELECTED`;
 - `geometry_frozen=false` until exact-head CI succeeds;
 - review: `docs/art/reference_freeze/reviews/ref.empire.station.mining_outpost.v1_batch_001.md`.
+
+
+### Run 019 — Empire volatile depot batch 001
+
+- reference: `ref.empire.station.volatile_depot.v1`;
+- generation ID `958326e2-a119-4402-916c-129f18f7aadc`;
+- transparent five-candidate Empire station source board;
+- selected `candidate_04`, score **95/100**;
+- strongest evidence: repeated protected pressure/tank groups, isolation/service framing, central control
+  spine, manifold/truss routing, docking/transfer interfaces and stowed transfer-boom geometry;
+- source alpha allowed direct connected-component isolation rather than opaque-background matting;
+- canonical 1024x1024 master SHA-256:
+  `846c3cb4f27cc6c115b3959d6d18ee81b59222559c415a120ca8de98ae5e7090`;
+- added `Stage23EEmpireVolatileDepotReferenceFreezeTest`;
+- manifest `PLANNED -> SELECTED`, `geometry_frozen=false` pending exact-head CI;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.volatile_depot.v1_batch_001.md`.
