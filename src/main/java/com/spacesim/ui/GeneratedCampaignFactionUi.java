@@ -40,6 +40,7 @@ public final class GeneratedCampaignFactionUi {
                 InfoSection.of("Институциональные предпочтения","Текущее значение",doctrine[i]+" / 100","Шаг изменения","5 пунктов","Последствие","Вес решений; ресурсы и права не предоставляются"),null,world.getAuthoritativeWorldTick()));
         for(int i=0;i<FISCAL.length;i++)rows.add(row("fiscal|"+i,FISCAL[i],"Мои финансы",fiscalValue(i,fiscal[i]),
                 InfoSection.of("Фискальные ограничения","Текущее значение",fiscalValue(i,fiscal[i]),"Шаг изменения",i<2?"1 процентный пункт":"1 000 кредитов","Действие","Меняет разрешённые будущие потоки; существующие деньги не создаёт"),null,world.getAuthoritativeWorldTick()));
+        rows.addAll(GeneratedCampaignStockProductionUi.rows(c));
         for(var other:snapshot.galaxy().factions()) {
             if(other.factionId().equals(own))continue;
             rows.add(row("embargo|"+other.factionId(),"Доступ к рынкам: "+other.displayName(),"Моя дипломатия","Эмбарго или отмена",
@@ -80,6 +81,7 @@ public final class GeneratedCampaignFactionUi {
     public static List<Action> actions(String id) {
         if(!id.startsWith(PREFIX))return List.of();String kind=id.substring(PREFIX.length()).split("\\|",-1)[0];
         return switch(kind) {
+            case "stock","production","apply-production" -> GeneratedCampaignStockProductionUi.actions(kind);
             case "affiliation" -> List.of(new Action("affiliate","ЗАРЕГИСТРИРОВАТЬ"));
             case "doctrine","fiscal" -> List.of(new Action("less","УМЕНЬШИТЬ"),new Action("more","УВЕЛИЧИТЬ"));
             case "embargo" -> List.of(new Action("impose","ЭМБАРГО"),new Action("revoke","ОТМЕНИТЬ"));
@@ -103,6 +105,7 @@ public final class GeneratedCampaignFactionUi {
         if(actions(id).stream().noneMatch(v->v.id().equals(action)))throw new IllegalArgumentException("Unknown faction presentation action");
         String[] p=id.substring(PREFIX.length()).split("\\|",-1);String own=c.playerState().orElseThrow().factionContentId();var world=c.coordinator().runtime().world();
         return switch(p[0]) {
+            case "stock","production","apply-production" -> GeneratedCampaignStockProductionUi.preview(c,p,action);
             case "affiliation" -> c.previewPlayerAssetAffiliation();
             case "doctrine" -> {
                 long[] v=doctrine(world.findFactionStrategicState(own).orElseThrow().doctrine());int index=Integer.parseInt(p[1]);v[index]+=action.equals("less")?-5:5;
@@ -134,6 +137,7 @@ public final class GeneratedCampaignFactionUi {
      */
     public static String explanation(Stage228CampaignAuthority c,String id,String action) {
         String[] p=id.substring(PREFIX.length()).split("\\|",-1);var world=c.coordinator().runtime().world();String own=c.playerState().orElseThrow().factionContentId();
+        if(p[0].equals("stock")||p[0].equals("production")||p[0].equals("apply-production"))return GeneratedCampaignStockProductionUi.explanation(c,p,action);
         if(p[0].equals("doctrine")){int i=Integer.parseInt(p[1]);long v=doctrine(world.findFactionStrategicState(own).orElseThrow().doctrine())[i];return "Проверено: "+DOCTRINE[i]+" "+v+" → "+(v+(action.equals("less")?-5:5))+" / 100.";}
         if(p[0].equals("fiscal")){int i=Integer.parseInt(p[1]);long v=fiscal(world.findFactionFiscalPolicy(own).orElseThrow())[i];return "Проверено: "+FISCAL[i]+" "+fiscalValue(i,v)+" → "+fiscalValue(i,v+(action.equals("less")?-1:1)*(i<2?100L:1_000_000L))+".";}
         return "Проверено: "+actions(id).stream().filter(a->a.id().equals(action)).map(Action::label).findFirst().orElseThrow()+". Условия в сведениях; ресурсы не предоставляются.";

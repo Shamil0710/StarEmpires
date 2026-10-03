@@ -25,9 +25,11 @@ public class Stage23BSoftwareGraphicsSmoke {
   px.getPixels().put(ScreenUtils.getFrameBufferPixels(0,0,1280,720,true)).flip();
   com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(System.getProperty("java.io.tmpdir")+"/"+name+".png"),px);px.dispose();
  }
- static void selectRow(com.spacesim.ui.ProductionUiWorkspace workspace, com.spacesim.GeneratedWorldCommandGame game, String id){
-  for(int i=0;i<100;i++)processor.keyDown(Input.Keys.UP);game.render();
-  int moves=0;while(!workspace.view().selection().stableId().equals(id)){processor.keyDown(Input.Keys.DOWN);game.render();if(++moves>200)throw new AssertionError("Row unreachable "+id);}
+ static void selectRow(com.spacesim.ui.ProductionUiWorkspace workspace, com.spacesim.GeneratedWorldCommandGame game, String id)throws Exception{
+  var field=game.getClass().getDeclaredField("production");field.setAccessible(true);
+  int total=workspace.page((com.spacesim.ui.ProductionUiSnapshot)field.get(game),1).total();
+  for(int i=0;i<total;i++)processor.keyDown(Input.Keys.UP);game.render();
+  int moves=0;while(!workspace.view().selection().stableId().equals(id)){processor.keyDown(Input.Keys.DOWN);game.render();if(++moves>total)throw new AssertionError("Row unreachable "+id);}
  }
  static void ships(com.spacesim.ui.GeneratedWorldCommandUiRenderer renderer, com.spacesim.GeneratedWorldCommandGame game)throws Exception{
   var field=renderer.getClass().getDeclaredField("hitTargets");field.setAccessible(true);
@@ -199,6 +201,21 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(campaign(game).coordinator().runtime().world().findFactionStrategicState("faction.player").orElseThrow().doctrine().tradeOpenness()!=55)throw new AssertionError("Doctrine UI command failed");
   selectRow(workspace,game,"player-government|fiscal|0");keyboardAction(renderer,game,"pilot.government-more");keyboardAction(renderer,game,"pilot.government-confirm");
   if(campaign(game).coordinator().runtime().world().findFactionFiscalPolicy("faction.player").orElseThrow().stationTaxBasisPoints()!=100)throw new AssertionError("Fiscal UI command failed");
+  selectRow(workspace,game,"player-government|stock|item.energy");
+  var beforeStockCheckpoint=campaign(game).captureState();keyboardAction(renderer,game,"pilot.government-more");screenshot("stage23b-own-stock-preview");
+  if(!beforeStockCheckpoint.equals(campaign(game).captureState()))throw new AssertionError("Stock preview changed authoritative state");
+  keyboardAction(renderer,game,"pilot.government-confirm");
+  if(campaign(game).coordinator().runtime().world().findFactionStockProductionPolicy("faction.player").orElseThrow().stockPolicies().stream().noneMatch(p->p.itemContentId().equals("item.energy")&&p.targetStockFloor()==100))throw new AssertionError("Stock UI intent failed");
+  selectRow(workspace,game,"player-government|production|station.arsenal");keyboardAction(renderer,game,"pilot.government-more");screenshot("stage23b-own-production-preview");keyboardAction(renderer,game,"pilot.government-confirm");
+  var stockPolicy=campaign(game).coordinator().runtime().world().findFactionStockProductionPolicy("faction.player").orElseThrow();
+  if(stockPolicy.productionPolicies().size()!=1)throw new AssertionError("Production UI intent failed");
+  selectRow(workspace,game,"player-government|apply-production");var beforeApply=campaign(game).captureState();
+  keyboardAction(renderer,game,"pilot.government-apply");screenshot("stage23b-own-production-apply");keyboardAction(renderer,game,"pilot.government-confirm");
+  if(!beforeApply.equals(campaign(game).captureState()))throw new AssertionError("Applying without an owned commodity consumer changed physical state");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+  if(!stockPolicy.equals(campaign(game).coordinator().runtime().world().findFactionStockProductionPolicy("faction.player").orElseThrow()))throw new AssertionError("Stock/production intent lost on reload");
+  System.out.println("Personal stock/recipe UI authoring, pure previews, explicit zero-consumer apply and exact reload passed; no physical production grant claimed");
+  processor.keyDown(Input.Keys.F3);game.render();
   selectRow(workspace,game,"player-government|embargo|faction.alpha");keyboardAction(renderer,game,"pilot.government-impose");keyboardAction(renderer,game,"pilot.government-confirm");
   if(campaign(game).coordinator().runtime().world().findFactionDiplomacyState("faction.player").orElseThrow().embargoes().isEmpty())throw new AssertionError("Embargo UI command failed");
   keyboardAction(renderer,game,"pilot.government-revoke");keyboardAction(renderer,game,"pilot.government-confirm");

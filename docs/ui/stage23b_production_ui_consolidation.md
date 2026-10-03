@@ -568,3 +568,34 @@ order save/load. It then passed existing registration, faction/policy commands, 
 conserved physical profit and reload. The personal-fleet confirmation was visually inspected: full
 control conditions remain readable; provenance uses the existing detail scroll and both actions and
 confirmation remain accessible. This is graphical engineering evidence, not human B18 PASS.
+
+## Own stock/production policy authoring and explicit ordinary application
+
+Faction controls now expose catalog-named commodity floors in **count-based item units**, recipe
+preferences per station archetype, reset, and a separate explicit strategic-policy apply. The
+adapter reuses UpdateStockProductionPolicy / ApplyStrategicPolicy and the same exact-state
+single-use confirmation. Numeric changes preserve the other item/archetype policies; recipe
+selection uses authored catalog definitions. All policy state remains in WorldState, with no new
+schema, owner, clock, opening profile, resource grant or SI reinterpretation.
+
+The inspector reports actual own eligible commodity-market / commodity-production counts from
+their real registration and components. Changing a policy alone changes no goods or processes.
+Ordinary apply uses existing stock-capacity bounds and real recipe-retool progress reset. Actual
+Stage-18 kilogram stores, finite sources, installed physical processes and engineering work remain
+under their existing authorities. A newly founded faction has zero eligible commodity consumers;
+its apply is an exact no-op, not a claim of autonomous physical manufacturing.
+
+Local validation: 14 tests passed across the new three generated-player scenarios, existing
+Stage-17F real commodity-market/production acceptance, Stage-17G2 player service, and faction
+command integration. Pure projection/previews, own-only intent, unknown references, stale/foreign/
+reused tokens, recipe cycling/reset, exact roundtrip and zero-consumer resource conservation passed.
+Strict Java-17 Javadoc/desktop packaging passed with coverage skipped. The final packaged llvmpipe
+journey passed keyboard authoring, pure previews, explicit apply and reload, followed by original
+embargo/treaty/territory, actual hop, conserved physical trade and reload. QA uses the actual filtered
+row count for keyboard traversal and returns to the faction tab after the ordinary load reset.
+
+The registration batch passed CI #7829 with 2387 tests; the completed fleet/loss batch at dec9a2a
+is separately under CI #7837. This policy presentation batch stays unpublished while that required
+CI runs. Physical owned industry/construction/supply/mining/fitting, established territorial
+control, carrier operations, production NPC opportunities and genuine B18 remain mandatory.
+23B stays ACTIVE/PARTIAL; no merge or 23C.

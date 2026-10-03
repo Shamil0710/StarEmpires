@@ -191,3 +191,15 @@ absent; live empty-hold registration and removal of the persisted player still r
 schema/layout or resource changes accompany this correction, and no replacement hull is granted.
 The final combined affiliation/NPC/personal-fleet regression gate passed 26 tests, zero
 failures/errors/skips, including actual registered-hull destruction and an exact codec roundtrip.
+
+## Count-based stock/recipe controls
+
+New faction presentation rows draft the existing immutable stock/production command and explicitly
+apply it through PlayerFactionManagementService. Existing WorldState owns all persistent intent;
+the campaign v5 envelope, freight schema 3, content/profile identities and opening resources stay
+unchanged. No legacy item-count field is reinterpreted as physical kilograms. Actual eligible own
+consumers are disclosed, including zero for a newly founded faction. Shared Stage-17F tests prove
+ordinary commodity configuration consequences; generated-player tests prove pure confirmation,
+references/token guards, exact reload and preservation of existing Stage-18 physical storage.
+The 14-test local gate, strict Javadoc/desktop packaging and final packaged graphical journey passed.
+Full required CI of the current fleet execution-owner batch must finish before this next ref update.
