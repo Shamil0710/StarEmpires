@@ -7,6 +7,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class ShipMathematicsV05SweepAcceptanceTest {
     private static final String EXPECTED_FINGERPRINT =
             "5c1ee91e262a410fffd7af46a4d328c7788c82612dd594ae375f3bd9487eac26";

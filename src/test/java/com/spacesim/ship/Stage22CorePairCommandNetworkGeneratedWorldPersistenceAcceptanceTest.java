@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Persistence must retain the failed radar and exact fitted network while Stage-19 reconstructs all
  * contacts and decisions from scratch after load.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairCommandNetworkGeneratedWorldPersistenceAcceptanceTest {
     private static final String SENSOR_MOUNT = "utility_sensor";
     private static final int CONTROL_WINDOW_TICKS = 20;

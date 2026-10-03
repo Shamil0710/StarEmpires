@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage17EconomicDependenceDiagnosticsAcceptanceTest {
     private static final String SOURCE = "faction.neutral";
     private static final String PARTNER = "faction.trade_league";

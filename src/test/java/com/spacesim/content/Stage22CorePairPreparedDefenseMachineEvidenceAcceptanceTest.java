@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>This does not invent a synthetic system-defense simulator. Longer multi-wave campaign endurance
  * remains part of the wider B09/B13 campaign evidence boundary.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPreparedDefenseMachineEvidenceAcceptanceTest {
     private static final int PREPARED_MISSION_FLOOR_BPS = 1_000;
 

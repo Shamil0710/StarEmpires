@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20LocalInfrastructureLayoutGeneratorTest {
     private static final String HUB_ARCHETYPE = "station.infrastructure.trade_logistics_hub";
 

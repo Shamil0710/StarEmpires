@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage21FGeneratedWorldRuntimePersistenceAcceptanceTest {
     @Test
     void occupationRoundTripsDeterministicallyInsideCompleteStage21ECheckpoint() {

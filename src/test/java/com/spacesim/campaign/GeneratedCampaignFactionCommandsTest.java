@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignFactionCommandsTest {
     private static final String OWN = "faction.player", FOREIGN = "faction.alpha";
 
@@ -114,6 +115,6 @@ class GeneratedCampaignFactionCommandsTest {
     }
 
     private static List<DiplomaticTreatyClauseState> clauses(){return List.of(new DiplomaticTreatyClauseState(DiplomaticTreatyClauseState.Kind.MARKET_ACCESS,DiplomaticTreatyClauseState.Direction.MUTUAL,null));}
-    private static Stage228CampaignAuthority founded(){var c=Stage228CampaignAuthority.create(1);c.submitIndependentPilotStart(c.previewIndependentPilotStart());return c.submitPlayerFactionFoundation(c.previewPlayerFactionFoundation(OWN,"Содружество"));}
+    private static Stage228CampaignAuthority founded(){return FoundedCampaignFixture.restore();}
     private static Stage228CampaignAuthority roundtrip(Stage228CampaignAuthority c){var state=c.captureState();var r=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(Stage228GeneratedCampaignPersistenceCodec.encode(state)));assertEquals(state,r.captureState());return r;}
 }

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Acceptance for exact local FTL approach continuation through the existing Stage-20 checkpoint. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage20GeneratedWorldMidApproachPersistenceAcceptanceTest {
     @Test
     void movingToJumpExactPhysicalStateRoundTripsAndContinuesTowardPersistedEndpoint() {

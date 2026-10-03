@@ -66,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Stage-21E physical-loss protocol; only Stage 19 is allowed to apply the final destructive effect.
  * This is a physical initial condition, not a synthetic combat-result flag or manual fleet removal.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairEscortInterdictionIntegrationAcceptanceTest {
     private static final long OPERATION_ID = 22_608L;
     private static final long TACTICAL_TICKS = 1_200L;

@@ -7,6 +7,7 @@ import com.spacesim.world.*;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPersonalFleetOrdersTest {
     @Test void independentPersonalOrderIsPureSingleUseAndCannotCommandForeignOrActiveAssets() {
         var c=twoShips();var id=inactive(c);var before=c.captureState();

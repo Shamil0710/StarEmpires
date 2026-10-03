@@ -11,6 +11,7 @@ import java.util.stream.LongStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20RepresentativeSeedCorpusTest {
     private static final Path EVIDENCE_DIRECTORY = Path.of("target", "stage20e-evidence");
     private static final Path MEASURED_BASELINE = Path.of(

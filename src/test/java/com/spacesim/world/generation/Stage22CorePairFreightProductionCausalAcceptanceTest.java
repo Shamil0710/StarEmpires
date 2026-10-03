@@ -69,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.6 B08: physical interdiction outcome -> same freight order -> real Stage-18 production. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairFreightProductionCausalAcceptanceTest {
     private static final long OPERATION_ID = 22_608_100L;
     private static final long TACTICAL_TICKS = 1_200L;

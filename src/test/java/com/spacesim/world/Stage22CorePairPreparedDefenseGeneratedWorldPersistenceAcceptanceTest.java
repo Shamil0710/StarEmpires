@@ -61,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * before and after save/load for both exact core packages. No reserve FleetId, movement, ammunition,
  * readiness or supply fact is synthesized by operation metadata.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPreparedDefenseGeneratedWorldPersistenceAcceptanceTest {
     private static final int CREW_AVAILABLE = 100_000;
     private static final int MINIMUM_MISSION_READINESS_BPS = 1_000;

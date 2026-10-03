@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * same finite M22.4 retool transition from both the live checkpoint and its decoded copy and requires
  * the resulting state to be byte-identical.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPersistenceMachineEvidenceAcceptanceTest {
     private static final String TARGET_FAMILY = "ship_family.industrial_union.corvette";
 

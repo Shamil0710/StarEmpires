@@ -127,6 +127,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * extraction/freight and player-owned mission completion. No test-only combat score, territory flag,
  * cargo mint or mission-completion flag exists in this chain.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 final class Stage21IFinalLivingWorldSoakAcceptanceTest {
     private static final double CRITICAL_INTEGRITY = 1e-6d;
     private static final String LAST_LIVE_MOUNT = "utility_storage";

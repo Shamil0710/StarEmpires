@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20RepresentativeFreightPortfolioDiagnosticsTest {
     private static final String BEGIN = "STAGE20E_FREIGHT_PORTFOLIO_DIAGNOSTICS_BEGIN";
     private static final String END = "STAGE20E_FREIGHT_PORTFOLIO_DIAGNOSTICS_END";

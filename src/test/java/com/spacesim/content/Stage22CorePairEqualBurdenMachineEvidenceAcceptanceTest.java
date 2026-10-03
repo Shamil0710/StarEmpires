@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** M22.6 B07 canonical paired machine evidence over ordinary Stage-19 combat authorities. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairEqualBurdenMachineEvidenceAcceptanceTest {
     private static final double MAX_DRY_MASS_KG = 33_000_000d;
     private static final double MAX_LOADED_MASS_KG = 34_000_000d;

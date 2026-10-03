@@ -9,6 +9,7 @@ import java.util.Locale;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignThroughputBaselineTest {
     private static final int PROBE_FRAMES = 100;
     private static final float FRAME_SECONDS = 0.1f;

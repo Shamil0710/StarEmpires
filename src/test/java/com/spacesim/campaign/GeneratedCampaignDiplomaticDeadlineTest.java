@@ -13,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignDiplomaticDeadlineTest {
     @Test
     void ordinaryCampaignExpiresRestoredProposalAtItsExactDeadline() {
@@ -99,7 +100,7 @@ class GeneratedCampaignDiplomaticDeadlineTest {
 
     @Test
     void alreadyOverdueLegacyOfferRemainsExactOnRestoreAndExpiresAtFirstResumedTick() {
-        var source = GeneratedCampaignCoordinator.create(1L);
+        var source = GeneratedCampaignCoordinator.restore(InitialCampaign.STATE);
         var service = new DiplomaticLifecycleService(source.runtime().world(),
                 new Stage19ConflictRuntime(source.warfare()), source.diplomacy());
         service.propose(new ProposalRequest("command.overdue-test", "faction.alpha", "faction.beta",
@@ -149,6 +150,11 @@ class GeneratedCampaignDiplomaticDeadlineTest {
                 source.strategicIntents(), service.snapshot(), source.warfare(), source.commands(),
                 source.operations(), source.transitions(), source.recovery(), source.npcMissions());
         return GeneratedCampaignCoordinator.restore(checkpoint);
+    }
+
+    private static final class InitialCampaign {
+        private static final com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState STATE =
+                GeneratedCampaignCoordinator.create(1L).captureState();
     }
 
     private static void advanceTo(GeneratedCampaignCoordinator campaign, long tick) {

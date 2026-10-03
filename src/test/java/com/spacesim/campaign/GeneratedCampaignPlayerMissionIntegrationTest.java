@@ -21,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPlayerMissionIntegrationTest {
     private static final long REWARD = 1000L;
 
@@ -290,7 +291,8 @@ class GeneratedCampaignPlayerMissionIntegrationTest {
     }
 
     private static Stage228CampaignAuthority fixture(boolean initialized, boolean knows, boolean owns, int count, long deadline) {
-        var authority = Stage228CampaignAuthority.create(1L);
+        // Generate once; restore independent runtime owners before each fixture mutation.
+        var authority = Stage228CampaignAuthority.restore(InitialCampaign.STATE);
         var c = authority.coordinator();
         var runtime = c.runtime().captureState();
         var order = runtime.freight().orders().get(0);
@@ -318,6 +320,11 @@ class GeneratedCampaignPlayerMissionIntegrationTest {
                 knows ? List.of(npc.locationSystemId()) : List.of(), List.of(), null) : null;
         return Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistentState.compose(stage21,
                 base.smallCraft(), base.hangars(), base.flightDeck(), base.operations(), player));
+    }
+
+    private static final class InitialCampaign {
+        private static final Stage228GeneratedCampaignPersistentState STATE =
+                Stage228CampaignAuthority.create(1L).captureState();
     }
 
     private static Stage228CampaignAuthority withDeliveredCheckpoint(Stage228CampaignAuthority source) {

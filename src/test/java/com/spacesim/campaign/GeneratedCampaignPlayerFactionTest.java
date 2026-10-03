@@ -4,6 +4,7 @@ import com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPlayerFactionTest {
     @Test void foundationIsPureSingleUseAndPreservesEveryPhysicalOwnerAndClock() {
         var c = started(); var before = c.captureState(); var world = c.coordinator().runtime().captureState().worldState();

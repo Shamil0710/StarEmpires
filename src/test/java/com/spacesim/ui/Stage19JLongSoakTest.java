@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Long-running Stage-19J closeout soak, activated only by the dedicated PR workflow. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage19JLongSoakTest {
     private static final double STANDARD_SOAK_SECONDS = 130d;
     private static final double SATURATION_SOAK_SECONDS = 600d;

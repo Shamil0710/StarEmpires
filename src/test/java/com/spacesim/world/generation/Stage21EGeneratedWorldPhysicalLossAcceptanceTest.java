@@ -46,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the existing world destruction authority, and proves that Stage 21E can only report and reconcile
  * the loss from the resulting world truth. No replacement fleet is allocated.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage21EGeneratedWorldPhysicalLossAcceptanceTest {
     @Test
     void ordinaryPhysicalFleetLossIsReportedAndRemovedFromLiveCommandWithoutReplacement() {

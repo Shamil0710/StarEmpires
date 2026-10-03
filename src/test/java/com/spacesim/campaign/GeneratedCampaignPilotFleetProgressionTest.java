@@ -7,6 +7,7 @@ import com.spacesim.world.LocalPhysicalKinematics;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPilotFleetProgressionTest {
     @Test void localReservePurchasePaysRealSellerWithoutCreatingAnotherHull() {
         var c = started(); var r = c.coordinator().runtime(); var world = r.world();

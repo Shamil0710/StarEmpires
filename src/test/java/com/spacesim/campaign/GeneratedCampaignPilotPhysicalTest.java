@@ -11,6 +11,7 @@ import com.spacesim.world.LocalPhysicalPosition;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPilotPhysicalTest {
     private static final String WATER = "commodity.material.purified_water";
 

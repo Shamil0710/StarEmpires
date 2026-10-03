@@ -6,6 +6,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairPhysicalReplacementAcceptanceTest {
     @Test
     void paidCoreReplacementsUseFreshIdentitiesAndInvalidPlansLeaveEveryAuthorityUntouched() {

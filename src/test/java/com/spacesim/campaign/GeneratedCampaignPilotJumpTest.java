@@ -12,6 +12,7 @@ import com.spacesim.world.StarSystemId;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPilotJumpTest {
     @Test void departurePreviewIsPureForeignAndStaleTokensRejectAndOnlyNeighborsAreAdmitted() {
         var c = started(); var r = c.coordinator().runtime(); var p = placement(c);

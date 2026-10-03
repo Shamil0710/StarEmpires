@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage21EGeneratedWorldTrafficRuntimeAcceptanceTest {
     private static final double HANDLING_SECONDS = 3_600d;
 

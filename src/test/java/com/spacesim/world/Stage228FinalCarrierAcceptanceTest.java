@@ -91,6 +91,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no gameplay state. Each scenario proves a different part of the final causal chain while sharing
  * the same production content, physical logistics, individual-craft identity and no-grant rules.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 final class Stage228FinalCarrierAcceptanceTest {
     private static final String STATION_ID = "station.m22_8n.production";
     private static final String HOST = "carrier.m22_8n.alpha";

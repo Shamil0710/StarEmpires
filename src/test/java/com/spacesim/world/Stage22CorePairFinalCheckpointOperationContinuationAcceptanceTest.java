@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * encode/decode and ordinary Stage-20 runtime restore, the same operation identities must make the same
  * supply/readiness continuation decisions. No test-owned campaign state or outcome simulator is used.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairFinalCheckpointOperationContinuationAcceptanceTest {
     private static final int CREW_AVAILABLE = 100_000;
     private static final int REQUIRED_SUPPLY_ACCESS_BPS = 5_000;

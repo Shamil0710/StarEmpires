@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * runtime and the existing Stage-21G paid replacement authority. This class is evidence only and
  * owns no gameplay state or faction modifier.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairEqualBurdenAcceptanceTest {
     private static final PatrolAuthorization AUTHORIZATION = new PatrolAuthorization(
             33_000_000d,

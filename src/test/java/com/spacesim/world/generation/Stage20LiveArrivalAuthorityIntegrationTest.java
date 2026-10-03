@@ -46,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20LiveArrivalAuthorityIntegrationTest {
     private static final ContentCatalog CONTENT = ContentCatalogLoader.loadDefault();
     private static volatile CadenceFixture sharedFixture;

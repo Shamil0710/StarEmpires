@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * <p>This test intentionally stops at the combat-to-committed-state boundary. It does not invent the
  * still-missing campaign production/replacement scheduler and therefore cannot close B13 by itself.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairRollingAttritionMachineEvidenceAcceptanceTest {
     @Test
     void b13RunsEightPairedThreeEncounterAttritionCellsWithByteStableContinuation() {

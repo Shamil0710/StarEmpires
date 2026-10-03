@@ -63,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * finite Stage-18 replacement bill can commission only one fresh FleetId, leaving two causal persisted
  * DEMANDED rows rather than an abstract backlog counter.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairGeneratedWorldReplacementBacklogAcceptanceTest {
     private static final long OPERATION_BASE = 22_613_700L;
     private static final int CREW_AVAILABLE = 100_000;

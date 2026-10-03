@@ -33,6 +33,7 @@ import java.util.OptionalDouble;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage21HPlayerMissionAuthorityTest {
     private static final String TRADE_LEAGUE = "faction.trade_league";
     private static final String MINERS = "faction.miners";

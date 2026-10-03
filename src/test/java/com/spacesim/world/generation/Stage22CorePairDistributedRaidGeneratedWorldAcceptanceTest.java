@@ -74,6 +74,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * owned by B10; this test intentionally preserves the existing provisional generated-world FTL
  * engineering until arrival instead of manufacturing a second travel authority.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairDistributedRaidGeneratedWorldAcceptanceTest {
     private static final long OPERATION_BASE = 22_606_000L;
     private static final long TACTICAL_TICKS = 600L;

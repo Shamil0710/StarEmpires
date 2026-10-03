@@ -66,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * not claim that the generated world owner itself is one of the two core faction identities; stable
  * core-identity mirroring remains covered by {@code Stage22CorePairTerritoryMachineEvidenceAcceptanceTest}.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairTerritoryGeneratedWorldPersistenceAcceptanceTest {
     private static final int CREW_AVAILABLE = 100_000;
     private static final int SUPPLY_ACCESS_BPS = FleetReadinessState.FULL;

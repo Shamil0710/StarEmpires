@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage20SpecialLocationGeneratorTest {
     private static final ResolvedProbeResult ACCEPTED =
             Stage20ResolvedGeneratedWorldProductionProbe.runCurrent(1L);

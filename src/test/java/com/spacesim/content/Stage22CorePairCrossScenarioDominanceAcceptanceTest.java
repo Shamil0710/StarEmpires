@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * survivability axis participates in the cross-scenario Gate-C conclusion. Individual tactical
  * inversions remain raw evidence rather than being deleted or mislabeled as authority failures.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairCrossScenarioDominanceAcceptanceTest {
 
     @Test

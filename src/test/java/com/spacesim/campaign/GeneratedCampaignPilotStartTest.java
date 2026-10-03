@@ -8,6 +8,7 @@ import com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPilotStartTest {
     @Test void startPurchasesExistingReserveWithConservedPaymentAndNoFactionControl() {
         var campaign = Stage228CampaignAuthority.create(1);

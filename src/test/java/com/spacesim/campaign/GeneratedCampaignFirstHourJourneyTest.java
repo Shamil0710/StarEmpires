@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignFirstHourJourneyTest {
     private static final float EIGHT_TIMES_PRESENTATION_FRAME_SECONDS = 0.05f;
     private static final double SIMULATION_SECONDS_PER_FRAME = 0.4d;

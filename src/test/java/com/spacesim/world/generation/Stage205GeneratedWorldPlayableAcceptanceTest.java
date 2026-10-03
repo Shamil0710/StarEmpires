@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+@org.junit.jupiter.api.Tag("slow")
 class Stage205GeneratedWorldPlayableAcceptanceTest {
     @Test
     void acceptedWorldRunsConservedFreightThroughOrdinaryJumpAndMidTransitSaveLoad() {

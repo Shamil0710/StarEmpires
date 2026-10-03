@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.zip.GZIPInputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPlayerAssetAffiliationTest {
     private static final String OWN="faction.player", WATER="commodity.material.purified_water";
 
@@ -91,7 +92,7 @@ class GeneratedCampaignPlayerAssetAffiliationTest {
         roundtrip(c);
     }
 
-    private static Stage228CampaignAuthority founded(){var c=Stage228CampaignAuthority.create(1);c.submitIndependentPilotStart(c.previewIndependentPilotStart());return c.submitPlayerFactionFoundation(c.previewPlayerFactionFoundation(OWN,"Содружество"));}
+    private static Stage228CampaignAuthority founded(){return FoundedCampaignFixture.restore();}
     private static void buyWater(Stage228CampaignAuthority c){var r=c.coordinator().runtime();var p=r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();var e=r.infrastructure().endpoints().stream().filter(v->v.systemId().equals(p.systemId())&&v.storage().commodityMassKg(WATER)>0).findFirst().orElseThrow();r.arrival().materialization(p.systemId()).updatePhysicalState(p.localEntityId(),LocalPhysicalKinematics.stationary(e.position()));c.submitPilotAction(c.previewPilotAction("DOCK",e.stationId(),"",0));c.advanceFrame(c.coordinator().session().fixedStepSeconds());c.submitPilotAction(c.previewPilotAction("BUY",e.stationId(),WATER,1));}
     private static Stage228CampaignAuthority roundtrip(Stage228CampaignAuthority c){var state=c.captureState();var r=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(Stage228GeneratedCampaignPersistenceCodec.encode(state)));assertEquals(state,r.captureState());return r;}
 }

@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** M22.6 B01 generated-world commit evidence for the exact Empire/Industrial Union core fits. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairGeneratedWorldCommitAcceptanceTest {
     private static final long OPERATION_ID = 22_601L;
     private static final long TACTICAL_TICKS = 240L;

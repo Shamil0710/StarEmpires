@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Regression for exact generated-world continuation with a non-default multi-system scheduler. */
+@org.junit.jupiter.api.Tag("slow")
 class Stage20GeneratedWorldSchedulerPersistenceAcceptanceTest {
     @Test
     void generatedWorldSchedulerRoundTripsAndKeepsRemoteContinuationExact() {

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignStockProductionCommandsTest {
     private static final String OWN="faction.player", STOCK="player-government|stock|item.energy", RECIPE="player-government|production|station.arsenal";
 

@@ -9,6 +9,7 @@ import com.spacesim.world.LocalPhysicalKinematics;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+@org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPhysicalMarketTest {
     private static final String WATER = "commodity.material.purified_water";
 

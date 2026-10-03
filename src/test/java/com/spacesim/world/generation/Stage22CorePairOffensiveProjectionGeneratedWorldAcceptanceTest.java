@@ -54,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the co-located tanker restores exactly that finite mass through Stage19FleetReplenishmentService.
  * No abstract projection token, free docking refill or faction-specific travel authority is used.</p>
  */
+@org.junit.jupiter.api.Tag("slow")
 class Stage22CorePairOffensiveProjectionGeneratedWorldAcceptanceTest {
     private static final String PROPELLANT_FEED = "propellant_feed";
     private static final String REPLENISHMENT_TRANSFER = "replenishment_transfer";
