@@ -1553,3 +1553,14 @@ art-production process only.
 - neither is frozen until canonical normalization plus grayscale/downscale/silhouette/anchor QA;
 - the existing shipyard asset is deliberately not reused for a mismatched Stage-23E station role;
 - review: `docs/art/reference_freeze/reviews/stage23e_existing_empire_station_promotion_audit.md`.
+
+
+### Run 013 — Empire existing-station freeze accepted
+
+- exact-head commit: `81edf75c66f1976c326f9dc4be880a202e5bf1b1`;
+- CI run `37112721779`: **SUCCESS**;
+- `ref.empire.station.industrial_station.v1` -> `FROZEN`;
+- `ref.empire.station.trade_logistics_hub.v1` -> `FROZEN`;
+- source production PNGs remain canonical geometry authority;
+- committed Stage-23E silhouette/anchor/QA review artifacts remain presentation-only;
+- no replacement five-candidate generation is required for these two references.
