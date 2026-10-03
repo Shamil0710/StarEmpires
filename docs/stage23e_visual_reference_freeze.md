@@ -1484,3 +1484,33 @@ art-production process only.
 - geometry remains **not frozen** until the canonical normalized master is persisted in the repository;
 - no interceptor/defence/strike overlay generation may begin before that freeze;
 - review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_batch_001.md`.
+
+
+### Run 009 — Industrial Union small-craft exact-source correction and freeze
+
+- reference: `ref.industrial_union.small_craft.base.v1`;
+- the locally retained source PNGs from batch 001 were re-opened and measured directly with an
+  alpha > 16 visible-pixel threshold;
+- this found that Run 008's recorded normalized measurements for `candidate_05` were inconsistent
+  with the actual source pixels: its source silhouette L/W is 2.794 versus the authoritative
+  29/14 = 2.071 physical L/W, a 34.9% relative error;
+- because the reference contract hard-rejects a candidate that visibly violates the authoritative
+  physical envelope/aspect, the Run-008 `candidate_05` selection is superseded before geometry freeze;
+- surviving source aspects were rechecked: candidate 01 = 2.722 (31.4% error), candidate 02 = 2.605
+  (25.8%), candidate 03 = 2.788 (34.6%, already hard-rejected for fragile lateral booms),
+  candidate 04 = 2.317 (11.8%), candidate 05 = 2.794 (34.9%);
+- `candidate_04` retains its existing 92/100 qualitative score and becomes the authoritative selected
+  design because it is the only non-hard-rejected candidate in the batch with acceptable physical
+  envelope fidelity;
+- candidate-04 generation ID: `92f9d865-c4a3-403e-ac9d-5c919b71e60b`;
+- candidate 04 was alpha-trimmed and uniformly normalized without redrawing onto the canonical
+  512x256 canvas;
+- persisted master visible bounds: 480x207; visual L/W = 2.319; relative error to physical L/W =
+  11.94%; minimum horizontal transparent padding = 16 px;
+- persisted review artifacts include the reference master, silhouette, anchor review and QA sheet;
+- `Stage23EUnionSmallCraftReferenceFreezeTest` pins the canonical master SHA-256 and checks alpha
+  padding, centering, physical-aspect sanity, grayscale 25%/12.5% readability and reviewed
+  presentation-anchor support;
+- manifest status becomes `FROZEN`, `geometry_frozen=true` in the same acceptance batch;
+- no simulation authority is inferred from the review anchors or sprite pixels;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.small_craft.base.v1_freeze_recheck.md`.
