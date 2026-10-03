@@ -1710,3 +1710,27 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - local normalized working master is not repository authority until persisted;
 - `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.empire.station.frontier_multipurpose.v1_batch_001.md`.
+
+
+### Run 024 — Union mining-outpost reseed retry
+
+- reference: `ref.industrial_union.station.mining_outpost.v1`;
+- generation ID: `8a772f8e-836a-4bd2-858f-ecbc61ed6a06`;
+- retry was explicitly reseeded with real Union production corvette and freight sprites;
+- backend still returned an Imperial cream/burgundy/heraldic station board;
+- hard-rejected for persistent faction/style drift and board packaging;
+- row remains `PLANNED`;
+- further Union station generation is suspended until a clean image-context reset is available;
+- review: `docs/art/reference_freeze/reviews/ref.industrial_union.station.mining_outpost.v1_generation_attempt_002.md`.
+
+### Run 025 — Empire naval-ordnance clean-master retry
+
+- reference: `ref.empire.station.naval_ordnance_depot.v1`;
+- generation ID: `25ef5eb1-94f1-41d3-b6a8-82a6837cbf8a`;
+- requested a clean five-candidate replacement discovery batch because the accepted old selection has
+  only small previews in Git;
+- backend returned eight concepts on one sheet;
+- hard-rejected for finite-candidate/packaging contract violation;
+- original selected candidate remains preferred;
+- row remains `SELECTED`, `geometry_frozen=false`;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_clean_master_attempt_002.md`.
