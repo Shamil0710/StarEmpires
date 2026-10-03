@@ -1629,3 +1629,21 @@ This reduces ambiguity without falsely treating a technical overlay as finished 
 - no provable batch-001 Empire candidate-03 source/master was recovered;
 - Empire base remains `SELECTED`, `geometry_frozen=false`;
 - review: `docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_library_recovery_audit.md`.
+
+
+### Run 018 — Empire mining outpost batch 001
+
+- reference: `ref.empire.station.mining_outpost.v1`;
+- generation ID: `4798a103-b990-4594-a7fe-1bf42d13dbb1`;
+- backend returned a five-Imperial-station board rather than five separate files;
+- object class was correct, so five candidates were reviewed after deterministic board-cell isolation;
+- selected: `candidate_03`, score **92/100**;
+- candidate 03 provides the strongest mining/extraction role through protected service structure,
+  handling/extractor arm roots, finite storage/handling blocks and survey/service geometry;
+- selected geometry was technically normalized, not redrawn, into a transparent 1024x1024 master;
+- canonical master SHA-256:
+  `160f5d5779eb762a43feb43109619a14260e587ee068512860a4154eb1863811`;
+- added executable `Stage23EEmpireMiningOutpostReferenceFreezeTest`;
+- manifest advances `PLANNED -> SELECTED`;
+- `geometry_frozen=false` until exact-head CI succeeds;
+- review: `docs/art/reference_freeze/reviews/ref.empire.station.mining_outpost.v1_batch_001.md`.
