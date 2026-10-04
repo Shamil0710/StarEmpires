@@ -69,7 +69,7 @@ class GeneratedCampaignDiplomaticDeadlineTest {
 
     @Test
     void campaignWithoutOffersRetainsExactHistoricalDiplomacyCheckpoint() {
-        var campaign = GeneratedCampaignCoordinator.create(1L);
+        var campaign = GeneratedCampaignFixture.restoreCoordinator();
         var original = campaign.diplomacy();
         advanceTo(campaign, 5L);
         assertEquals(original, campaign.diplomacy());
@@ -100,7 +100,7 @@ class GeneratedCampaignDiplomaticDeadlineTest {
 
     @Test
     void alreadyOverdueLegacyOfferRemainsExactOnRestoreAndExpiresAtFirstResumedTick() {
-        var source = GeneratedCampaignCoordinator.restore(InitialCampaign.STATE);
+        var source = GeneratedCampaignFixture.restoreCoordinator();
         var service = new DiplomaticLifecycleService(source.runtime().world(),
                 new Stage19ConflictRuntime(source.warfare()), source.diplomacy());
         service.propose(new ProposalRequest("command.overdue-test", "faction.alpha", "faction.beta",
@@ -134,7 +134,7 @@ class GeneratedCampaignDiplomaticDeadlineTest {
 
     private static GeneratedCampaignCoordinator withProposal(
             long deadlineTick, boolean linkedTreaty, boolean accepted) {
-        var source = GeneratedCampaignCoordinator.create(1L);
+        var source = GeneratedCampaignFixture.restoreCoordinator();
         var service = new DiplomaticLifecycleService(source.runtime().world(),
                 new Stage19ConflictRuntime(source.warfare()), source.diplomacy());
         var proposal = service.propose(new ProposalRequest("command.deadline-test", "faction.alpha", "faction.beta",
@@ -150,11 +150,6 @@ class GeneratedCampaignDiplomaticDeadlineTest {
                 source.strategicIntents(), service.snapshot(), source.warfare(), source.commands(),
                 source.operations(), source.transitions(), source.recovery(), source.npcMissions());
         return GeneratedCampaignCoordinator.restore(checkpoint);
-    }
-
-    private static final class InitialCampaign {
-        private static final com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState STATE =
-                GeneratedCampaignCoordinator.create(1L).captureState();
     }
 
     private static void advanceTo(GeneratedCampaignCoordinator campaign, long tick) {

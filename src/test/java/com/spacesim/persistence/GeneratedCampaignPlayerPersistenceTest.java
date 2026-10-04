@@ -1,6 +1,7 @@
 package com.spacesim.persistence;
 
 import com.spacesim.campaign.Stage228CampaignAuthority;
+import com.spacesim.campaign.GeneratedCampaignFixture;
 import com.spacesim.player.DiscoveredObjectRef;
 import com.spacesim.player.FleetOrderType;
 import com.spacesim.player.OwnedStationRef;
@@ -91,7 +92,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void generatedCheckpointRetainsPlayerWithoutChangingWorldOrGrantingAffiliation() {
-        var authority = Stage228CampaignAuthority.create(1L);
+        var authority = GeneratedCampaignFixture.restoreAuthority();
         var baseline = authority.captureState();
         var home = authority.coordinator().runtime().world().getActiveSystemId();
         var player = independent(home, 123_000L);
@@ -110,7 +111,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void v4MigrationPreservesAllSidecarsAndWorldWithoutInitializingPlayer() throws Exception {
-        var baseline = Stage228CampaignAuthority.create(1L).captureState();
+        var baseline = GeneratedCampaignFixture.checkpoint();
         var craft = com.spacesim.world.SmallCraftRegistry.empty(
                 com.spacesim.world.ProductionSmallCraftFixture.fitAuthority());
         var id = craft.reserveIdentityForCompletedProduction();
@@ -137,7 +138,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void olderStage21MigrationAlsoKeepsPlayerAbsent() {
-        var state = Stage228CampaignAuthority.create(1L).captureState();
+        var state = GeneratedCampaignFixture.checkpoint();
         var migrated = Stage228GeneratedCampaignPersistenceCodec.decodeOrMigrate(
                 Stage21IGeneratedWorldRuntimePersistenceCodec.encode(state.stage21Runtime()));
         assertEquals(null, migrated.playerState());
@@ -146,7 +147,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void checkpointRejectsForeignReferencesAndFutureObservationsWithoutMutatingAuthority() {
-        var authority = Stage228CampaignAuthority.create(1L);
+        var authority = GeneratedCampaignFixture.restoreAuthority();
         var state = authority.captureState();
         var home = authority.coordinator().runtime().world().getActiveSystemId();
         var nonexistent = new FleetId(Long.MAX_VALUE);
@@ -172,7 +173,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void playerAndCampaignContinuationShareTheSameCheckpointAndClock() {
-        var initial = Stage228CampaignAuthority.create(1L);
+        var initial = GeneratedCampaignFixture.restoreAuthority();
         var home = initial.coordinator().runtime().world().getActiveSystemId();
         var authority = Stage228CampaignAuthority.restore(withPlayer(
                 initial.captureState(), independent(home, 456_000L)));
@@ -191,7 +192,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void currentEnvelopeRejectsMissingOrOversizedPlayerPayloadAndFutureFile() {
-        var state = Stage228CampaignAuthority.create(1L).captureState();
+        var state = GeneratedCampaignFixture.checkpoint();
         byte[] valid = Stage228GeneratedCampaignPersistenceCodec.encode(state);
         int playerLength = GeneratedCampaignPlayerStateCodec.encode(null).length;
         byte[] missing = Arrays.copyOf(valid, valid.length - playerLength - Integer.BYTES);
@@ -210,7 +211,7 @@ class GeneratedCampaignPlayerPersistenceTest {
 
     @Test
     void nativeV5RetainsOwnedFleetOrdersAndHistoricalDiscoveryExactly() {
-        var authority = Stage228CampaignAuthority.create(1L);
+        var authority = GeneratedCampaignFixture.restoreAuthority();
         var world = authority.coordinator().runtime().world();
         var fleet = world.getFleetPlacements().get(0);
         var discovery = new DiscoveredObjectRef(fleet.systemId(), new EntityId(Long.MAX_VALUE));

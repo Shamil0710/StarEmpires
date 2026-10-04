@@ -14,7 +14,7 @@ class Stage20RepresentativeFreightPortfolioDiagnosticsTest {
 
     @Test
     void fixedCorpusMeasuresSingleSupplierMismatchWithoutInventingFleetCapacity() {
-        var report = Stage20RepresentativeFreightPortfolioDiagnostics.evaluateCurrent();
+        var report = Stage20RepresentativeFreightPortfolioDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
 
         assertEquals(Stage20RepresentativeFreightPortfolioDiagnostics.CURRENT_VERSION, report.version());
         assertEquals(Stage20RepresentativeSeedCorpus.seeds().size(), report.seeds().size());

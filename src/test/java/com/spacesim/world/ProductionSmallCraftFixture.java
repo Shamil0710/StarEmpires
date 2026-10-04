@@ -19,6 +19,10 @@ import java.util.Map;
 
 /** Shared production-catalog fixture for M22.8A identity/persistence acceptance tests. */
 public final class ProductionSmallCraftFixture {
+    private static final class CatalogHolder {
+        private static final ShipEngineeringCatalog CATALOG = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+    }
+
     /** Existing Stage-22 authored fit used only to prove the common production-content validation seam. */
     public static final String DESIGN_ID = "fit.empire.corvette.line_v1";
 
@@ -28,7 +32,7 @@ public final class ProductionSmallCraftFixture {
 
     /** @return ordinary M22.8A fitting authority over the accepted Stage-22 core-pair catalog */
     public static SmallCraftFitAuthority fitAuthority() {
-        return new SmallCraftFitAuthority(Stage22CorePairEngineeringCatalogLoader.loadDefault());
+        return new SmallCraftFitAuthority(CatalogHolder.CATALOG);
     }
 
     /**
@@ -53,7 +57,7 @@ public final class ProductionSmallCraftFixture {
             double reactionMassKg,
             double weaponIntegrity,
             double maintenanceAgeSeconds) {
-        ShipEngineeringCatalog catalog = Stage22CorePairEngineeringCatalogLoader.loadDefault();
+        ShipEngineeringCatalog catalog = CatalogHolder.CATALOG;
         InstalledFit fit = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(DESIGN_ID));
         ConsumableState consumables = new ConsumableState(
                 0d,

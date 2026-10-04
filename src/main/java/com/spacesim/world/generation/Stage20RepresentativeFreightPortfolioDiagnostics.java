@@ -19,6 +19,8 @@ import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyKey;
 import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyThroughputReport;
 import com.spacesim.world.StarSystemId;
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.PhysicalTransportAuthority;
+import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeInputs;
+import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 
 /**
  * Read-only Stage-20E diagnostics for the current single-supplier final throughput gate.
@@ -277,6 +280,12 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
      * @return deterministic fixed-corpus freight-portfolio evidence
      */
     public static Report evaluateCurrent() {
+        return evaluateCurrent(Stage20GeneratedWorldProductionProbe::run);
+    }
+
+    /** Reuses supplied generation while executing the complete downstream diagnostic. */
+    static Report evaluateCurrent(BiFunction<Long, ProbeInputs, ProbeResult> probes) {
+        Objects.requireNonNull(probes, "probes");
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage18StationInfrastructureCatalog stations = Stage18StationInfrastructureCatalogLoader.loadDefault();
         int configuredFreighters = profile.inputs().transport().fleetProfile().activeFreighterCount();
@@ -287,7 +296,7 @@ public final class Stage20RepresentativeFreightPortfolioDiagnostics {
         int oneGlobalFleetSeeds = 0;
 
         for (long rootSeed : Stage20RepresentativeSeedCorpus.seeds()) {
-            var probe = Stage20GeneratedWorldProductionProbe.run(rootSeed, profile.inputs());
+            var probe = probes.apply(rootSeed, profile.inputs());
             PlacementResult placement = probe.placement().orElseThrow();
             if (placement.status() != PlacementStatus.ACCEPTED) {
                 seedEvidence.add(new SeedEvidence(

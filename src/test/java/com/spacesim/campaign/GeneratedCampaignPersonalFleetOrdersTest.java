@@ -99,7 +99,15 @@ class GeneratedCampaignPersonalFleetOrdersTest {
         c.advanceFrame(.1f);var after=material.physicalState(fleet.localEntityId()).orElseThrow();assertEquals(100d,after.velocityXMps());assertEquals(100d*c.coordinator().session().fixedStepSeconds(),physical.position().distanceTo(after.position()),1e-7);assertTrue(r.world().findFleetJump(id).isEmpty());roundtrip(c);
     }
 
-    private static Stage228CampaignAuthority twoShips(){var c=Stage228CampaignAuthority.create(1);c.submitIndependentPilotStart(c.previewIndependentPilotStart());var r=c.coordinator().runtime();var p=r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();var origin=r.freight().findFreighter(p.fleetId()).orElseThrow().stableFactionId();var endpoint=r.infrastructure().endpoints().stream().filter(e->e.systemId().equals(p.systemId())&&r.world().findSession(p.systemId()).orElseThrow().getEntityRegistry().require(c.pilotMarketReference(e.stationId()).orElseThrow().entityId()).getComponent(com.spacesim.components.FactionComponent.class).factionId==r.world().findFactionRuntimeId(origin).orElseThrow()).findFirst().orElseThrow();
+    private static Stage228CampaignAuthority twoShips() {
+        return Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(TwoShips.BYTES));
+    }
+
+    private static final class TwoShips {
+        private static final byte[] BYTES = Stage228GeneratedCampaignPersistenceCodec.encode(createTwoShips().captureState());
+    }
+
+    private static Stage228CampaignAuthority createTwoShips(){var c=Stage228CampaignAuthority.create(1L);c.submitIndependentPilotStart(c.previewIndependentPilotStart());var r=c.coordinator().runtime();var p=r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();var origin=r.freight().findFreighter(p.fleetId()).orElseThrow().stableFactionId();var endpoint=r.infrastructure().endpoints().stream().filter(e->e.systemId().equals(p.systemId())&&r.world().findSession(p.systemId()).orElseThrow().getEntityRegistry().require(c.pilotMarketReference(e.stationId()).orElseThrow().entityId()).getComponent(com.spacesim.components.FactionComponent.class).factionId==r.world().findFactionRuntimeId(origin).orElseThrow()).findFirst().orElseThrow();
         // Explicit docking geometry; purchase is ordinary conserved seller authority.
         r.arrival().materialization(p.systemId()).updatePhysicalState(p.localEntityId(),LocalPhysicalKinematics.stationary(endpoint.position()));c.submitPilotAction(c.previewPilotAction("DOCK",endpoint.stationId(),"",0));
         var offer=r.freight().capture().freighters().stream().filter(f->!f.fleetId().equals(p.fleetId())&&f.stableFactionId().equals(origin)&&f.currentSystemId().equals(p.systemId())&&f.phase()==Stage20FreightPersistentState.FreightPhase.IDLE).findFirst().orElseThrow();c.submitPilotAction(c.previewPilotAction("PURCHASE",Long.toString(offer.fleetId().value()),"",0));return c;}

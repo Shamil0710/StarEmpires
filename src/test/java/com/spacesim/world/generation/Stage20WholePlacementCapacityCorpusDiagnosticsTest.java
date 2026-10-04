@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Stage20WholePlacementCapacityCorpusDiagnosticsTest {
     @Test
     void fixedCorpusMeasuresFiniteStartPortfoliosBeforeSharedProducerReservation() {
-        var report = Stage20WholePlacementCapacityCorpusDiagnostics.evaluateCurrent();
+        var report = Stage20WholePlacementCapacityCorpusDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
         var capacity = Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
 
         assertEquals(Stage20WholePlacementCapacityCorpusDiagnostics.CURRENT_VERSION, report.version());

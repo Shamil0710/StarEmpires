@@ -16,7 +16,7 @@ class Stage20CoordinatedFreightCorpusDiagnosticsTest {
     @Test
     void fixedCorpusKeepsAcceptedInfeasibleAndUnresolvedOutcomesDistinct() {
         Stage20CoordinatedFreightCorpusDiagnostics.Report report =
-                Stage20CoordinatedFreightCorpusDiagnostics.evaluateCurrent();
+                Stage20CoordinatedFreightCorpusDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
 
         assertEquals(Stage20CoordinatedFreightCorpusDiagnostics.CURRENT_VERSION, report.version());
         assertEquals(Stage20CoordinatedWholePlacementFreightPlanner.CURRENT_VERSION, report.plannerVersion());

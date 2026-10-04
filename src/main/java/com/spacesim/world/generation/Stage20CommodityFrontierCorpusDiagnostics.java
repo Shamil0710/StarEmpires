@@ -19,6 +19,8 @@ import com.spacesim.world.Stage20PhysicalFreightRouteEvaluator;
 import com.spacesim.world.Stage20TheoreticalSupplyThroughputAnalyzer.SupplyThroughputReport;
 import com.spacesim.world.calibration.Stage20BootstrapFreightCapacityRequirementProfile;
 import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.PhysicalTransportAuthority;
+import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeInputs;
+import com.spacesim.world.generation.Stage20GeneratedWorldProductionProbe.ProbeResult;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 
 /**
  * Read-only Stage-20E fixed-corpus measurement of the per-commodity freight-frontier decomposition.
@@ -270,6 +273,12 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
      * @return deterministic measurement; no accepted-seed target is applied
      */
     public static Report evaluateCurrent() {
+        return evaluateCurrent(Stage20GeneratedWorldProductionProbe::run);
+    }
+
+    /** Reuses supplied generation while executing the complete downstream diagnostic. */
+    static Report evaluateCurrent(BiFunction<Long, ProbeInputs, ProbeResult> probes) {
+        Objects.requireNonNull(probes, "probes");
         var profile = Stage20RepresentativeGeneratedWorldProbeProfileV2.deriveCurrent();
         Stage20BootstrapFreightCapacityRequirementProfile capacity =
                 Stage20BootstrapFreightCapacityRequirementProfile.deriveLegacyStage20();
@@ -299,7 +308,7 @@ public final class Stage20CommodityFrontierCorpusDiagnostics {
         int maxCommodityNodes = 0;
 
         for (long rootSeed : Stage20RepresentativeSeedCorpus.seeds()) {
-            var probe = Stage20GeneratedWorldProductionProbe.run(rootSeed, profile.inputs());
+            var probe = probes.apply(rootSeed, profile.inputs());
             PlacementResult placement = probe.placement().orElseThrow();
             if (placement.status() != PlacementStatus.ACCEPTED) {
                 seeds.add(new SeedEvidence(

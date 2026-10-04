@@ -16,7 +16,7 @@ final class Stage22CorePairWorldFixture {
     static WorldSimulation create(long seed) {
         var content = ContentCatalogLoader.loadDefault();
         var base = DemoGalaxyFactory.createState(seed, content);
-        var identities = LargeDemoGalaxyFactory.createState(seed, content).factionIdentities();
+        var identities = LargeDemoGalaxyFactory.createFactionIdentities();
         var factions = new ArrayList<>(base.factions());
         var strategies = new ArrayList<>(base.factionStrategies());
         var diplomacy = new ArrayList<>(base.factionDiplomacyStates());
