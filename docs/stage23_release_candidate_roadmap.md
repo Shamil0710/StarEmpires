@@ -193,7 +193,21 @@ Exit criteria:
 
 ### 23E — Final art, VFX, animation and audio replacement
 
+**Reference pre-production progress:** 27/49 visual references `FROZEN`, 10 `SELECTED`,
+12 `PLANNED` on the active Stage-23E reference branch. This is **not** Stage-23E completion:
+broad production-layer generation remains gated by the full visual-reference freeze.
+Current blockers and exact unblock conditions are recorded in
+[Stage 23E — Visual Reference Blocker Ledger](art/reference_freeze/stage23e_reference_blockers.md).
+ Four selected station masters (Empire refinery/high-tech/frontier and Union industrial station) now
+have exact accepted byte contracts; their remaining blocker is repository persistence, not art
+selection.
+
 Цель: заменить остаточные prototype assets при неизменной simulation authority.
+
+Canonical detailed execution contract: [Stage 23E — Final Presentation Production Plan](stage23e_final_presentation_plan.md).
+Production asset/animation specification: [Stage 23E — Production Asset and Animation Specification](stage23e_production_asset_spec.md).
+Visual-reference freeze: [Stage 23E — Visual Reference Freeze Catalog](stage23e_visual_reference_freeze.md).
+Generation/authoring catalog: [Stage 23E — Generation Prompt Catalog](stage23e_generation_prompt_catalog.md).
 
 Art closure:
 

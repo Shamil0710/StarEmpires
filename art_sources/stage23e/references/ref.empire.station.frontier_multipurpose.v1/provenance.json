@@ -1,0 +1,33 @@
+{
+  "reference_id": "ref.empire.station.frontier_multipurpose.v1",
+  "asset_id": "empire.station.frontier_multipurpose",
+  "mode": "GENERATE_5_SELECT_1",
+  "status": "CLEAN_MASTER_ACCEPTED_PENDING_REPOSITORY_PERSISTENCE",
+  "source_generation_id": "39b5a286-e7bc-4ff8-b174-5969598dddf0",
+  "selected_candidate": "candidate_03",
+  "selected_score": 95,
+  "geometry_frozen": false,
+  "accepted_clean_master": {
+    "intended_path": "art_sources/stage23e/references/ref.empire.station.frontier_multipurpose.v1/selected/reference_master.png",
+    "filename": "frontier_candidate_03_master.png",
+    "byte_size": 752620,
+    "sha256": "8a57860f9e6bb8aa273d30966d64a1d6428e493048cb2debef01cd45dc1fafd2",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "visible_bounds_alpha_gt_16": [
+      92,
+      104,
+      932,
+      920
+    ],
+    "repository_persisted": false
+  },
+  "mechanism_disposition": {
+    "mechanical_service_arm": "REQUIRED at approximately (470,355)",
+    "mechanical_module_door": "REQUIRED at approximately (565,760)"
+  },
+  "review": "docs/art/reference_freeze/reviews/ref.empire.station.frontier_multipurpose.v1_clean_master_acceptance.md",
+  "notes": "Exact recovered clean-master bytes accepted. Persistence + committed-byte QA + exact-head CI still block FROZEN."
+}

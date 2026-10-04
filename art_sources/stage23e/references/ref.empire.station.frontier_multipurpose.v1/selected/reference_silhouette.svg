@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs><mask id="a" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024" style="mask-type:alpha"><image href="reference_master.png" width="1024" height="1024"/></mask></defs>
+  <rect width="1024" height="1024" fill="#ffffff" mask="url(#a)"/>
+</svg>

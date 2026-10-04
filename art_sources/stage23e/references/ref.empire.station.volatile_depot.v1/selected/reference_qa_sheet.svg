@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1050" viewBox="0 0 1400 1050">
+<defs><filter id="g"><feColorMatrix type="saturate" values="0"/></filter></defs>
+<rect width="1400" height="1050" fill="#20242a"/>
+<text x="36" y="48" font-family="sans-serif" font-size="28" fill="#fff">Empire volatile depot — candidate 04 QA</text>
+<image href="reference_master.png" x="50" y="100" width="600" height="600"/>
+<image href="reference_master.png" x="750" y="100" width="600" height="600" filter="url(#g)"/>
+<text x="50" y="730" font-family="sans-serif" font-size="18" fill="#fff">native</text>
+<text x="750" y="730" font-family="sans-serif" font-size="18" fill="#fff">grayscale</text>
+<image href="reference_master.png" x="80" y="780" width="256" height="256"/>
+<text x="360" y="920" font-family="sans-serif" font-size="20" fill="#fff">25%</text>
+<image href="reference_master.png" x="790" y="800" width="128" height="128"/>
+<text x="950" y="885" font-family="sans-serif" font-size="20" fill="#fff">12.5%</text>
+</svg>

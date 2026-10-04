@@ -1,0 +1,32 @@
+{
+  "reference_id": "ref.empire.station.refinery_complex.v1",
+  "asset_id": "empire.station.refinery_complex",
+  "mode": "GENERATE_5_SELECT_1",
+  "status": "CLEAN_MASTER_ACCEPTED_PENDING_REPOSITORY_PERSISTENCE",
+  "source_generation_id": "8bfb7e78-9299-411f-83d0-c797a893cce7",
+  "selected_candidate": "candidate_02",
+  "selected_score": 94,
+  "geometry_frozen": false,
+  "accepted_clean_master": {
+    "intended_path": "art_sources/stage23e/references/ref.empire.station.refinery_complex.v1/selected/reference_master.png",
+    "filename": "refinery_candidate_02_master.png",
+    "byte_size": 740524,
+    "sha256": "2b5fbf5d23262c6d2bac619b106495ca16d33c37de1637bfbb2b0faa80ee9fe8",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "visible_bounds_alpha_gt_16": [
+      148,
+      92,
+      876,
+      932
+    ],
+    "repository_persisted": false
+  },
+  "mechanism_disposition": {
+    "mechanical_radiator_shutter": "N/A — no unambiguous shutter hardware in accepted base"
+  },
+  "review": "docs/art/reference_freeze/reviews/ref.empire.station.refinery_complex.v1_clean_master_acceptance.md",
+  "notes": "Exact recovered clean-master bytes accepted. Persistence + committed-byte QA + exact-head CI still block FROZEN."
+}
