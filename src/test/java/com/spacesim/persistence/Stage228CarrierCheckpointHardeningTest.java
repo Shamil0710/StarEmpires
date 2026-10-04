@@ -1,6 +1,6 @@
 package com.spacesim.persistence;
 
-import com.spacesim.campaign.GeneratedCampaignCoordinator;
+import com.spacesim.campaign.GeneratedCampaignFixture;
 import com.spacesim.campaign.Stage228CampaignAuthority;
 import com.spacesim.content.ship.ShipEngineeringCatalog.Dimensions3d;
 import com.spacesim.ship.ShipEngineeringState.ConsumableLoad;
@@ -31,7 +31,6 @@ import com.spacesim.world.SmallCraftPhysicalLogisticsService.LogisticsState;
 import com.spacesim.world.SmallCraftPhysicalLogisticsService.PendingDelivery;
 import com.spacesim.world.SmallCraftRegistry;
 import com.spacesim.world.SmallCraftState;
-import com.spacesim.world.generation.Stage20PlayableGeneratedWorldFactory;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -49,8 +48,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void canonicalCarrierLifecycleCheckpointRoundTripsWithoutGrantingOrResettingState() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftFitAuthority fitAuthority = ProductionSmallCraftFixture.fitAuthority();
         SmallCraftRegistry registry = SmallCraftRegistry.empty(fitAuthority);
 
@@ -121,7 +119,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState original =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistenceMapper.capture(hangars),
                         Stage228FlightDeckPersistenceMapper.capture(deck),
@@ -163,10 +161,9 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void v3MigrationAddsEmptyOperationsWithoutSynthesizingMissionsDeliveriesOrWings() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         byte[] legacyV3 = encodeLegacyV3(
-                coordinator.captureState(),
+                baseline,
                 Stage228SmallCraftPersistentState.empty(),
                 Stage228HangarPersistentState.empty(),
                 Stage228FlightDeckPersistentState.empty());
@@ -182,8 +179,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void malformedOperationsFailBeforeLiveCampaignCanBeRestored() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftFitAuthority fitAuthority = ProductionSmallCraftFixture.fitAuthority();
         SmallCraftRegistry registry = SmallCraftRegistry.empty(fitAuthority);
         SmallCraftId craft = register(registry, 1L, 4d, 20d, 1d, 0d);
@@ -208,7 +204,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState checkpoint =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistentState.empty(),
                         Stage228FlightDeckPersistentState.empty(),
@@ -222,15 +218,14 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void neverIssuedLostWingIdentityFailsClosedInsteadOfBecomingLossEvidence() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
 
         SmallCraftId neverIssued = new SmallCraftId(9999L);
         Stage228GeneratedCampaignPersistentState checkpoint =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistentState.empty(),
                         Stage228FlightDeckPersistentState.empty(),
@@ -251,8 +246,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void futureDatedMissionFailsClosedAgainstAuthoritativeWorldTick() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId craft = register(registry, 4L, 16d, 80d, 1d, 0d);
@@ -269,7 +263,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState checkpoint =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistentState.empty(),
                         Stage228FlightDeckPersistentState.empty(),
@@ -282,8 +276,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void launchQueuedMissionRequiresMatchingPhysicalDeckOperation() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId craft = register(registry, 8L, 32d, 160d, 1d, 0d);
@@ -305,7 +298,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState checkpoint =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistenceMapper.capture(hangars),
                         Stage228FlightDeckPersistenceMapper.capture(deck),
@@ -336,10 +329,9 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void stage21MigrationAddsNoCarrierCraftSupplyOrOperationState() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         byte[] stage21 = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(
-                coordinator.captureState());
+                baseline);
 
         Stage228GeneratedCampaignPersistentState migrated =
                 Stage228GeneratedCampaignPersistenceCodec.decodeOrMigrate(stage21);
@@ -356,8 +348,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void nativeV1AndV2MigrationPreservesEarlierPhysicalStateWithoutLaterGrants() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId craft = register(registry, 5L, 20d, 100d, 0.95d, 50d);
@@ -366,7 +357,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState migratedV1 =
                 Stage228GeneratedCampaignPersistenceCodec.decode(
-                        encodeLegacyV1(coordinator.captureState(), craftState));
+                        encodeLegacyV1(baseline, craftState));
         Stage228CampaignAuthority restoredV1 = Stage228CampaignAuthority.restore(migratedV1);
 
         assertEquals(1, restoredV1.smallCraft().size());
@@ -385,7 +376,7 @@ final class Stage228CarrierCheckpointHardeningTest {
         Stage228GeneratedCampaignPersistentState migratedV2 =
                 Stage228GeneratedCampaignPersistenceCodec.decode(
                         encodeLegacyV2(
-                                coordinator.captureState(),
+                                baseline,
                                 craftState,
                                 Stage228HangarPersistenceMapper.capture(hangars)));
         Stage228CampaignAuthority restoredV2 = Stage228CampaignAuthority.restore(migratedV2);
@@ -402,8 +393,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void v3QueuedDeckMigrationPreservesPhysicalWorkWithoutSynthesizingMission() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId craft = register(registry, 8L, 32d, 160d, 1d, 0d);
@@ -420,7 +410,7 @@ final class Stage228CarrierCheckpointHardeningTest {
                 -1L);
 
         byte[] legacyV3 = encodeLegacyV3(
-                coordinator.captureState(),
+                baseline,
                 Stage228SmallCraftPersistenceMapper.capture(registry),
                 Stage228HangarPersistenceMapper.capture(hangars),
                 Stage228FlightDeckPersistenceMapper.capture(deck));
@@ -438,8 +428,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
     @Test
     void recoveryPendingPostCycleServicingSeamRemainsRestorable() {
-        GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage21IGeneratedWorldRuntimePersistentState baseline = GeneratedCampaignFixture.coordinatorCheckpoint();
         SmallCraftRegistry registry =
                 SmallCraftRegistry.empty(ProductionSmallCraftFixture.fitAuthority());
         SmallCraftId craft = register(registry, 3L, 12d, 80d, 0.75d, 300d);
@@ -461,7 +450,7 @@ final class Stage228CarrierCheckpointHardeningTest {
 
         Stage228GeneratedCampaignPersistentState checkpoint =
                 Stage228GeneratedCampaignPersistentState.compose(
-                        coordinator.captureState(),
+                        baseline,
                         Stage228SmallCraftPersistenceMapper.capture(registry),
                         Stage228HangarPersistenceMapper.capture(hangars),
                         Stage228FlightDeckPersistenceMapper.capture(deck),

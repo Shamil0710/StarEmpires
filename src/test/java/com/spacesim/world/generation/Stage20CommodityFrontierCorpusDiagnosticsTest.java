@@ -16,7 +16,7 @@ class Stage20CommodityFrontierCorpusDiagnosticsTest {
     @Test
     void fixedCorpusMeasuresFrontiersAndExactCombinationWithoutPassRateTarget() {
         Stage20CommodityFrontierCorpusDiagnostics.Report report =
-                Stage20CommodityFrontierCorpusDiagnostics.evaluateCurrent();
+                Stage20CommodityFrontierCorpusDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
 
         assertEquals(Stage20CommodityFrontierCorpusDiagnostics.CURRENT_VERSION, report.version());
         assertEquals(Stage20CommodityWholePlacementFrontierGenerator.CURRENT_VERSION,

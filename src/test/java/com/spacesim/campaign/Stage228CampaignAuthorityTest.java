@@ -84,8 +84,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void campaignRoundTripPreservesIndividualPhysicalHangarOccupancy() {
-        Stage228CampaignAuthority original = Stage228CampaignAuthority.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228CampaignAuthority original = GeneratedCampaignFixture.restoreAuthority();
         SmallCraftId id = original.smallCraft().reserveIdentityForCompletedProduction();
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
@@ -114,8 +113,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void campaignRoundTripPreservesAwaitingLaunchHandoffWithoutTeleportingCraft() {
-        Stage228CampaignAuthority original = Stage228CampaignAuthority.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228CampaignAuthority original = GeneratedCampaignFixture.restoreAuthority();
         SmallCraftId id = original.smallCraft().reserveIdentityForCompletedProduction();
         original.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
@@ -167,8 +165,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void restoreRejectsFlightDeckWatermarkAheadOfCampaignTime() {
-        Stage228CampaignAuthority original = Stage228CampaignAuthority.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228CampaignAuthority original = GeneratedCampaignFixture.restoreAuthority();
         Stage228GeneratedCampaignPersistentState base = original.captureState();
         long currentTick = original.coordinator().runtime().world().getAuthoritativeWorldTick();
         Stage228FlightDeckPersistentState futureDeck =
@@ -192,8 +189,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void compatibilityAdvanceRefusesToSkipQueuedFlightDeckWork() {
-        long rootSeed = Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED;
-        Stage228CampaignAuthority baseAuthority = Stage228CampaignAuthority.create(rootSeed);
+        Stage228CampaignAuthority baseAuthority = GeneratedCampaignFixture.restoreAuthority();
         SmallCraftId id = baseAuthority.smallCraft().reserveIdentityForCompletedProduction();
         baseAuthority.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
@@ -246,8 +242,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void flightDeckAdvancesOnlyOnExistingCampaignFixedTick() {
-        Stage228CampaignAuthority seed = Stage228CampaignAuthority.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228CampaignAuthority seed = GeneratedCampaignFixture.restoreAuthority();
         SmallCraftId id = seed.smallCraft().reserveIdentityForCompletedProduction();
         seed.smallCraft().registerProducedCraft(ProductionSmallCraftFixture.craft(
                 id, 8L, 80d, 4_000d, 1d, 100d));
@@ -310,8 +305,7 @@ class Stage228CampaignAuthorityTest {
 
     @Test
     void currentEnvelopeRoundTripPreservesAcceptedStage21AndEmptySidecarExactly() {
-        Stage228CampaignAuthority original = Stage228CampaignAuthority.create(
-                Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        Stage228CampaignAuthority original = GeneratedCampaignFixture.restoreAuthority();
         Stage228GeneratedCampaignPersistentState saved = original.captureState();
         Stage228CampaignAuthority restored = Stage228CampaignAuthority.restore(saved);
 

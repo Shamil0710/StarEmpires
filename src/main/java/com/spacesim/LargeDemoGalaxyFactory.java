@@ -113,7 +113,7 @@ public final class LargeDemoGalaxyFactory {
         sectors.addAll(compact.topology().sectors());
         List<JumpConnection> connections = new ArrayList<>(compact.topology().connections());
 
-        List<WorldFactionIdentityState> dynamicIdentities = demoFactionIdentities();
+        List<WorldFactionIdentityState> dynamicIdentities = createFactionIdentities();
         List<FactionDescriptor> factions = allFactions(content);
         Map<String, List<StarSystemId>> controlled = new HashMap<>();
         for (FactionDescriptor faction : factions) {
@@ -347,7 +347,12 @@ public final class LargeDemoGalaxyFactory {
         return List.copyOf(result);
     }
 
-    private static List<WorldFactionIdentityState> demoFactionIdentities() {
+    /**
+     * Creates the canonical seed-independent identity metadata without building demo systems.
+     *
+     * @return immutable world-bootstrap identities used by the large demo
+     */
+    public static List<WorldFactionIdentityState> createFactionIdentities() {
         List<WorldFactionIdentityState> identities = new ArrayList<>();
         for (DemoFaction faction : DEMO_FACTIONS) {
             identities.add(new WorldFactionIdentityState(
@@ -356,6 +361,7 @@ public final class LargeDemoGalaxyFactory {
                     faction.displayName(),
                     WorldFactionIdentityState.Origin.WORLD_BOOTSTRAP));
         }
+        identities.sort(Comparator.naturalOrder());
         return List.copyOf(identities);
     }
 

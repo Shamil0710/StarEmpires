@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Stage20CommodityFrontierResolvedCorpusDiagnosticsTest {
     @Test
     void measuresFixedCorpusWithoutAcceptedSeedTarget() {
-        var report = Stage20CommodityFrontierResolvedCorpusDiagnostics.evaluateCurrent();
+        var report = Stage20CommodityFrontierResolvedCorpusDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
 
         assertEquals(Stage20CommodityFrontierResolvedCorpusDiagnostics.CURRENT_VERSION, report.version());
         assertEquals(Stage20CommodityWholePlacementFrontierResolverVersion.value(), report.frontierGeneratorVersion());

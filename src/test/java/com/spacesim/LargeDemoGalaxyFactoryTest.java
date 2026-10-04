@@ -28,6 +28,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LargeDemoGalaxyFactoryTest {
 
     @Test
+    void lightweightIdentitiesMatchTheCanonicalWorldAcrossSeeds() {
+        var content = ContentCatalogLoader.loadDefault();
+        var identities = LargeDemoGalaxyFactory.createFactionIdentities();
+        for (long seed : new long[]{1L, 22_600_001L}) {
+            assertEquals(LargeDemoGalaxyFactory.createState(seed, content).factionIdentities(), identities);
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, identities::clear);
+    }
+
+    @Test
     void largeDemoHasOneHundredConnectedVariedSystemsAndEightPhysicalFactions() {
         ContentCatalog content = ContentCatalogLoader.loadDefault();
         WorldState state = LargeDemoGalaxyFactory.createState(0x1005_17L, content);

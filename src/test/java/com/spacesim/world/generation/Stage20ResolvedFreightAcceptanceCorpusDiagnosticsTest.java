@@ -10,7 +10,7 @@ class Stage20ResolvedFreightAcceptanceCorpusDiagnosticsTest {
     @Test
     void printsFixedCorpusEvidenceWithoutApplyingAPassRateTarget() {
         Stage20ResolvedFreightAcceptanceCorpusDiagnostics.Report report =
-                Stage20ResolvedFreightAcceptanceCorpusDiagnostics.evaluateCurrent();
+                Stage20ResolvedFreightAcceptanceCorpusDiagnostics.evaluateCurrent(Stage20V2CorpusFixture::probe);
 
         System.out.println("STAGE20E_RESOLVED_FREIGHT_ACCEPTANCE_CORPUS_BEGIN");
         System.out.print(Stage20ResolvedFreightAcceptanceCorpusDiagnostics.toText(report));
