@@ -19,7 +19,7 @@
 
 ## Текущее состояние
 
-**Последняя синхронизация README: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE; Stage 23 IN PROGRESS — 23A COMPLETE / 23B NEXT.**
+**Последняя синхронизация README: 2026-10-01 / Stage 20 + Stage 20.5 COMPLETE; Stage 21 COMPLETE; Stage 22 COMPLETE; Stage 23 IN PROGRESS — 23A COMPLETE / 23B ACTIVE/PARTIAL.**
 
 Канонический статус разработки: [`docs/development_roadmap.md`](docs/development_roadmap.md). Stage-23 RC governance: [`docs/release/rc_governance_v1.md`](docs/release/rc_governance_v1.md); 23A completion: [`docs/release/stage23a_completion_record.md`](docs/release/stage23a_completion_record.md). Финальный Stage-22 closure: [`docs/stage22_final_completion_record.md`](docs/stage22_final_completion_record.md).
 
@@ -31,7 +31,7 @@
 | **v0.4 Fleet & Empire Sandbox** | fleets, stations, player faction, combat depth, industry, warfare | **COMPLETE** |
 | **v0.5 RPG & Living World** | world generation, discovery, NPC, missions, reputation | **COMPLETE — Stage 20–21** |
 | **v0.6 Content & Balance Alpha** | technology/content breadth + integrated campaign + carrier/small-craft operations | **COMPLETE — Stage 22** |
-| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | **IN PROGRESS — 23A COMPLETE / 23B NEXT** |
+| **v0.7 Polish / RC** | UX, onboarding, performance, save hardening | **IN PROGRESS — 23A COMPLETE / 23B ACTIVE/PARTIAL** |
 
 На текущем roadmap завершены Stages **0–21**, включая **Stage 20A–20L physical-world generation**,
 обязательный **Stage 20.5 runtime + visual integration gate** и полный **Stage 21 Living World**.
@@ -49,7 +49,7 @@ corpus, core-pair doctrine acceptance, bounded workload evidence and non-vacuous
 launch/recovery/turnaround, shared PLAYER/AI missions, exact Stage-19 combat, finite Stage-18 supply
 and replacement, strategic readiness, save/migration hardening и финальный integrated soak.
 M22.8N принят PR #409 (CI #7710, merge `0deb1973a0ddb1b766b6418f34bb2a1924f79055`).
-Stage 23 начат: 23A зафиксировал RC scope, severity/change-control, version identity, known-issue policy и provisional-content gate. Следующий delivery slice — 23B production information architecture / UI consolidation.
+Stage 23 начат: 23A зафиксировал RC scope, severity/change-control, version identity, known-issue policy и provisional-content gate. 23B ACTIVE/PARTIAL: единая навигация, поиск, фильтры и инспекторы реализованы; подключение player ownership/save и production-команд (#412), графическая проверка и B18 (#370) остаются обязательными. Контракт: [`docs/ui/stage23b_production_ui_consolidation.md`](docs/ui/stage23b_production_ui_consolidation.md).
 
 ## Что уже реализовано
 
@@ -215,7 +215,12 @@ Scalability contract: [`docs/simulation_scalability_architecture.md`](docs/simul
 `run-generated-world.bat` запускает тот же `GeneratedCampaignCoordinator`, который используется для
 обычной симуляции и финального Stage-21I save/load; это не отдельный демонстрационный runtime.
 В generated-world UI: `F1`–`F5` переключают системную, глобальную, фракционную, военную и
-логистическую вкладки; колесо над картой масштабирует её, удержание средней кнопки перемещает
+логистическую вкладки; `F6` открывает контакты, `F7` — меню. Промышленность, корабли, журнал и
+разведка доступны в общей навигации. `Tab`/`Enter` управляют фокусом, `Esc` возвращает назад,
+`Ctrl+F` открывает поиск; выбор и параметры каждого раздела сохраняются при возврате.
+Списки используют поиск, фильтры, сортировку и плотность строк; инспекторы показывают источник
+сведений. Это пока наблюдение принятой кампании, а не новый слой личного владения игрока.
+Колесо над картой масштабирует её, удержание средней кнопки перемещает
 камеру, а двойной клик по кораблю в списке логистики или военных сил открывает его систему.
 `F8`/`F9` сохраняют и загружают тот же composed runtime без повторной генерации.
 
@@ -334,3 +339,8 @@ Stage 17 COMPLETE
 ## Лицензия
 
 См. [`LICENSE`](LICENSE).
+
+23B NPC contract integration: already initialized campaign players can preview/confirm existing
+personal contracts in Contacts; expiry, escrow refund and participation-checked settlement use the
+ordinary campaign ticks and v5 checkpoint. Fresh independent-pilot start and the remaining physical
+player commands are still mandatory work in #412. This does not close 23B or B18.

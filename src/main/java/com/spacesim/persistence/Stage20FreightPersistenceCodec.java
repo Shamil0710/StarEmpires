@@ -124,6 +124,7 @@ public final class Stage20FreightPersistenceCodec {
             writeText(output, fleet.activeOrderId());
             output.writeInt(fleet.routeIndex());
             writeStorage(output, fleet.cargoStorage());
+            writeText(output, fleet.legalFactionId());
         }
 
         writeCount(output, state.cargoLots().size(), "cargo lots", MAX_ROWS);
@@ -162,6 +163,8 @@ public final class Stage20FreightPersistenceCodec {
 
     private static Stage20FreightPersistentState readState(DataInputStream input) throws IOException {
         int schemaVersion = input.readInt();
+        if (schemaVersion < 1 || schemaVersion > Stage20FreightPersistentState.CURRENT_VERSION)
+            throw new IllegalArgumentException("Unsupported freight schema: " + schemaVersion);
         long rootSeed = input.readLong();
         String generatorVersion = readText(input, "generatorVersion");
         String worldFingerprint = readText(input, "worldFingerprint");
@@ -173,9 +176,11 @@ public final class Stage20FreightPersistenceCodec {
         int fleetCount = readCount(input, "freighters", MAX_ROWS);
         ArrayList<FreighterState> fleets = new ArrayList<>(fleetCount);
         for (int index = 0; index < fleetCount; index++) {
+            FleetId fleetId = new FleetId(input.readLong());
+            String originFaction = readText(input, "stableFactionId");
             fleets.add(new FreighterState(
-                    new FleetId(input.readLong()),
-                    readText(input, "stableFactionId"),
+                    fleetId,
+                    originFaction,
                     input.readInt(),
                     readText(input, "hullId"),
                     readText(input, "fitId"),
@@ -185,7 +190,8 @@ public final class Stage20FreightPersistenceCodec {
                     readEnum(input, Stage20FreightPersistentState.FreightPhase.class, "freight phase"),
                     readText(input, "activeOrderId"),
                     input.readInt(),
-                    readStorage(input)));
+                    readStorage(input),
+                    schemaVersion >= 3 ? readText(input, "legalFactionId") : originFaction));
         }
 
         int lotCount = readCount(input, "cargo lots", MAX_ROWS);

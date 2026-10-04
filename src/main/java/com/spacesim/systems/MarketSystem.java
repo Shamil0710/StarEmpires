@@ -109,7 +109,7 @@ public class MarketSystem extends EntitySystem {
                 float ratio = (float) market.targetStock[itemId] / Math.max(1, inventory.stock[itemId]);
                 float priceMultiplier = getPriceMultiplier(itemId, position);
                 float dynamicSellPrice = item.basePrice()
-                        * (float) Math.pow(ratio, 1.2)
+                        * (float) scarcityMultiplier(ratio)
                         * priceMultiplier;
                 market.sellPrices[itemId] = procurement == null ? dynamicSellPrice : 0f;
                 market.buyPrices[itemId] = procurement == null
@@ -122,6 +122,18 @@ public class MarketSystem extends EntitySystem {
         }
 
         lastEventRevision = eventRevision;
+    }
+
+    /**
+     * Shared dimensionless stock-scarcity rule for item and physical kilogram markets.
+     * Callers own units, target admission and any authored finite quote bounds.
+     * @param targetToAvailableRatio finite non-negative target/current stock ratio
+     * @return the existing stock-price multiplier
+     */
+    public static double scarcityMultiplier(double targetToAvailableRatio) {
+        if (!Double.isFinite(targetToAvailableRatio) || targetToAvailableRatio < 0d)
+            throw new IllegalArgumentException("Invalid market stock ratio");
+        return Math.pow(targetToAvailableRatio, 1.2d);
     }
 
     /**

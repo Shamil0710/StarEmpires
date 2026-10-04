@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "profile": "se-pilot-start-1",
+  "releaseGeneratorProfile": "se-gen-2",
+  "corpus": "stage20e.representative-seed-corpus.v1",
+  "sourceStage20GeneratorChanged": false,
+  "requestedSeeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+  ],
+  "outcomes": [
+    {
+      "seed": 1,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 2,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 3,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 4,
+      "result": "GENERATION_REJECTED",
+      "phase": "unchanged-production-generation",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 5,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 6,
+      "result": "GENERATION_REJECTED",
+      "phase": "unchanged-production-generation",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 7,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 8,
+      "result": "GENERATION_REJECTED",
+      "phase": "unchanged-production-generation",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 9,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 10,
+      "result": "GENERATION_REJECTED",
+      "phase": "unchanged-production-generation",
+      "reason": "industrial specialization candidates require an accepted resolved seed"
+    },
+    {
+      "seed": 11,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 12,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 13,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 14,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 15,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    },
+    {
+      "seed": 16,
+      "result": "OPENING_AND_ROUNDTRIP_PASS",
+      "phase": "pilot-opening-and-v5-roundtrip"
+    }
+  ],
+  "openingPassCount": 12,
+  "generationRejectedCount": 4,
+  "pilotOpeningFailureCount": 0,
+  "overallCorpusPass": false,
+  "humanAcceptance": false
+}

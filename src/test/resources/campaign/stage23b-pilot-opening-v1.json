@@ -1,0 +1,21 @@
+{
+  "profile": "se-pilot-start-1",
+  "sourceCommit": "8444116936399a0d1975337f69a66661a287bd2e",
+  "sourceTree": "36f19f1e8fe8663d227118e8648c95808429e6a6",
+  "rootSeed": 1,
+  "fixture": "stage23b-pilot-opening-v1.s25.gz",
+  "compressedSha256": "68239f1f8d192000f69d06e1227ac0488aa3de2387802bffd14ede5ed828d906",
+  "checkpointSha256": "7985015d55d459f055f8a81f3d8553843618907953344f8463b1feb0bbbd9e0b",
+  "markets": 2,
+  "physicalEndpoints": 72,
+  "playerWalletMilliCredits": 75000000,
+  "reproduction": "Run tools/qa/Stage23BLegacyOpeningFixture.java against a packaged sourceCommit JAR. This is an ordinary confirmed opening, not a constructed or migrated player.",
+  "embeddedFreightFixture": {
+    "file": "stage23b-freight-v2.s20f.gz",
+    "schema": 2,
+    "uncompressedBytes": 16439,
+    "rawSha256": "6dc3fce927245d8b15ae96d168e28c7912a7df0263fc4845f294273f8a805221",
+    "compressedSha256": "99e6002a8bc78475e55f88eb06d5ae3348d3e8501133ce5c0a26bd51b1e7c797",
+    "provenance": "Exact embedded S20F payload extracted from this genuine ancestor campaign; no current-code serialization or field removal."
+  }
+}

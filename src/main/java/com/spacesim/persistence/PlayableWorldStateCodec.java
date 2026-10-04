@@ -218,7 +218,7 @@ public final class PlayableWorldStateCodec {
         return value == MAGIC;
     }
 
-    private static void writePlayer(DataOutputStream output, PlayerState player) throws IOException {
+    static void writePlayer(DataOutputStream output, PlayerState player) throws IOException {
         requireCount("reputations", player.reputations().size(), MAX_REPUTATIONS);
         requireCount("owned fleets", player.ownedFleetIds().size(), MAX_OWNED_FLEETS);
         requireCount("discovered systems", player.discoveredSystemIds().size(), MAX_DISCOVERED_SYSTEMS);
@@ -287,7 +287,7 @@ public final class PlayableWorldStateCodec {
         }
     }
 
-    private static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
+    static PlayerState readPlayer(DataInputStream input, int schemaVersion) throws IOException {
         long wallet = input.readLong();
         String affiliation = readNullableContentId(input);
 

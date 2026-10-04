@@ -47,7 +47,7 @@ public record Stage20FreightPersistentState(
         List<CargoLotState> cargoLots,
         List<TransportOrderState> orders) {
     /** Current physical-freight persistence schema. */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 3;
     private static final double EPSILON = 1.0e-9d;
 
     /** Physical route lifecycle for one real freighter. */
@@ -70,7 +70,7 @@ public record Stage20FreightPersistentState(
      * Persistent physical state of one owned freight asset.
      *
      * @param fleetId ordinary world-level fleet identity
-     * @param stableFactionId exact owner identity
+     * @param stableFactionId immutable accepted bootstrap pool origin
      * @param ownershipOrdinal exact Stage-20E owned-pool ordinal
      * @param hullId explicit compatible physical hull
      * @param fitId explicit compatible physical fit
@@ -81,6 +81,7 @@ public record Stage20FreightPersistentState(
      * @param activeOrderId assigned order or empty for reserve fleet
      * @param routeIndex current index in the order's producer-to-consumer route
      * @param cargoStorage exact Stage-18 physical cargo-hold snapshot
+     * @param legalFactionId redundant legal-faction mirror; ordinary world affiliation remains canonical
      */
     public record FreighterState(
             FleetId fleetId,
@@ -94,12 +95,36 @@ public record Stage20FreightPersistentState(
             FreightPhase phase,
             String activeOrderId,
             int routeIndex,
-            StationStorageSnapshot cargoStorage) {
+            StationStorageSnapshot cargoStorage,
+            String legalFactionId) {
+        /**
+         * Source-compatible bootstrap constructor; original pool faction is also initial legal faction.
+         * @param fleetId ordinary fleet identity
+         * @param stableFactionId immutable accepted bootstrap pool origin
+         * @param ownershipOrdinal original pool slot
+         * @param hullId compatible hull
+         * @param fitId compatible fit
+         * @param cargoCapacityKg physical capacity
+         * @param currentSystemId physical system
+         * @param physicalState exact kinematics
+         * @param phase freight lifecycle phase
+         * @param activeOrderId assigned ordinary order or empty
+         * @param routeIndex route index
+         * @param cargoStorage existing owning cargo snapshot
+         */
+        public FreighterState(FleetId fleetId, String stableFactionId, int ownershipOrdinal, String hullId,
+                String fitId, double cargoCapacityKg, StarSystemId currentSystemId,
+                LocalPhysicalKinematics physicalState, FreightPhase phase, String activeOrderId,
+                int routeIndex, StationStorageSnapshot cargoStorage) {
+            this(fleetId, stableFactionId, ownershipOrdinal, hullId, fitId, cargoCapacityKg,
+                    currentSystemId, physicalState, phase, activeOrderId, routeIndex, cargoStorage, stableFactionId);
+        }
+
         /**
          * Validates one persistent physical freighter row.
          *
          * @param fleetId ordinary world-level fleet identity
-         * @param stableFactionId exact owner identity
+         * @param stableFactionId immutable accepted bootstrap pool origin
          * @param ownershipOrdinal exact accepted owned-pool ordinal
          * @param hullId explicit compatible physical hull
          * @param fitId explicit compatible physical fit
@@ -110,10 +135,12 @@ public record Stage20FreightPersistentState(
          * @param activeOrderId assigned order or empty for reserve fleet
          * @param routeIndex current order route index
          * @param cargoStorage exact Stage-18 cargo-hold snapshot
+         * @param legalFactionId exact canonical world legal affiliation mirror
          */
         public FreighterState {
             Objects.requireNonNull(fleetId, "fleetId");
             stableFactionId = requireText(stableFactionId, "stableFactionId");
+            legalFactionId = requireText(legalFactionId, "legalFactionId");
             if (ownershipOrdinal < 0) {
                 throw new IllegalArgumentException("ownershipOrdinal must be non-negative");
             }
@@ -310,9 +337,13 @@ public record Stage20FreightPersistentState(
      * @param orders ordinary persistent transport orders
      */
     public Stage20FreightPersistentState {
-        if (schemaVersion != CURRENT_VERSION) {
+        if (schemaVersion != CURRENT_VERSION && schemaVersion != 1 && schemaVersion != 2) {
             throw new IllegalArgumentException("Unsupported Stage-20.5B freight schema: " + schemaVersion);
         }
+        boolean historical = schemaVersion == 1;
+        if (schemaVersion < 3 && freighters.stream().anyMatch(f -> !f.legalFactionId().equals(f.stableFactionId())))
+            throw new IllegalArgumentException("Historical freight cannot contain explicit legal affiliation");
+        schemaVersion = CURRENT_VERSION;
         generatorVersion = requireText(generatorVersion, "generatorVersion");
         worldFingerprint = requireText(worldFingerprint, "worldFingerprint");
         materializationVersion = requireText(materializationVersion, "materializationVersion");
@@ -381,8 +412,12 @@ public record Stage20FreightPersistentState(
         for (CargoLotState lot : lotCopy) {
             FreighterState fleet = fleetsById.get(lot.fleetId());
             TransportOrderState order = ordersById.get(lot.orderId());
-            if (fleet == null || order == null || !order.fleetId().equals(lot.fleetId())
-                    || !order.commodityId().equals(lot.commodityId()) || !lotIds.add(lot.lotId())) {
+            boolean manual = fleet != null && fleet.phase() == FreightPhase.IDLE
+                    && lot.orderId().equals(manualCargoOrderId(fleet.fleetId()))
+                    && lot.sourceProvenanceId().equals("player-market:" + lot.sourceEndpointId());
+            if (historical && manual) throw new IllegalArgumentException("Manual cargo requires freight schema v2");
+            if (fleet == null || !manual && (order == null || !order.fleetId().equals(lot.fleetId())
+                    || !order.commodityId().equals(lot.commodityId())) || !lotIds.add(lot.lotId())) {
                 throw new IllegalArgumentException("cargo lot must match one existing fleet order");
             }
             lotMassByFleetCommodity.computeIfAbsent(lot.fleetId(), ignored -> new HashMap<>())
@@ -413,6 +448,13 @@ public record Stage20FreightPersistentState(
     public static String cargoHoldId(FleetId fleetId) {
         return "freight-hold:" + Objects.requireNonNull(fleetId, "fleetId").value();
     }
+
+    /**
+     * Identifies manually purchased cargo on one existing reserve fleet.
+     * @param fleetId carrying reserve fleet
+     * @return ordinary manually purchased cargo provenance identity
+     */
+    public static String manualCargoOrderId(FleetId fleetId) { return "player-market-cargo:" + fleetId.value(); }
 
     private static boolean sameMassMap(Map<String, Double> left, Map<String, Double> right) {
         Set<String> keys = new HashSet<>(left.keySet());

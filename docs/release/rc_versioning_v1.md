@@ -34,13 +34,23 @@ Stage-23 entry baseline:
 A schema-affecting change increments the owning schema/file version and adds supported old-version
 fixtures. Failed migration must leave the original checkpoint unchanged.
 
+## 23B composed player checkpoint change
+
+The Stage-23 entry baseline above remains historical evidence. The current 23B checkpoint advances
+only the composed owner to `campaign=5` / `m22.8.generated-campaign.v5`. Core, content envelope and
+the embedded Stage-21/A/B/C/M formats retain their accepted identities. Native v1–v4 adopt without
+initializing a player. This persistence change alone does not initialize a player. The subsequent explicit new-game opening profile is recorded below.
+
+Change control and migration evidence: `docs/release/stage23b_player_checkpoint_change_control.md`.
+A generator-profile change is not implied: no generated starter assets or new funding are added.
+
 ## Generator profile version
 
-RC governance profile:
+Stage-23 entry governance profile: `se-gen-1`.
 
-`se-gen-1`
+Current new-game release profile: `se-gen-3` (unchanged accepted Stage-20 generator plus explicitly confirmed `se-pilot-start-2`; preceding opening alias was `se-gen-2`).
 
-This is a release metadata alias for the accepted Stage-20 production generator/calibration set.
+These are release metadata aliases. `se-gen-2` records the subsequent new-game physical market/player composition; it does not relabel saved Stage-20 generation identities.
 Any change that can alter newly generated physical world state requires a generator-profile bump and
 representative seed-corpus rerun. Existing saves are never silently regenerated because the profile
 changed.
@@ -63,3 +73,20 @@ packageSha256
 ```
 
 Two candidates that differ in any field are different release identities.
+
+## 23B physical pilot slice
+
+Explicit new-game initialization uses `se-pilot-start-1`; its numeric fingerprint, disclosed money
+sources and unchanged generator boundary are recorded in
+`docs/release/stage23b_pilot_start_profile_v1.md`. Freight owning schema advances from 1 to 2 for
+manual physical cargo provenance, with non-granting schema-1 adoption. Freight file format 1,
+composed campaign v5, core/envelope/content and underlying Stage-20 generation identities remain unchanged; the new-game release alias advances to `se-gen-2`.
+
+## 23B global physical-market composition
+
+The subsequent `se-pilot-start-2` commissions finite markets at all existing physical endpoints and
+adds stock-responsive SI-kilogram quotes through the shared MarketSystem scarcity rule. Because
+new-game physical composition changes, the release alias advances to `se-gen-3`; the full fixed
+seed corpus must be rerun. Existing markers retain v1 policy and existing saves are not
+recommissioned, refunded or regenerated. Owning save schemas/formats remain unchanged. Numeric
+policy/fingerprint and source declarations: `docs/release/stage23b_pilot_start_profile_v2.md`.

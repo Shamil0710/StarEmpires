@@ -1,12 +1,14 @@
 package com.spacesim.campaign;
 
 import com.spacesim.content.ContentCatalog;
+import com.spacesim.warfare.Stage19ConflictRuntime;
 import com.spacesim.persistence.Stage19ConflictState;
 import com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.LiveRuntime;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimeMigration;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState.MigrationProvenance;
 import com.spacesim.world.DiplomaticLifecycleState;
+import com.spacesim.world.DiplomaticLifecycleService;
 import com.spacesim.world.FactionInterestResolver.DecisionTrace;
 import com.spacesim.world.FactionLivingActorKernel.ReviewResult;
 import com.spacesim.world.FactionLivingActorRuntime;
@@ -14,6 +16,7 @@ import com.spacesim.world.FactionStrategicIntentState;
 import com.spacesim.world.FleetCommandState;
 import com.spacesim.world.SettlementRecoveryState;
 import com.spacesim.world.Stage21HNpcMissionState;
+import com.spacesim.world.Stage21HNpcMissionService;
 import com.spacesim.world.StrategicOperationState;
 import com.spacesim.world.TerritorialTransitionState;
 
@@ -28,7 +31,9 @@ import java.util.function.LongConsumer;
  *
  * <p>The coordinator owns no replacement simulation authority. It keeps the accepted Stage-20/20.5
  * {@link GeneratedCampaignSession}, the mutable Stage-21A actor scheduler and the immutable snapshots
- * owned by the accepted Stage-21B-H systems together as one lifecycle boundary. Capture delegates to
+ * owned by the accepted Stage-21B-H systems together as one lifecycle boundary. Due diplomatic
+ * proposals are reconciled by the existing Stage-21C service at completed campaign ticks. Capture
+ * delegates to
  * {@link GeneratedCampaignAuthorityCheckpoint}, so save/load uses the existing final Stage-21I
  * envelope instead of introducing another persistence format.</p>
  */
@@ -39,13 +44,14 @@ public final class GeneratedCampaignCoordinator {
     private final GeneratedCampaignSession session;
     private final FactionLivingActorRuntime actors;
     private final List<FactionStrategicIntentState> strategicIntents;
-    private final DiplomaticLifecycleState diplomacy;
+    private DiplomaticLifecycleState diplomacy;
+    private final DiplomaticLifecycleService diplomacyLifecycle;
     private final Stage19ConflictState warfare;
     private final FleetCommandState commands;
     private final StrategicOperationState operations;
     private final TerritorialTransitionState transitions;
     private final SettlementRecoveryState recovery;
-    private final Stage21HNpcMissionState npcMissions;
+    private final Stage21HNpcMissionService npcMissionService;
     private final MigrationProvenance migrationProvenance;
     private final TreeMap<String, DecisionTrace> latestDecisionTraceByFaction = new TreeMap<>();
 
@@ -59,11 +65,13 @@ public final class GeneratedCampaignCoordinator {
         this.strategicIntents = checked.strategicIntents();
         this.diplomacy = checked.diplomacy();
         this.warfare = checked.warfare();
+        this.diplomacyLifecycle = new DiplomaticLifecycleService(
+                session.runtime().world(), new Stage19ConflictRuntime(warfare), diplomacy);
         this.commands = checked.commands();
         this.operations = checked.operations();
         this.transitions = checked.transitions();
         this.recovery = checked.recovery();
-        this.npcMissions = checked.npcMissions();
+        this.npcMissionService = new Stage21HNpcMissionService(checked.npcMissions());
         this.migrationProvenance = Objects.requireNonNull(migrationProvenance, "migrationProvenance");
     }
 
@@ -121,7 +129,7 @@ public final class GeneratedCampaignCoordinator {
                 operations,
                 transitions,
                 recovery,
-                npcMissions);
+                npcMissions());
         return new Stage21IGeneratedWorldRuntimePersistentState(
                 Stage21IGeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                 Stage21IGeneratedWorldRuntimePersistentState.CURRENT_RUNTIME_VERSION,
@@ -191,7 +199,12 @@ public final class GeneratedCampaignCoordinator {
 
     /** @return exact Stage-21H NPC/mission/reputation/story snapshot */
     public Stage21HNpcMissionState npcMissions() {
-        return npcMissions;
+        return npcMissionService.snapshot();
+    }
+
+    /** @return existing mission lifecycle owner for adjacent composed player commands */
+    Stage21HNpcMissionService npcMissionService() {
+        return npcMissionService;
     }
 
     /** @return final-format migration/adoption lineage metadata */
@@ -282,9 +295,22 @@ public final class GeneratedCampaignCoordinator {
             LongConsumer afterFixedTick) {
         LongConsumer observer = Objects.requireNonNull(afterFixedTick, "afterFixedTick");
         return session.advanceFrame(realDeltaSeconds, tick -> {
+            expireDiplomaticProposalsAtTick(tick);
+            npcMissionService.expireDueMissions(runtime().world(), 8);
             reviewActorsAtTick(tick);
             observer.accept(tick);
         });
+    }
+
+    private void expireDiplomaticProposalsAtTick(long authoritativeTick) {
+        if (authoritativeTick != runtime().world().getAuthoritativeWorldTick()) {
+            throw new IllegalStateException("Diplomatic lifecycle requires the exact campaign tick");
+        }
+        if (diplomacyLifecycle.expireDueProposals() > 0) {
+            // The existing service also rejects linked ordinary treaty offers. Preserve its exact
+            // result, but do not normalize a historical sidecar merely by capturing/restoring it.
+            diplomacy = diplomacyLifecycle.snapshot();
+        }
     }
 
     private void reviewActorsAtTick(long authoritativeTick) {

@@ -521,7 +521,9 @@ final class FactionDiplomacyRuntime {
         DiplomaticTreatyCommand.Offer renewal = new DiplomaticTreatyCommand.Offer(
                 command.actorFactionContentId(),
                 counterparty,
-                treaty.clauses(),
+                existing.ownerFactionContentId().equals(command.actorFactionContentId())
+                        ? treaty.clauses()
+                        : treaty.clauses().stream().map(DiplomaticTreatyClauseState::relativeToOppositeParty).toList(),
                 command.expiresTick());
         return offer(
                 renewal,

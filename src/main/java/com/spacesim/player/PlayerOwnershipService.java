@@ -30,6 +30,30 @@ public final class PlayerOwnershipService {
     }
 
     /**
+     * Purchases an existing reserve asset from the ordinary faction treasury.
+     * @param fleetId existing fleet offered by the caller's validated sale authority
+     * @param sellerFactionId ordinary seller faction
+     * @param priceMilliCredits positive price
+     * @return whether the conserved payment and personal ownership committed
+     */
+    public boolean purchaseFactionFleet(FleetId fleetId, String sellerFactionId, long priceMilliCredits) {
+        Objects.requireNonNull(fleetId);
+        PlayerState previous = runtime.player();
+        if (priceMilliCredits <= 0 || previous.walletMilliCredits() < priceMilliCredits
+                || previous.ownedFleetIds().contains(fleetId) || runtime.world().findFleet(fleetId).isEmpty()) return false;
+        List<FleetId> owned = new ArrayList<>(previous.ownedFleetIds());
+        owned.add(fleetId);
+        PlayerState candidate = PlayerRuntime.copyWithOwnershipAndWallet(previous,
+                previous.walletMilliCredits() - priceMilliCredits, owned,
+                previous.activeFleetId() == null ? fleetId : previous.activeFleetId());
+        WalletComponent payer = new WalletComponent(previous.walletMilliCredits());
+        if (!runtime.world().transferToFactionTreasury(sellerFactionId, payer, PLAYER_LEDGER_NAME,
+                priceMilliCredits, "player-reserve-fleet-purchase")) return false;
+        runtime.replacePlayerState(candidate);
+        return true;
+    }
+
+    /**
      * Purchases ownership of an already existing world fleet.
      *
      * @param fleetId stable fleet to acquire

@@ -325,6 +325,61 @@ public final class Stage21HNpcMissionService {
         }
     }
 
+    /** Player-facing contract transitions executed by this existing lifecycle owner. */
+    public enum PlayerCommand {
+        /** Accept a live funded offer. */ ACCEPT,
+        /** Decline a funded offer and refund its issuer. */ REJECT,
+        /** Cancel an active contract and refund its issuer. */ CANCEL
+    }
+
+    /**
+     * Runs the same non-mutating lifecycle validator used by command submission.
+     *
+     * @param command requested lifecycle transition
+     * @param missionId existing contract identity
+     * @param nowTick exact authoritative tick
+     * @return current contract when the transition is permitted
+     */
+    public MissionContract validatePlayerCommand(PlayerCommand command, String missionId, long nowTick) {
+        Objects.requireNonNull(command, "Player command not set");
+        requireAdvancingOrEqualTick(nowTick);
+        MissionContract mission = requireMission(missionId);
+        if (command == PlayerCommand.ACCEPT && nowTick > mission.deadlineTick()) {
+            throw new IllegalStateException("Mission response deadline has elapsed");
+        }
+        boolean allowed = switch (command) {
+            case ACCEPT, REJECT -> mission.status() == MissionStatus.OFFERED;
+            case CANCEL -> mission.active();
+        };
+        if (!allowed) throw new IllegalStateException("Mission lifecycle does not allow this command");
+        return mission;
+    }
+
+    /**
+     * Expires a bounded deterministic batch using the ordinary world tick and issuer treasury.
+     * No initialized player or caller-provided reward wallet is needed to return escrow.
+     * Deadlines are inclusive; an offer remains live at its deadline and expires on the next tick.
+     *
+     * @param world existing world and treasury owner
+     * @param maxMissions positive work budget
+     * @return number of newly expired contracts
+     */
+    public int expireDueMissions(WorldSimulation world, int maxMissions) {
+        WorldSimulation checked = Objects.requireNonNull(world, "World simulation not set");
+        long tick = checked.getAuthoritativeWorldTick();
+        requireAdvancingOrEqualTick(tick);
+        if (maxMissions <= 0) throw new IllegalArgumentException("Mission expiry budget must be positive");
+        List<MissionContract> due = state.missions().stream()
+                .filter(MissionContract::active).filter(mission -> tick > mission.deadlineTick())
+                .sorted(java.util.Comparator.comparingLong(MissionContract::deadlineTick)
+                        .thenComparing(MissionContract::missionId)).limit(maxMissions).toList();
+        for (MissionContract mission : due) {
+            refundAndTerminate(checked, mission, MissionStatus.EXPIRED, tick, "deadline.expired");
+            rememberAcceptedFailure(mission, Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, tick);
+        }
+        return due.size();
+    }
+
     /**
      * Accepts one still-live funded offer.
      *
@@ -333,14 +388,7 @@ public final class Stage21HNpcMissionService {
      * @return accepted contract
      */
     public MissionContract acceptMission(String missionId, long nowTick) {
-        requireAdvancingOrEqualTick(nowTick);
-        MissionContract mission = requireMission(missionId);
-        if (mission.status() != MissionStatus.OFFERED) {
-            throw new IllegalStateException("Only OFFERED mission may be accepted");
-        }
-        if (nowTick > mission.deadlineTick()) {
-            throw new IllegalStateException("Expired mission cannot be accepted before expiry reconciliation");
-        }
+        MissionContract mission = validatePlayerCommand(PlayerCommand.ACCEPT, missionId, nowTick);
         MissionContract accepted = replaceStatus(
                 mission, MissionStatus.ACCEPTED, nowTick, "accepted", mission.pendingWakeups());
         replaceMission(accepted, nowTick);
@@ -357,11 +405,7 @@ public final class Stage21HNpcMissionService {
     public MissionContract rejectMission(WorldSimulation world, String missionId) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "World simulation not set");
         long tick = checkedWorld.getAuthoritativeWorldTick();
-        requireAdvancingOrEqualTick(tick);
-        MissionContract mission = requireMission(missionId);
-        if (mission.status() != MissionStatus.OFFERED) {
-            throw new IllegalStateException("Only OFFERED mission may be rejected");
-        }
+        MissionContract mission = validatePlayerCommand(PlayerCommand.REJECT, missionId, tick);
         return refundAndTerminate(checkedWorld, mission, MissionStatus.REJECTED, tick, "rejected");
     }
 
@@ -378,11 +422,7 @@ public final class Stage21HNpcMissionService {
     public MissionContract cancelMission(WorldSimulation world, String missionId) {
         WorldSimulation checkedWorld = Objects.requireNonNull(world, "World simulation not set");
         long tick = checkedWorld.getAuthoritativeWorldTick();
-        requireAdvancingOrEqualTick(tick);
-        MissionContract mission = requireMission(missionId);
-        if (!mission.active()) {
-            throw new IllegalStateException("Only active mission may be cancelled");
-        }
+        MissionContract mission = validatePlayerCommand(PlayerCommand.CANCEL, missionId, tick);
         return refundAndTerminate(checkedWorld, mission, MissionStatus.CANCELLED, tick, "cancelled");
     }
 

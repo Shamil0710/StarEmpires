@@ -35,7 +35,7 @@ class Stage22GeneratedWorldIdentityGovernanceAcceptanceTest {
         Stage22FactionIdentityEvidence first = Stage22FactionIdentityEvidence.loadDefault();
         Stage22FactionIdentityEvidence second = Stage22FactionIdentityEvidence.loadDefault();
 
-        assertEquals(10, first.records().size());
+        assertEquals(11, first.records().size());
         assertEquals(first.records(), second.records());
         assertEquals(first.fingerprint(), second.fingerprint());
         assertEquals(64, first.fingerprint().length());

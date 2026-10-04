@@ -1,14 +1,18 @@
 package com.spacesim.persistence;
 
+import com.spacesim.player.PlayerState;
+
 import java.util.Objects;
 
 /**
  * Current M22.8 campaign persistence envelope extending the accepted Stage-21I checkpoint.
  *
  * <p>The embedded Stage-21 checkpoint remains authoritative for all pre-M22.8 systems. Sidecars own
- * only newly introduced durable carrier/small-craft state. Native M22.8A/B/C and supported Stage-21
+ * only newly introduced durable carrier/small-craft state and the existing player contract. Native
+ * M22.8A/B/C/M and supported Stage-21
  * checkpoints migrate without synthesizing missions, craft, hangar occupancy, deck work, supplies,
- * pending replacements or carrier-wing membership.</p>
+ * pending replacements, carrier-wing membership or player assets. Version 5 adds exact optional
+ * player persistence; historical checkpoints remain uninitialized.</p>
  *
  * @param schemaVersion exact current M22.8 envelope schema
  * @param runtimeVersion exact current M22.8 runtime identifier
@@ -17,6 +21,7 @@ import java.util.Objects;
  * @param hangars individual M22.8B physical hangar occupancy sidecar
  * @param flightDeck M22.8C deterministic launch/recovery sidecar
  * @param operations M22.8M D/G/H mission/logistics/carrier-wing sidecar
+ * @param playerState existing durable player state, or null for an uninitialized campaign
  */
 public record Stage228GeneratedCampaignPersistentState(
         int schemaVersion,
@@ -25,12 +30,35 @@ public record Stage228GeneratedCampaignPersistentState(
         Stage228SmallCraftPersistentState smallCraft,
         Stage228HangarPersistentState hangars,
         Stage228FlightDeckPersistentState flightDeck,
-        Stage228OperationsPersistentState operations) {
+        Stage228OperationsPersistentState operations,
+        PlayerState playerState) {
 
     /** Current M22.8 campaign envelope schema. */
-    public static final int CURRENT_VERSION = 4;
+    public static final int CURRENT_VERSION = 5;
     /** Current M22.8 campaign runtime contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
+    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v5";
+
+    /**
+     * Source-compatible composition without an initialized player; never invents player assets.
+     *
+     * @param schemaVersion current envelope schema
+     * @param runtimeVersion current runtime identifier
+     * @param stage21Runtime complete Stage-21 checkpoint
+     * @param smallCraft exact craft state
+     * @param hangars exact hangar state
+     * @param flightDeck exact deck state
+     * @param operations exact operations state
+     */
+    public Stage228GeneratedCampaignPersistentState(
+            int schemaVersion, String runtimeVersion,
+            Stage21IGeneratedWorldRuntimePersistentState stage21Runtime,
+            Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars,
+            Stage228FlightDeckPersistentState flightDeck,
+            Stage228OperationsPersistentState operations) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars,
+                flightDeck, operations, null);
+    }
 
     /**
      * Compatibility constructor for pre-M22.8M call sites; adds an empty non-granting operations sidecar.
@@ -69,6 +97,7 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param hangars exact B sidecar
      * @param flightDeck exact C sidecar
      * @param operations exact M operations sidecar
+     * @param playerState exact optional player checkpoint
      */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -85,6 +114,30 @@ public record Stage228GeneratedCampaignPersistentState(
         Objects.requireNonNull(hangars, "hangars");
         Objects.requireNonNull(flightDeck, "flightDeck");
         Objects.requireNonNull(operations, "operations");
+        GeneratedCampaignPlayerCheckpointValidator.validate(stage21Runtime, playerState);
+    }
+
+    /**
+     * Composes the existing authoritative checkpoint with an exact durable player state.
+     *
+     * @param stage21 complete Stage-21 checkpoint
+     * @param smallCraft exact craft state
+     * @param hangars exact hangar state
+     * @param flightDeck exact deck state
+     * @param operations exact operations state
+     * @param playerState existing player state, or null before player initialization
+     * @return current validated v5 envelope
+     */
+    public static Stage228GeneratedCampaignPersistentState compose(
+            Stage21IGeneratedWorldRuntimePersistentState stage21,
+            Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars,
+            Stage228FlightDeckPersistentState flightDeck,
+            Stage228OperationsPersistentState operations,
+            PlayerState playerState) {
+        return new Stage228GeneratedCampaignPersistentState(
+                CURRENT_VERSION, CURRENT_RUNTIME_VERSION, stage21, smallCraft,
+                hangars, flightDeck, operations, playerState);
     }
 
     /**
@@ -95,7 +148,7 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param hangars exact B sidecar
      * @param flightDeck exact C sidecar
      * @param operations exact D/G/H sidecar
-     * @return current v4 envelope
+     * @return current v5 envelope
      */
     public static Stage228GeneratedCampaignPersistentState compose(
             Stage21IGeneratedWorldRuntimePersistentState stage21,
@@ -120,7 +173,7 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param smallCraft exact A sidecar
      * @param hangars exact B sidecar
      * @param flightDeck exact C sidecar
-     * @return current v4 envelope with empty operations
+     * @return current v5 envelope with empty operations
      */
     public static Stage228GeneratedCampaignPersistentState compose(
             Stage21IGeneratedWorldRuntimePersistentState stage21,
@@ -141,7 +194,7 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param stage21 accepted Stage-21I state
      * @param smallCraft exact A sidecar
      * @param hangars exact B sidecar
-     * @return current v4 envelope with no deck or operations state
+     * @return current v5 envelope with no deck or operations state
      */
     public static Stage228GeneratedCampaignPersistentState compose(
             Stage21IGeneratedWorldRuntimePersistentState stage21,
@@ -172,7 +225,7 @@ public record Stage228GeneratedCampaignPersistentState(
     }
 
     /**
-     * Migrates native M22.8A into v4 without inventing later state.
+     * Migrates native M22.8A into v5 without inventing later state.
      *
      * @param stage21 accepted Stage-21I checkpoint embedded by A
      * @param smallCraft exact A craft sidecar
@@ -190,7 +243,7 @@ public record Stage228GeneratedCampaignPersistentState(
     }
 
     /**
-     * Migrates native M22.8B into v4 without inventing later state.
+     * Migrates native M22.8B into v5 without inventing later state.
      *
      * @param stage21 accepted Stage-21I checkpoint embedded by B
      * @param smallCraft exact A craft sidecar
@@ -210,7 +263,7 @@ public record Stage228GeneratedCampaignPersistentState(
     }
 
     /**
-     * Migrates native M22.8C/v3 into v4 without inventing D/G/H state.
+     * Migrates native M22.8C/v3 into v5 without inventing D/G/H state.
      *
      * @param stage21 accepted Stage-21I checkpoint
      * @param smallCraft exact A sidecar

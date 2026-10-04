@@ -178,6 +178,44 @@ public final class Stage20FreightRuntime {
     }
 
     /**
+     * Exchanges manually purchased commodity mass using the same finite logistics/hold authority.
+     * The caller validates personal ownership, docking, consideration and the once-per-tick budget.
+     * @param fleetId existing unassigned reserve
+     * @param endpoint actual station storage
+     * @param commodityId admitted physical commodity
+     * @param massKg positive requested mass
+     * @param buying whether to load from the station
+     * @param seconds authoritative transaction time
+     * @param handling compatible physical handling
+     * @param budget unspent finite interval budget
+     * @return whether the physical transfer committed
+     */
+    public boolean exchangeManualCommodity(FleetId fleetId, Stage18StationStorage endpoint,
+            String commodityId, double massKg, boolean buying, double seconds,
+            HandlingCapability handling, TransferBudget budget) {
+        var fleet = requireFreighter(fleetId);
+        requirePhase(fleet, FreightPhase.IDLE);
+        requireNonNegativeFinite(seconds, "seconds");
+        if (!Double.isFinite(massKg) || massKg <= 0 || buying && fleet.cargoMassKg() + massKg > fleet.cargoCapacityKg()) return false;
+        if (buying && nextCargoLotOrdinal == Long.MAX_VALUE) return false;
+        String order = Stage20FreightPersistentState.manualCargoOrderId(fleetId);
+        if (!buying && lots.values().stream().filter(l -> l.fleetId().equals(fleetId)
+                && l.orderId().equals(order) && l.commodityId().equals(commodityId))
+                .mapToDouble(CargoLotState::massKg).sum() + EPSILON < massKg) return false;
+        var hold = requireHold(fleetId);
+        var result = logistics.transferCommodity(buying ? endpoint : hold, buying ? hold : endpoint,
+                commodityId, massKg, handling, budget);
+        if (!result.transferred()) return false;
+        if (buying) {
+            String id = "freight-lot:" + nextCargoLotOrdinal++;
+            lots.put(id, new CargoLotState(id, fleetId, order, commodityId, massKg,
+                    endpoint.stationId(), "player-market:" + endpoint.stationId(), seconds));
+        } else consumeLots(fleetId, order, commodityId, massKg);
+        refreshFreighterHold(fleetId);
+        return true;
+    }
+
+    /**
      * Finds one immutable current order state.
      *
      * @param orderId stable transport order identity
@@ -279,6 +317,40 @@ public final class Stage20FreightRuntime {
         freighters.put(fleetId, copyFreighter(
                 fleet, fleet.currentSystemId(), fleet.physicalState(), FreightPhase.OUTBOUND,
                 fleet.routeIndex(), requireHold(fleetId).snapshot()));
+    }
+
+    /**
+     * Mirrors a completed ordinary world hop for an unassigned physical freighter.
+     * This changes neither cargo, orders nor travel time; the caller supplies committed arrival.
+     * @param fleetId existing idle identity
+     * @param systemId committed world location
+     * @param physical exact arrived kinematics
+     * @return the same freight identity and hold at its committed location
+     */
+    public FreighterState synchronizeIdleArrival(FleetId fleetId, StarSystemId systemId,
+            LocalPhysicalKinematics physical) {
+        var fleet = requireFreighter(fleetId);
+        requirePhase(fleet, FreightPhase.IDLE);
+        var updated = copyFreighter(fleet, Objects.requireNonNull(systemId), Objects.requireNonNull(physical),
+                FreightPhase.IDLE, fleet.routeIndex(), requireHold(fleetId).snapshot());
+        freighters.put(fleetId, updated);
+        return updated;
+    }
+
+    /**
+     * Mirrors an explicit ordinary world affiliation for a personally controlled idle hull.
+     * Bootstrap pool origin, allocator slot, physical placement and cargo remain exact.
+     * Capture/restore verifies this mirror against the canonical world faction.
+     * @param fleetId existing idle hull
+     * @param legalFactionId actually committed ordinary world affiliation
+     * @return updated redundant freight mirror
+     */
+    public FreighterState synchronizeLegalAffiliation(FleetId fleetId, String legalFactionId) {
+        var f = requireFreighter(fleetId); requirePhase(f, FreightPhase.IDLE);
+        var updated = new FreighterState(f.fleetId(), f.stableFactionId(), f.ownershipOrdinal(), f.hullId(),
+                f.fitId(), f.cargoCapacityKg(), f.currentSystemId(), f.physicalState(), f.phase(),
+                f.activeOrderId(), f.routeIndex(), requireHold(fleetId).snapshot(), legalFactionId);
+        freighters.put(fleetId, updated); return updated;
     }
 
     /**
@@ -716,7 +788,8 @@ public final class Stage20FreightRuntime {
                 phase,
                 source.activeOrderId(),
                 routeIndex,
-                storage);
+                storage,
+                source.legalFactionId());
     }
 
     private static TransportOrderState copyOrder(
