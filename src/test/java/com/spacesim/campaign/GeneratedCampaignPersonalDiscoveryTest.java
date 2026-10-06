@@ -28,13 +28,18 @@ class GeneratedCampaignPersonalDiscoveryTest {
         assertTrue(preview.allowed()); assertEquals(before, c.captureState());
         c.submitPilotAction(preview);
         var knowledge = r.discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
-        assertEquals(1, knowledge.entries().size());
+        var previous = beforeKnowledge.knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+        assertEquals(previous.entries().size() + 1, knowledge.entries().size());
+        for (var entry : previous.entries()) assertEquals(entry, knowledge.knowledge(entry.object()).orElseThrow());
         var station = knowledge.knowledge(object).orElseThrow();
         assertEquals(DiscoveryState.KNOWN_STATIC_LOCATION, station.state());
         assertEquals(endpoint.position(), station.knownLocation().orElseThrow());
         assertEquals(DiscoverySource.PHYSICAL_VISIT_OR_SURVEY, station.evidence().get(0).source());
         assertEquals(ResourceKnowledge.none(), station.resourceKnowledge());
-        for (var owner : beforeKnowledge.knowledgeStates()) assertEquals(owner, r.discoveryState().knowledgeFor(owner.ownerId()));
+        for (var owner : beforeKnowledge.knowledgeStates()) {
+            if (!owner.ownerId().equals(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID))
+                assertEquals(owner, r.discoveryState().knowledgeFor(owner.ownerId()));
+        }
         var saved = c.captureState();
         var loaded = Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
                 Stage228GeneratedCampaignPersistenceCodec.encode(saved)));

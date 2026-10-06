@@ -41,7 +41,15 @@ class GeneratedCampaignStockProductionCommandsTest {
         var before=c.captureState();String id="player-government|apply-production";
         assertTrue(GeneratedCampaignFactionUi.explanation(c,id,"apply").contains("рынков 0, производств 0"));
         var preview=GeneratedCampaignFactionUi.preview(c,id,"apply");assertTrue(preview.allowed());assertEquals(before,c.captureState());
-        var next=c.submitPlayerFactionCommand(preview);assertEquals(before,next.captureState());roundtrip(next);
+        var next=c.submitPlayerFactionCommand(preview);var after=next.captureState();
+        assertEquals(before,new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
+                Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,after.stage21Runtime(),after.smallCraft(),after.hangars(),
+                after.flightDeck(),after.operations(),after.playerState(),before.playerJournal(),after.moduleCustody(),after.repairQueue(),
+                after.refitQueue(),after.moduleTransfers(),after.productTransfers(),after.yardConstruction()));
+        assertEquals(before.playerJournal().nextSequence()+1,after.playerJournal().nextSequence());
+        var receipt=after.playerJournal().entries().get(after.playerJournal().entries().size()-1);
+        assertEquals(com.spacesim.player.PlayerJournalState.Kind.GOVERNMENT_COMMAND,receipt.kind());
+        assertEquals(0,receipt.walletDeltaMilliCredits());roundtrip(next);
     }
 
     @Test void unknownReferencesUnaffiliatedStaleForeignAndReusedConfirmationsCannotAuthorPolicy() {

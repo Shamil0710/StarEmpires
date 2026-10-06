@@ -2,6 +2,13 @@
 
 Status: **FROZEN FOR v0.7 RC TRAIN**
 
+Current development identity (2026-10-06): `campaign=16` / `m22.8.generated-campaign.v16`.
+This supersedes the historical development entries below. The separately versioned initial
+NPC mining manifest is admitted only from native v16; older manifests restore exactly.
+Supply predicates remain v15 additions, paid-refit and explicit-custody rights remain v14 additions.
+Core, content envelope, product RC train and root payload framing retain their identities.
+This is 23B ACTIVE/PARTIAL, without final release or player acceptance.
+
 Current development checkpoint update (2026-10-06): native schema/file/runtime is v14.
 This supersedes the v13/v12 development notes below. Paid-refit schema 3 and equipment-custody
 schema 2 retain real held money and actor rights independently from storage. Native v1–v13
@@ -234,7 +241,8 @@ site custody, with shared finite handling and no general warehouse grant. Schema
 original full-bill warehouse reserve. Ordinary economic acquisition of all materials and
 resource allocation to a working yard remain incomplete. This is ACTIVE/PARTIAL,
 not a final RC or stage acceptance.
-Текущий 23B native writer на 2026-10-06: **v15** (`m22.8.generated-campaign.v15`).
-Он добавляет личное физическое условие supply contract; старые v1–v14 мигрируют без
-новых обязательств, а новый predicate под старым header отклоняется. Это частичный
+Текущий 23B native writer на 2026-10-06: **v16** (`m22.8.generated-campaign.v16`).
+Он допускает отдельный начальный NPC-манифест шахтёрского резерва Союза; старые v1–v15
+сохраняют свой фактический манифест без выдачи корабля или оборудования. Личное физическое
+условие supply contract остаётся доступным с v15 и отвергается под старым v14 header. Это частичный
 срез 23B, не завершение этапа или финальный проверенный release revision.

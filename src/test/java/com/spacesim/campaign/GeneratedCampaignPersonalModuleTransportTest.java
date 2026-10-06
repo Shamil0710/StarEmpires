@@ -100,7 +100,13 @@ class GeneratedCampaignPersonalModuleTransportTest {
     }
 
     @Test void nativeV9MigrationPreservesStationEquipmentWithoutAddingHandlingWork() throws Exception {
-        var c = fixture(); var base = c.captureState(); var buffer = new java.io.ByteArrayOutputStream();
+        var c = fixture(); var current = c.captureState();
+        // Explicit schema-1 station custody represents v9 data, before actor tags existed.
+        var historicalCustody = new com.spacesim.economy.ShipyardModuleCustodyState(current.moduleCustody().modules().stream()
+                .map(m -> new com.spacesim.economy.ShipyardModuleCustodyState.StoredModule(
+                        m.custodyId(), m.stationId(), m.sourceAssetId(), m.removedAtTick(), m.condition())).toList());
+        var base = compose(current, historicalCustody, current.moduleTransfers());
+        var buffer = new java.io.ByteArrayOutputStream();
         try (var out = new java.io.DataOutputStream(buffer)) {
             out.writeInt(0x53323843); out.writeInt(9); out.writeInt(9); out.writeUTF("m22.8.generated-campaign.v9");
             for (var payload : List.of(Stage21IGeneratedWorldRuntimePersistenceCodec.encode(base.stage21Runtime()),

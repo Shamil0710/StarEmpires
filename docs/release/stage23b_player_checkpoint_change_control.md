@@ -2,6 +2,20 @@
 
 Status: **IMPLEMENTED PERSISTENCE SLICE / 23B ACTIVE/PARTIAL**.
 
+## Current native v16: explicit initial NPC mining manifest (2026-10-06)
+
+The current schema/file/runtime is v16 (`m22.8.generated-campaign.v16`). Root payload framing
+is unchanged. New games use `stage23b.freight-initial-mining-reserve.v1`: one existing spare
+Union ownership slot starts with the authored strategic mining fit and its eight-million-kilogram
+ore hold. It remains NPC capital; the ordinary cargo starter, fleet count, assigned orders,
+warehouse stock and treasuries are preserved. This is an explicit new-game loadout choice,
+not a free refit of a running historical ship. The BASELINE policy retains the old manifest.
+
+Native v1–v15 cannot declare the mining manifest. Genuine old manifests remain exact during
+adoption and restore; loading never creates a miner, installs equipment or runs bootstrap.
+Supply-contract predicate admission still begins at v15, and paid-refit/custody rights at v14.
+The older version declarations below describe their historical slices.
+
 ## Current native v14: paid refit and equipment rights (2026-10-06)
 
 Current schema/file/runtime v14 supersedes the historical v13/v12 entries below. Refits support

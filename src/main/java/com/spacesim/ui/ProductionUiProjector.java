@@ -556,11 +556,18 @@ public final class ProductionUiProjector {
 
     private static String overlaySubjectName(GeneratedWorldUiSnapshot world, String id) {
         String prefix = "StarSystemId[value=";
-        if (id.startsWith(prefix) && id.endsWith("]")) {
+        int closing = id.indexOf(']', prefix.length());
+        if (id.startsWith(prefix) && closing >= prefix.length()) {
             try {
-                long value = Long.parseLong(id.substring(prefix.length(), id.length() - 1));
-                return world.galaxy().systems().stream().filter(system -> system.id().value() == value)
+                long value = Long.parseLong(id.substring(prefix.length(), closing));
+                String systemName = world.galaxy().systems().stream().filter(system -> system.id().value() == value)
                         .map(system -> system.name()).findFirst().orElse("Неизвестная система");
+                if (closing == id.length() - 1) return systemName;
+                var object = id.substring(closing + 1).split(":", 3);
+                if (object.length != 3 || !object[0].isEmpty()) return systemName;
+                String objectName = world.localObjects().stream().filter(row -> row.stableId().equals(object[2]))
+                        .map(row -> row.name()).findFirst().orElse(label(object[2]));
+                return systemName + " — " + objectName;
             } catch (NumberFormatException invalid) { return "Неизвестная система"; }
         }
         if (id.startsWith("faction.")) return factionName(world, id);

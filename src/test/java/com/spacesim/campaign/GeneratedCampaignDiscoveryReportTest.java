@@ -148,7 +148,11 @@ class GeneratedCampaignDiscoveryReportTest {
         var c = FoundedCampaignFixture.restore(); var coordinator = c.coordinator(); var r = coordinator.runtime();
         var fleet = r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
         var endpoint = r.infrastructure().endpoints().stream().filter(e -> e.systemId().equals(fleet.systemId())).findFirst().orElseThrow();
-        String faction = coordinator.actors().capture().get(0).factionContentId();
+        var target = new StaticObjectRef(endpoint.systemId(), StaticObjectKind.INFRASTRUCTURE, endpoint.stationId());
+        // Own station archives now exist at creation; reconnaissance needs a genuinely unknown target.
+        String faction = coordinator.actors().capture().stream().map(actor -> actor.factionContentId())
+                .filter(owner -> r.discoveryState().knowledgeFor(owner).discoveryState(target) == DiscoveryState.UNKNOWN)
+                .findFirst().orElseThrow();
         long tick = r.world().getAuthoritativeWorldTick();
         // Explicit NPC/causal posting fixture, not a claim of authored generated opportunities.
         var fact = new NpcKnowledgeFact("fact.test.recon", endpoint.stationId(), KnowledgeKind.DISCOVERY,
@@ -156,7 +160,10 @@ class GeneratedCampaignDiscoveryReportTest {
         var npc = new NpcState("npc.test.recon", "Разведчик", NpcRole.EXPLORATION_INTELLIGENCE,
                 faction, remote ? r.world().getTopology().systems().stream().map(s -> s.id())
                         .filter(s -> !s.equals(fleet.systemId())).findFirst().orElseThrow() : fleet.systemId(), availability, List.of(fact));
-        var service = coordinator.npcMissionService(); service.installNpcRoster(List.of(npc));
+        // Isolate this explicit reconnaissance roster instead of replacing production dispatchers.
+        var service = new com.spacesim.world.Stage21HNpcMissionService(
+                com.spacesim.world.Stage21HNpcMissionState.empty(tick));
+        service.installNpcRoster(List.of(npc));
         var economy = r.world().findFactionEconomicState(faction).orElseThrow();
         long missing = Math.max(0, 1000 - Math.max(0, economy.treasuryMilliCredits() - economy.treasuryReserveFloorMilliCredits()));
         if (missing > 0) assertTrue(r.world().transferToFactionTreasury(faction, new WalletComponent(missing),
@@ -166,6 +173,15 @@ class GeneratedCampaignDiscoveryReportTest {
                 coordinator.operations(), npc.npcId(), MissionTemplate.SYSTEM_OBJECT_RECONNAISSANCE,
                 new MissionObjective(ObjectiveAuthority.DISCOVERY, ObjectiveKind.DISCOVERY_AT_LEAST, endpoint.stationId(),
                         fleet.systemId().value(), 0, "INFRASTRUCTURE:KNOWN_STATIC_LOCATION"), List.of(fact.factId()), tick + 100, 1000);
-        return c;
+        var checkpoint = c.captureState();
+        var stage21 = GeneratedCampaignAuthorityCheckpoint.capture(coordinator.session(), coordinator.actors(), coordinator.strategicIntents(),
+                coordinator.diplomacy(), coordinator.warfare(), coordinator.commands(), coordinator.operations(), coordinator.transitions(),
+                coordinator.recovery(), service.snapshot());
+        return Stage228CampaignAuthority.restore(new com.spacesim.persistence.Stage228GeneratedCampaignPersistentState(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION, stage21,
+                checkpoint.smallCraft(), checkpoint.hangars(), checkpoint.flightDeck(), checkpoint.operations(), checkpoint.playerState(),
+                checkpoint.playerJournal(), checkpoint.moduleCustody(), checkpoint.repairQueue(), checkpoint.refitQueue(),
+                checkpoint.moduleTransfers(), checkpoint.productTransfers(), checkpoint.yardConstruction()));
     }
 }

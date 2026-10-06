@@ -4,7 +4,7 @@ import com.spacesim.persistence.Stage21IGeneratedWorldRuntimePersistentState;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec;
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 
-/** Seed-one baseline stored as private bytes; callers receive independent checkpoint graphs. */
+/** Historical freight baseline stored as private bytes; callers receive independent checkpoint graphs. */
 public final class GeneratedCampaignFixture {
     private GeneratedCampaignFixture() { }
 
@@ -26,6 +26,7 @@ public final class GeneratedCampaignFixture {
 
     private static final class Baseline {
         private static final byte[] BYTES = Stage228GeneratedCampaignPersistenceCodec.encode(
-                Stage228CampaignAuthority.create(1L).captureState());
+                Stage228CampaignAuthority.create(1L, java.util.List.of(),
+                        com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE).captureState());
     }
 }

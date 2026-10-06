@@ -2,7 +2,7 @@ package com.spacesim.campaign;
 
 import com.spacesim.persistence.Stage228GeneratedCampaignPersistentState;
 
-/** Immutable seed-one baseline; every command test receives independent restored owners. */
+/** Historical freight baseline; every command test receives independent restored owners. */
 final class FoundedCampaignFixture {
     private FoundedCampaignFixture() { }
 
@@ -14,7 +14,9 @@ final class FoundedCampaignFixture {
         private static final Stage228GeneratedCampaignPersistentState STATE = create();
 
         private static Stage228GeneratedCampaignPersistentState create() {
-            var campaign = Stage228CampaignAuthority.create(1L);
+            // These command and migration fixtures predate the v16 mining reserve manifest.
+            var campaign = Stage228CampaignAuthority.create(1L, java.util.List.of(),
+                    com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
             campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());
             return campaign.submitPlayerFactionFoundation(
                     campaign.previewPlayerFactionFoundation("faction.player", "Содружество")).captureState();

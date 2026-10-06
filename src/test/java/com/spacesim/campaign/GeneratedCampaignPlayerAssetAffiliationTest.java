@@ -37,7 +37,8 @@ class GeneratedCampaignPlayerAssetAffiliationTest {
         var adopted=Stage20FreightPersistenceCodec.decode(old);assertEquals(Stage20FreightPersistentState.CURRENT_VERSION,adopted.schemaVersion());
         assertTrue(adopted.freighters().stream().allMatch(f->f.legalFactionId().equals(f.stableFactionId())));
         assertArrayEquals(bytes,old);assertEquals(adopted,Stage20FreightPersistenceCodec.decode(Stage20FreightPersistenceCodec.encode(adopted)));
-        var fresh=Stage228CampaignAuthority.create(1).coordinator().runtime().freight().capture();assertEquals(fresh,adopted);
+        var fresh=Stage228CampaignAuthority.create(1, java.util.List.of(),
+                Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE).coordinator().runtime().freight().capture();assertEquals(fresh,adopted);
         var f=adopted.freighters().get(0);var fake=new Stage20FreightPersistentState.FreighterState(f.fleetId(),f.stableFactionId(),f.ownershipOrdinal(),f.hullId(),f.fitId(),f.cargoCapacityKg(),f.currentSystemId(),f.physicalState(),f.phase(),f.activeOrderId(),f.routeIndex(),f.cargoStorage(),OWN);
         var fleets=new java.util.ArrayList<>(adopted.freighters());fleets.set(0,fake);
         assertThrows(IllegalArgumentException.class,()->new Stage20FreightPersistentState(2,adopted.rootSeed(),adopted.generatorVersion(),adopted.worldFingerprint(),adopted.materializationVersion(),adopted.compatibilityAuthorityVersion(),adopted.nextFleetIdValue(),adopted.nextCargoLotOrdinal(),fleets,adopted.cargoLots(),adopted.orders()));

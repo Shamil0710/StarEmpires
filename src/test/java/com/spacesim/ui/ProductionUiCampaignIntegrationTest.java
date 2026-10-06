@@ -36,7 +36,11 @@ final class ProductionUiCampaignIntegrationTest {
         assertFalse(projected.rows(Tab.INTELLIGENCE).isEmpty());
         assertTrue(projected.rows(Tab.INTELLIGENCE).stream().noneMatch(row -> row.name().contains("StarSystemId[")),
                 "territorial labels should use actual system names");
-        assertTrue(projected.rows(Tab.CONTACTS).isEmpty(), "no synthetic NPCs/contracts in migrated fresh state");
+        assertFalse(projected.rows(Tab.CONTACTS).isEmpty(), "New campaigns contain real archived civilian dispatchers");
+        for (var row : projected.rows(Tab.CONTACTS)) {
+            assertTrue(coordinator.npcMissions().npcs().stream().anyMatch(npc -> npc.factionContentId().equals(observer)
+                    && row.selection().stableId().startsWith("npc:" + npc.npcId() + ":")), "Only the observer's real roster may be projected");
+        }
         assertTrue(projected.rows(Tab.HISTORY).isEmpty(), "no fake events");
         for (var faction : projected.rows(Tab.FACTIONS)) {
             boolean economyShown = faction.sections().stream().anyMatch(section -> section.title().equals("Экономика и территория"));

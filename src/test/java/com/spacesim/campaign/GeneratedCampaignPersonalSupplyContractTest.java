@@ -15,7 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPersonalSupplyContractTest {
     @Test void exactExternalDeliveryPaysHeldEscrowOnceWhileLocalResaleCannotClaimIt() throws Exception {
-        var campaign = Stage228CampaignAuthority.create(1);
+        // Use the historical manifest so a fake v14 header isolates the supply-predicate guard.
+        var campaign = Stage228CampaignAuthority.create(1, List.of(),
+                com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
         campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());
         var runtime = campaign.coordinator().runtime(); var world = runtime.world();
         var playerFleet = campaign.playerState().orElseThrow().activeFleetId();
@@ -64,7 +66,9 @@ class GeneratedCampaignPersonalSupplyContractTest {
                 coordinator.diplomacy(), coordinator.warfare(), coordinator.commands(), coordinator.operations(), coordinator.transitions(),
                 coordinator.recovery(), service.snapshot());
         var base = campaign.captureState();
-        var savedContract = new com.spacesim.persistence.Stage228GeneratedCampaignPersistentState(15, "m22.8.generated-campaign.v15",
+        var savedContract = new com.spacesim.persistence.Stage228GeneratedCampaignPersistentState(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
                 stage21, base.smallCraft(), base.hangars(), base.flightDeck(), base.operations(), base.playerState(), base.playerJournal(),
                 base.moduleCustody(), base.repairQueue(), base.refitQueue(), base.moduleTransfers(), base.productTransfers(), base.yardConstruction());
         var encoded = com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.encode(savedContract);
