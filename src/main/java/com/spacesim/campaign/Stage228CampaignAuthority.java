@@ -773,6 +773,7 @@ public final class Stage228CampaignAuthority {
                                 .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum() : 0),
                 p.action.equals("PURCHASE") || p.action.equals("SWITCH") ? new FleetId(Long.parseLong(p.station))
                         : p.action.equals("CAPITALIZE") || p.action.equals("WITHDRAW") ? null : beforeFleet);
+        if (p.action.equals("DOCK")) notifyContactedSupplyOffers(false);
         return playerState;
     }
 
@@ -1519,6 +1520,7 @@ public final class Stage228CampaignAuthority {
             advancePersonalRepairsAtTick(tick);
             advanceModuleTransfersAtTick(tick, handlingBudgets);
             reconcilePlayerMissionsAtTick(tick);
+            notifyContactedSupplyOffers(true);
         });
     }
 
@@ -1551,6 +1553,7 @@ public final class Stage228CampaignAuthority {
             advancePersonalRepairsAtTick(tick);
             advanceModuleTransfersAtTick(tick, handlingBudgets);
             reconcilePlayerMissionsAtTick(tick);
+            notifyContactedSupplyOffers(true);
         });
     }
 
@@ -1697,6 +1700,24 @@ public final class Stage228CampaignAuthority {
             case REJECT -> service.rejectMission(coordinator.runtime().world(), missionId);
             case CANCEL -> service.cancelMission(coordinator.runtime().world(), missionId);
         };
+    }
+
+    private void notifyContactedSupplyOffers(boolean createdThisTickOnly) {
+        if (playerState == null) return;
+        long tick = coordinator.runtime().world().getAuthoritativeWorldTick();
+        for (var mission : coordinator.npcMissions().missions()) {
+            if (mission.status() != com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
+                    || mission.objective().kind() != com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
+                    || !mission.issuerNpcId().startsWith("npc.stage23b.dispatcher:")
+                    || mission.deadlineTick() < tick
+                    || (createdThisTickOnly && mission.createdTick() != tick)
+                    || !canContactNpc(mission.issuerNpcId())) continue;
+            // A contact is a real event. Repeated ticks, preview and restore are not new contacts.
+            if (playerJournal.entries().stream().anyMatch(e -> e.tick() == tick
+                    && e.action().equals("SUPPLY_OFFER_AVAILABLE") && e.subject().equals(mission.missionId()))) continue;
+            recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.MISSION_CHANGED, "SUPPLY_OFFER_AVAILABLE",
+                    mission.objective().subjectId(), mission.missionId(), mission.objective().threshold(), 0, playerState.activeFleetId());
+        }
     }
 
     private void reconcilePlayerMissionsAtTick(long tick) {

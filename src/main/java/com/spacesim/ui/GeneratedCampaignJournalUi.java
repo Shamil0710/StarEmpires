@@ -37,7 +37,7 @@ public final class GeneratedCampaignJournalUi {
             var e = journal.entries().get(i);
             boolean unread = e.sequence() > journal.acknowledgedThroughSequence();
             String measure = e.action().equals("BUY") || e.action().equals("SELL") || e.action().equals("LOAD_CONSUMABLE")
-                    || e.action().equals("YARD_MATERIAL_DELIVERED")
+                    || e.action().equals("YARD_MATERIAL_DELIVERED") || e.action().equals("SUPPLY_OFFER_AVAILABLE")
                     ? " кг" : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
                     || e.action().equals("LOAD_PRODUCT") || e.action().equals("UNLOAD_PRODUCT")
                     || e.action().equals("PRODUCT_TRANSFER_COMPLETED") ? " шт."
@@ -69,6 +69,7 @@ public final class GeneratedCampaignJournalUi {
             default -> "Добыча остановлена: извлечение недоступно";
         };
         if (e.kind() == PlayerJournalState.Kind.MISSION_CHANGED) return switch (e.action()) {
+            case "SUPPLY_OFFER_AVAILABLE" -> "Диспетчер предлагает оплачиваемую поставку";
             case "COMPLETED" -> "Контракт выполнен";
             case "FAILED" -> "Контракт завершён неудачей";
             case "EXPIRED" -> "Срок контракта истёк";

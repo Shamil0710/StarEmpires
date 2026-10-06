@@ -47,6 +47,7 @@ class GeneratedCampaignNpcSupplyOffersTest {
         var offered = campaign.captureState();
         assertEquals(offered, Stage228CampaignAuthority.restore(offered).captureState());
         verifySupplyPortionAndCircularTrade(offered, mission, npc.npcId());
+        verifyNewOfferDuringContact(offered, mission, npc.npcId());
         GeneratedCampaignNpcSupplyOffers.offer(coordinator, npc.npcId(), observations);
         assertEquals(offered, campaign.captureState());
         coordinator.npcMissionService().rejectMission(runtime.world(), mission.missionId());
@@ -65,8 +66,28 @@ class GeneratedCampaignNpcSupplyOffersTest {
         var campaign = Stage228CampaignAuthority.restore(offered); var runtime = campaign.coordinator().runtime();
         var npc = campaign.coordinator().npcMissions().npcs().stream().filter(n -> n.npcId().equals(npcId)).findFirst().orElseThrow();
         String posting = npc.knowledge().stream().filter(k -> k.factId().equals(npcId + ":posting")).findFirst().orElseThrow().subjectId();
+        assertFalse(campaign.playerJournal().entries().stream().anyMatch(e -> e.action().equals("SUPPLY_OFFER_AVAILABLE")),
+                "Remote NPC knowledge must not issue personal notifications");
         dockWithExplicitTravelGeometry(campaign, posting);
         assertTrue(campaign.canContactNpc(npcId));
+        var notice = campaign.playerJournal().entries().stream().filter(e -> e.action().equals("SUPPLY_OFFER_AVAILABLE")).findFirst().orElseThrow();
+        assertEquals(proposal.missionId(), notice.subject());
+        assertEquals(proposal.objective().subjectId(), notice.endpoint());
+        assertEquals(proposal.objective().threshold(), notice.quantity());
+        assertEquals(0, notice.walletDeltaMilliCredits());
+        assertEquals(runtime.world().getAuthoritativeWorldTick(), notice.tick());
+        assertTrue(com.spacesim.ui.GeneratedCampaignJournalUi.rows(campaign).stream()
+                .anyMatch(row -> row.name().equals("Диспетчер предлагает оплачиваемую поставку")));
+        var contacted = campaign.captureState();
+        var reloaded = Stage228CampaignAuthority.restore(com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.decode(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.encode(contacted)));
+        assertEquals(contacted, reloaded.captureState(), "Reload must preserve the notice without replaying contact");
+        var acknowledge = reloaded.previewPilotAction("ACKNOWLEDGE_JOURNAL", Long.toString(reloaded.playerJournal().nextSequence() - 1), "", 0);
+        assertTrue(acknowledge.allowed()); assertEquals(contacted, reloaded.captureState());
+        reloaded.submitPilotAction(acknowledge);
+        advanceOneTick(reloaded);
+        assertEquals(0, reloaded.playerJournal().unreadCount(), "Remaining docked must not repeat acknowledged offers");
+        assertEquals(1, reloaded.playerJournal().entries().stream().filter(e -> e.action().equals("SUPPLY_OFFER_AVAILABLE")).count());
         var baseline = campaign.captureState();
         var accept = campaign.previewMissionCommand(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.ACCEPT, proposal.missionId(), 1);
         assertTrue(accept.allowed()); assertEquals(baseline, campaign.captureState(), "Preview cannot move escrow");
@@ -97,6 +118,40 @@ class GeneratedCampaignNpcSupplyOffersTest {
                 campaign.playerJournal().entries().stream().filter(e -> e.sequence() >= journal).mapToLong(e -> e.walletDeltaMilliCredits()).sum());
         var saved = campaign.captureState(); assertEquals(saved, Stage228CampaignAuthority.restore(saved).captureState());
     }
+    private static void verifyNewOfferDuringContact(com.spacesim.persistence.Stage228GeneratedCampaignPersistentState offered,
+            com.spacesim.world.Stage21HNpcMissionState.MissionContract proposal, String npcId) {
+        var campaign = Stage228CampaignAuthority.restore(offered);
+        var coordinator = campaign.coordinator(); var runtime = coordinator.runtime();
+        var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(npcId)).findFirst().orElseThrow();
+        String posting = npc.knowledge().stream().filter(k -> k.factId().equals(npcId + ":posting")).findFirst().orElseThrow().subjectId();
+        dockWithExplicitTravelGeometry(campaign, posting);
+        coordinator.npcMissionService().rejectMission(runtime.world(), proposal.missionId());
+        long sequence = campaign.playerJournal().nextSequence();
+        long wallet = campaign.playerState().orElseThrow().walletMilliCredits();
+        // Explicit funded offer fixture isolates notification of issuance during an existing contact.
+        coordinator.setPaused(false);
+        campaign.advanceFrame(coordinator.session().fixedStepSeconds(), tick -> {
+            coordinator.npcMissionService().offerMission(runtime.world(), runtime.freight().capture(),
+                    runtime.captureState().campaign().industrialState(), runtime.discoveryState().knowledgeFor(npc.factionContentId()),
+                    coordinator.operations(), npcId, proposal.template(), proposal.objective(), proposal.sourceKnowledgeFactIds(),
+                    tick + 100, proposal.rewardMilliCredits());
+            return java.util.Map.of();
+        });
+        coordinator.setPaused(true);
+        assertEquals(sequence + 1, campaign.playerJournal().nextSequence());
+        var notice = campaign.playerJournal().entries().get(campaign.playerJournal().entries().size() - 1);
+        assertEquals("SUPPLY_OFFER_AVAILABLE", notice.action());
+        assertNotEquals(proposal.missionId(), notice.subject());
+        assertEquals(runtime.world().getAuthoritativeWorldTick(), notice.tick());
+        assertEquals(wallet, campaign.playerState().orElseThrow().walletMilliCredits(), "Offer notice must not pay escrow");
+        var saved = campaign.captureState();
+        var loaded = Stage228CampaignAuthority.restore(com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.decode(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.encode(saved)));
+        assertEquals(saved, loaded.captureState());
+        advanceOneTick(loaded);
+        assertEquals(sequence + 1, loaded.playerJournal().nextSequence(), "The following tick cannot replay issuance");
+    }
+
     private static void advanceOneTick(Stage228CampaignAuthority campaign) {
         campaign.coordinator().setPaused(false); campaign.advanceFrame(campaign.coordinator().session().fixedStepSeconds());
         campaign.coordinator().setPaused(true);
@@ -114,6 +169,9 @@ class GeneratedCampaignNpcSupplyOffersTest {
         if (local.physicalState(fleet.localEntityId()).isEmpty()) local.registerPhysicalState(fleet.localEntityId(), com.spacesim.world.LocalPhysicalKinematics.stationary(endpoint.position()));
         local.updatePhysicalState(fleet.localEntityId(), com.spacesim.world.LocalPhysicalKinematics.stationary(endpoint.position()));
         advanceOneTick(campaign);
-        campaign.submitPilotAction(campaign.previewPilotAction("DOCK", stationId, "", 0));
+        var beforeDock = campaign.captureState();
+        var dock = campaign.previewPilotAction("DOCK", stationId, "", 0);
+        assertTrue(dock.allowed()); assertEquals(beforeDock, campaign.captureState(), "Dock preview cannot issue notices");
+        campaign.submitPilotAction(dock);
     }
 }
