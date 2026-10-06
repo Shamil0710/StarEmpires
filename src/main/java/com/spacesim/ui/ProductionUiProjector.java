@@ -22,7 +22,10 @@ public final class ProductionUiProjector {
     private static final com.spacesim.ship.ProductionEngineeringRuntimeResolver PERSONAL_ENGINEERING =
             new com.spacesim.ship.ProductionEngineeringRuntimeResolver();
     private final String viewerFactionId;
+    private final boolean personalClient;
     private final Stage21IFinalLivingWorldUiProjector living = new Stage21IFinalLivingWorldUiProjector();
+    private Stage228CampaignAuthority boundPersonalCampaign;
+    private GeneratedWorldUiModel personalWorld;
 
     /**
      * Binds a known actor as a knowledge viewer without transferring control.
@@ -30,8 +33,18 @@ public final class ProductionUiProjector {
      * @param viewerFactionId existing actor whose bounded observations are projected
      */
     public ProductionUiProjector(String viewerFactionId) {
+        this(viewerFactionId, false);
+    }
+
+    private ProductionUiProjector(String viewerFactionId, boolean personalClient) {
         this.viewerFactionId = Objects.requireNonNull(viewerFactionId).strip();
         if (this.viewerFactionId.isEmpty()) throw new IllegalArgumentException("viewer faction is empty");
+        this.personalClient = personalClient;
+    }
+
+    /** @return a client bound to the human actor, including the state before character creation */
+    public static ProductionUiProjector personalClient() {
+        return new ProductionUiProjector(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, true);
     }
 
     /**
@@ -49,15 +62,32 @@ public final class ProductionUiProjector {
      * Captures the client view with an explicit transient character-creation invitation.
      * Ordinary two-argument capture projects durable world information and remains exact on restore.
      * @param campaign current campaign authority
-     * @param world current read-only world projection
+     * @param sourceWorld current read-only world projection
      * @param includeNewGameOffer whether the client is showing fresh character creation
      * @return projection with the invitation only while the authoritative new-game gate permits it
      */
-    public ProductionUiSnapshot capture(Stage228CampaignAuthority campaign, GeneratedWorldUiSnapshot world,
+    public ProductionUiSnapshot capture(Stage228CampaignAuthority campaign, GeneratedWorldUiSnapshot sourceWorld,
             boolean includeNewGameOffer) {
         Objects.requireNonNull(campaign);
         var checkpoint = campaign.captureState();
-        var bounded = living.project(checkpoint.stage21Runtime().stage21HRuntime(), viewerFactionId);
+        var personal = campaign.playerState().orElse(null);
+        boolean personalView = personalClient || personal != null;
+        if (personalView) {
+            if (boundPersonalCampaign != campaign) {
+                boundPersonalCampaign = campaign;
+                personalWorld = new GeneratedWorldUiModel(campaign.coordinator().rootSeed(), campaign.coordinator().runtime(),
+                        campaign.coordinator().content(), GeneratedWorldUiModel.CarrierUiSource.none(),
+                        () -> campaign.playerState().orElse(null));
+            }
+        }
+        var world = personalView ? personalWorld.restrictToPersonalKnowledge(sourceWorld) : sourceWorld;
+        String authorizedFaction = personal == null ? personalView ? null : viewerFactionId : personal.factionContentId();
+        var actors = campaign.coordinator().actors().capture();
+        var bounded = !personalView || authorizedFaction != null && actors.stream()
+                .anyMatch(a -> a.factionContentId().equals(authorizedFaction))
+                ? living.project(checkpoint.stage21Runtime().stage21HRuntime(), authorizedFaction)
+                : new Stage21ILivingWorldUiSnapshot(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID,
+                        world.worldTick(), List.of(), List.of(), List.of(), List.of(), List.of());
         EnumMap<Tab, List<Row>> rows = compose(world, bounded);
         var settings = new ArrayList<>(rows.get(Tab.SETTINGS));
         if (includeNewGameOffer && campaign.canStartIndependentPilot()) {
@@ -274,22 +304,21 @@ public final class ProductionUiProjector {
             var active = runtime.world().findFleet(player.activeFleetId()).orElseThrow();
             if (active.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return;
             for (var offered : runtime.freight().capture().freighters()) {
-                var placement = runtime.world().findFleet(offered.fleetId()).orElseThrow();
-                if (player.ownedFleetIds().contains(offered.fleetId()) || offered.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
-                        || offered.cargoMassKg() != 0d || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
-                        || !placement.systemId().equals(active.systemId()) || runtime.world().findFleetJump(offered.fleetId()).isPresent()) continue;
+                if (!campaign.canViewPersonalReserveOffer(offered.fleetId())) continue;
                 craftRows.add(row("pilot-reserve|" + offered.fleetId().value(), "Резервный грузовой корабль " + offered.fleetId().value(),
                         "Покупка существующих кораблей", "Требуется местный док продавца",
                         List.of(InfoSection.of("Предложение корпуса", "Цена", credits(Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS),
                                 "Продавец", factionName(world, offered.stableFactionId()), "Трюм", offered.cargoCapacityKg() + " кг",
+                                "Назначение", com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT
+                                        .equals(offered.fitId()) ? "Добыча свободных тел и перевозка руды" : "Перевозка грузов",
                                 "Оплата", "Личный кошелёк → казна продавца", "Условия", "Стыковка у местной станции продавца; существующий свободный пустой корпус",
                                 "После покупки", "Активный корабль сохраняется; для смены управления отстыкуйтесь и остановитесь")),
-                        "Свободный пустой корпус в текущей системе; местный продавец и оплата в его казну",
-                        placement.systemId(), offered.fleetId().value(), world.worldTick()));
+                        "Предложение действующего оператора при физической стыковке; координаты корпуса не раскрываются",
+                        null, 0, world.worldTick()));
             }
         });
         for (var craft : checkpoint.smallCraft().craft()) {
-            if (!craft.stableFactionId().equals(viewerFactionId)) continue;
+            if (!craft.stableFactionId().equals(authorizedFaction)) continue;
             var assignment = checkpoint.hangars().assignments().stream()
                     .filter(item -> item.craftId().equals(craft.id())).findFirst();
             var missions = checkpoint.operations().missions().stream()
@@ -316,7 +345,7 @@ public final class ProductionUiProjector {
         industry.addAll(GeneratedCampaignRepairUi.rows(campaign));
         industry.addAll(GeneratedCampaignRefitUi.rows(campaign));
         for (var demand : campaign.coordinator().recovery().replacementDemands()) {
-            if (!demand.factionContentId().equals(viewerFactionId)) continue;
+            if (!demand.factionContentId().equals(authorizedFaction)) continue;
             industry.add(row("replacement:" + demand.id(), "Замещение потерянного корабля",
                     "Замещение", label(demand.status().name()),
                     List.of(InfoSection.of("План замещения", "Состояние", label(demand.status().name()),
@@ -328,7 +357,7 @@ public final class ProductionUiProjector {
         rows.put(Tab.INDUSTRY, List.copyOf(industry));
         var contacts = new ArrayList<>(rows.get(Tab.CONTACTS));
         for (var reputation : campaign.coordinator().npcMissions().reputations()) {
-            if (!reputation.subjectActorId().equals(viewerFactionId)) continue;
+            if (!reputation.subjectActorId().equals(authorizedFaction)) continue;
             contacts.add(row("reputation:" + reputation.ownerId(), "Репутация у «" + label(reputation.ownerId()) + "»",
                     "Репутация", Integer.toString(reputation.derivedValue()),
                     List.of(InfoSection.of("Отношение", "Репутация", Integer.toString(reputation.derivedValue()),
@@ -392,7 +421,9 @@ public final class ProductionUiProjector {
                         row.provenance(), system, row.focusFleet(), row.chronologicalTick());
             }).toList());
         }
-        return new ProductionUiSnapshot(world.worldTick(), factionName(world, viewerFactionId), rows);
+        return new ProductionUiSnapshot(world.worldTick(), !personalView ? factionName(world, viewerFactionId)
+                : personal == null ? "Создайте пилота"
+                : authorizedFaction == null ? "Независимый пилот" : factionName(world, authorizedFaction), rows);
     }
 
     /**

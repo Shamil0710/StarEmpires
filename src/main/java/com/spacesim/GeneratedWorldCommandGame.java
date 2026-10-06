@@ -84,10 +84,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
                 com.spacesim.ui.GeneratedWorldUiModel.CarrierUiSource.none(), () -> campaign.playerState().orElse(null));
         snapshot = model.capture();
-        // A knowledge viewer is not player ownership. No ship, wallet or control is granted here.
-        String viewer = coordinator.actors().capture().stream()
-                .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow();
-        projector = new ProductionUiProjector(viewer);
+        projector = ProductionUiProjector.personalClient();
         refreshProjection();
     }
 
@@ -722,8 +719,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             var nextModel = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
                     com.spacesim.ui.GeneratedWorldUiModel.CarrierUiSource.none(), () -> candidate.playerState().orElse(null));
             var nextSnapshot = nextModel.capture();
-            var nextProjector = new ProductionUiProjector(coordinator.actors().capture().stream()
-                    .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow());
+            var nextProjector = ProductionUiProjector.personalClient();
             var nextProjection = nextProjector.capture(candidate, nextSnapshot, true);
             pendingMissionPreview = null;
             pendingPilotStart = null;

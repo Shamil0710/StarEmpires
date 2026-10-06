@@ -393,16 +393,21 @@ public class Stage23BSoftwareGraphicsSmoke {
   processor.keyDown(Input.Keys.F5);game.render();int pilotMoves=0;
   while(!workspace.view().selection().stableId().equals("pilot-station|"+endpoint.stationId())){
    processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Personal station unreachable");}
-  keyboardAction(renderer,game,"focus");
-  if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
-          ||!workspace.view().selection().stableId().equals("station:"+endpoint.stationId()))throw new AssertionError("Station focus failed");
-  processor.keyDown(Input.Keys.F5);game.render();pilotMoves=0;
-  while(!workspace.view().selection().stableId().equals("pilot-station|"+endpoint.stationId())){
-   processor.keyDown(Input.Keys.DOWN);game.render();if(++pilotMoves>100)throw new AssertionError("Personal station unreachable");}
+  var projectionField=game.getClass().getDeclaredField("production");projectionField.setAccessible(true);
+  var projected=(com.spacesim.ui.ProductionUiSnapshot)projectionField.get(game);
+  var stationRow=projected.rows(com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.LOGISTICS).stream()
+    .filter(r->r.selection().stableId().equals("pilot-station|"+endpoint.stationId())).findFirst().orElseThrow();
+  boolean archived=pilotRuntime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .entries().stream().anyMatch(k->k.object().objectId().equals(endpoint.stationId())&&k.knownLocation().isPresent());
+  if(archived!=(stationRow.focusSystem()!=null))throw new AssertionError("Station navigation did not respect personal archive");
   keyboardAction(renderer,game,"pilot.dock");
   if(pilotCampaign.playerState().orElseThrow().docked())throw new AssertionError("Dock preview mutated state");
   keyboardAction(renderer,game,"pilot.physical-confirm");
   if(!pilotCampaign.playerState().orElseThrow().docked())throw new AssertionError("Dock confirmation failed");
+  keyboardAction(renderer,game,"focus");
+  if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+          ||!workspace.view().selection().stableId().equals("station:"+endpoint.stationId()))throw new AssertionError("Visited station focus failed");
+  processor.keyDown(Input.Keys.F5);game.render();
   processor.keyDown(Input.Keys.SPACE);for(int i=0;i<10;i++)game.render();
   for(int i=0;i<30;i++){processor.keyDown(Input.Keys.UP);game.render();}
   pilotMoves=0;while(!workspace.view().selection().stableId().equals("pilot-market|"+endpoint.stationId()+"|"+water)){
@@ -540,6 +545,8 @@ public class Stage23BSoftwareGraphicsSmoke {
           &&e.stationArchetypeId().equals("station.infrastructure.refinery_complex")).findFirst().orElseThrow();
   // Explicit docking geometry fixture; market stock, cash, cargo and UI sale remain ordinary authority.
   sellRuntime.arrival().materialization(destination).updatePhysicalState(sellFleet.localEntityId(),com.spacesim.world.LocalPhysicalKinematics.stationary(buyer.position()));
+  // The personal contact is new; allow the normal quarter-second panel refresh on the paused campaign.
+  for(int i=0;i<20;i++)game.render();
   processor.keyDown(Input.Keys.F5);game.render();selectRow(workspace,game,"pilot-station|"+buyer.stationId());
   keyboardAction(renderer,game,"pilot.dock");keyboardAction(renderer,game,"pilot.physical-confirm");
   selectRow(workspace,game,"pilot-market|"+buyer.stationId()+"|"+water);screenshot("stage23b-destination-market");

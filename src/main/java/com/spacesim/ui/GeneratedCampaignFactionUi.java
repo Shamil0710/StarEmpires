@@ -18,6 +18,7 @@ public final class GeneratedCampaignFactionUi {
      */
     public record Action(String id, String label) { }
     private static final String PREFIX = "player-government|";
+    private record Counterparty(String factionId, String displayName) { }
     private static final String[] DOCTRINE = {"Торговая открытость","Приоритет безопасности","Стремление к расширению","Чувствительность к суверенитету","Договорная дисциплина","Интервенционизм","Экономическая устойчивость"};
     private static final String[] FISCAL = {"Налог собственных станций","Сбор с иностранных станций","Резерв казны","Резерв кошелька станции","Поддержка станции за решение","Строительные инвестиции за решение"};
 
@@ -31,6 +32,13 @@ public final class GeneratedCampaignFactionUi {
         var player=c.playerState().orElse(null);
         if(player==null||!player.affiliated())return List.of();
         var world=c.coordinator().runtime().world();String own=player.factionContentId();
+        var publicCounterparties=new java.util.TreeMap<String,Counterparty>();
+        for(var definition:c.coordinator().content().getFactions())
+            if(world.findFactionEconomicState(definition.id()).isPresent())
+                publicCounterparties.put(definition.id(),new Counterparty(definition.id(),definition.displayName()));
+        for(var identity:world.getWorldFactionIdentities())
+            publicCounterparties.put(identity.stableFactionId(),new Counterparty(identity.stableFactionId(),identity.displayName()));
+        var counterparties=List.copyOf(publicCounterparties.values());
         var rows=new ArrayList<ProductionUiSnapshot.Row>();
         rows.add(row("affiliation", "Регистрация моих активов", "Моя фракция", "Существующие личные активы",
                 InfoSection.of("Явное решение о регистрации", "Последствие", "Правовая регистрация уже принадлежащих кораблей и станций переходит в собственную фракцию", "Сохраняются", "Личное владение, происхождение корпусов, груз, деньги, физическое положение и часы", "Ресурсы и территории", "Не выдаются", "Ограничение", "Только личные неназначенные грузовики; без захвата чужих активов"), null, world.getAuthoritativeWorldTick()));
@@ -41,7 +49,7 @@ public final class GeneratedCampaignFactionUi {
         for(int i=0;i<FISCAL.length;i++)rows.add(row("fiscal|"+i,FISCAL[i],"Мои финансы",fiscalValue(i,fiscal[i]),
                 InfoSection.of("Фискальные ограничения","Текущее значение",fiscalValue(i,fiscal[i]),"Шаг изменения",i<2?"1 процентный пункт":"1 000 кредитов","Действие","Меняет разрешённые будущие потоки; существующие деньги не создаёт"),null,world.getAuthoritativeWorldTick()));
         rows.addAll(GeneratedCampaignStockProductionUi.rows(c));
-        for(var other:snapshot.galaxy().factions()) {
+        for(var other:counterparties) {
             if(other.factionId().equals(own))continue;
             rows.add(row("embargo|"+other.factionId(),"Доступ к рынкам: "+other.displayName(),"Моя дипломатия","Эмбарго или отмена",
                     InfoSection.of("Одностороннее решение","Цель",other.displayName(),"Срок","Бессрочно, до отмены","Последствие","Правовой доступ; без уничтожения товаров и денег"),null,world.getAuthoritativeWorldTick()));
@@ -54,7 +62,7 @@ public final class GeneratedCampaignFactionUi {
         for(var directory:world.getFactionDiplomacyStates())for(var treaty:directory.treaties()) {
             if(!directory.factionContentId().equals(own)&&!treaty.counterpartyFactionContentId().equals(own))continue;
             String other=directory.factionContentId().equals(own)?treaty.counterpartyFactionContentId():directory.factionContentId();
-            String name=snapshot.galaxy().factions().stream().filter(f->f.factionId().equals(other)).map(f->f.displayName()).findFirst().orElse("Контрагент");
+            String name=counterparties.stream().filter(f->f.factionId().equals(other)).map(Counterparty::displayName).findFirst().orElse("Контрагент");
             rows.add(row("treaty-extra|"+treaty.treatyId(),"Изменить договор: "+name,"Мои договоры",treatyStatus(treaty.status()),
                     InfoSection.of("Дополнительные решения","Нарушение","Прекращает права; оставляет договорную претензию","Продление","Новое предложение тех же условий; требуется согласие","Контрпредложение","Отклоняет входящее предложение и предлагает те же условия от нашей стороны"),null,world.getAuthoritativeWorldTick()));
             rows.add(row("treaty|"+treaty.treatyId(),"Договор: "+name,"Мои договоры",treatyStatus(treaty.status()),
@@ -64,7 +72,7 @@ public final class GeneratedCampaignFactionUi {
             var claim=world.findFactionStrategicState(own).orElseThrow().claimFor(system);
             rows.add(row("territory|"+system.value(),"Территориальное решение: "+systemName(snapshot,system),"Моя территория",claim==null?"Своей претензии нет":"Своя претензия заявлена",
                     InfoSection.of("Политическая претензия","Претензия",claim==null?"Нет":"Заявлена; прогресс "+claim.stabilizationTicks()+" тактов","Контроль","Требует стабилизации и присутствия фракции; личное владение кораблём само не меняет регистрацию","Отказ от контроля","Доступен только фактическому владельцу"),system,world.getAuthoritativeWorldTick()));
-            for(var other:snapshot.galaxy().factions())if(!other.factionId().equals(own)) {
+            for(var other:counterparties)if(!other.factionId().equals(own)) {
                 rows.add(row("recognition|"+system.value()+"|"+other.factionId(),"Признание: "+other.displayName()+" / "+systemName(snapshot,system),"Моя территория","Претензия или контроль",
                         InfoSection.of("Политическое признание","Контрагент",other.displayName(),"Основание","Только существующая претензия или контроль; общая проверка"),system,world.getAuthoritativeWorldTick()));
                 rows.add(row("right|"+system.value()+"|"+other.factionId(),"Строительное право: "+other.displayName()+" / "+systemName(snapshot,system),"Моя территория","Предоставить или отозвать",

@@ -128,6 +128,11 @@ public final class GeneratedWorldFreightAutopilot {
                     if (placement != null
                             && placement.locationKind() == FleetLocationKind.IN_SYSTEM
                             && runtime.world().findFleetJump(fleet.fleetId()).isEmpty()) {
+                        var fitted = runtime.world().previewFittedFleetJump(fleet.fleetId());
+                        if (fitted.isPresent() && switch (fitted.orElseThrow().failure()) {
+                            case COOLDOWN_ACTIVE, STORED_ENERGY_UNAVAILABLE, THERMAL_LIMIT -> true;
+                            default -> false;
+                        }) continue;
                         runtime.requestNextRouteHop(fleet.fleetId());
                         jumpsRequested++;
                     }

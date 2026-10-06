@@ -730,6 +730,44 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
+     * Checks a civilian seller's public reserve offer at the player's actual local dock.
+     * This discloses a sale offer, without granting a sensor contact or the offered ship's position.
+     * @param offeredId existing reserve fleet
+     * @return whether the dock operator can disclose this existing empty idle fleet for sale
+     */
+    public boolean canViewPersonalReserveOffer(FleetId offeredId) {
+        if (playerState == null || !playerState.docked() || playerState.activeFleetId() == null
+                || !playerState.ownedFleetIds().contains(playerState.activeFleetId())
+                || playerState.ownedFleetIds().contains(offeredId)) return false;
+        var runtime = coordinator.runtime();
+        var world = runtime.world();
+        var active = world.findFleet(playerState.activeFleetId()).orElse(null);
+        var placement = world.findFleet(offeredId).orElse(null);
+        var offered = runtime.freight().findFreighter(offeredId).orElse(null);
+        if (active == null || placement == null || offered == null
+                || active.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || !placement.systemId().equals(active.systemId())
+                || !playerState.dockedAt().systemId().equals(active.systemId())
+                || world.findFleetJump(active.id()).isPresent() || world.findFleetJump(offeredId).isPresent()
+                || offered.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                || offered.cargoMassKg() != 0d) return false;
+        var endpoint = runtime.infrastructure().endpoints().stream()
+                .filter(e -> e.systemId().equals(active.systemId()))
+                .filter(e -> pilotMarketReference(e.stationId()).filter(playerState.dockedAt()::equals).isPresent())
+                .findFirst().orElse(null);
+        if (endpoint == null) return false;
+        var physical = runtime.arrival().materialization(active.systemId()).physicalState(active.localEntityId()).orElse(null);
+        if (physical == null || physical.position().distanceTo(endpoint.position()) > 1000d
+                || Math.hypot(physical.velocityXMps(), physical.velocityYMps()) > 1d) return false;
+        var seller = world.findSession(active.systemId()).orElseThrow().getEntityRegistry()
+                .find(playerState.dockedAt().entityId());
+        var legal = seller == null ? null : seller.getComponent(com.spacesim.components.FactionComponent.class);
+        var faction = world.findFactionRuntimeId(offered.stableFactionId());
+        return legal != null && faction.isPresent() && legal.factionId == faction.orElseThrow();
+    }
+
+    /**
      * Existing ordinary-state preview used for docking and physical cargo trades.
      * @param action docking, trade, flight, asset, finance, mining, supply, report or manufacturing verb
      * @param stationId endpoint, destination for JUMP, fleet for PURCHASE/SWITCH, or milli-credits for CAPITALIZE/WITHDRAW; ignored by UNDOCK
@@ -1125,23 +1163,10 @@ public final class Stage228CampaignAuthority {
             return;
         }
         if ("PURCHASE".equals(action)) {
-            if (!playerState.docked() || !playerState.dockedAt().systemId().equals(fleet.systemId()))
-                throw new IllegalStateException("An existing local seller dock is required");
             var offeredId = new com.spacesim.world.FleetId(Long.parseLong(stationId));
+            if (!canViewPersonalReserveOffer(offeredId))
+                throw new IllegalStateException("Existing reserve is not offered by this actual local seller dock");
             var offered = runtime.freight().findFreighter(offeredId).orElseThrow();
-            var placement = world.findFleet(offeredId).orElseThrow();
-            var seller = world.findSession(playerState.dockedAt().systemId()).orElseThrow()
-                    .getEntityRegistry().require(playerState.dockedAt().entityId());
-            var legal = seller.getComponent(com.spacesim.components.FactionComponent.class);
-            boolean commissioned = runtime.infrastructure().endpoints().stream()
-                    .filter(e -> e.systemId().equals(fleet.systemId()))
-                    .anyMatch(e -> pilotMarketReference(e.stationId()).filter(playerState.dockedAt()::equals).isPresent());
-            if (!commissioned || legal == null || legal.factionId != world.findFactionRuntimeId(offered.stableFactionId()).orElseThrow()
-                    || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
-                    || !placement.systemId().equals(fleet.systemId()) || world.findFleetJump(offeredId).isPresent()
-                    || offered.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
-                    || offered.cargoMassKg() != 0d)
-                throw new IllegalStateException("Existing reserve is not offered by this local seller");
             var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(world, coordinator.content(), playerState);
             if (!new com.spacesim.player.PlayerOwnershipService(adapter).purchaseFactionFleet(
                     offeredId, offered.stableFactionId(), PILOT_SHIP_PRICE_MILLI_CREDITS))

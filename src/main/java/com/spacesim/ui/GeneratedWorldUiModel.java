@@ -136,7 +136,7 @@ public final class GeneratedWorldUiModel {
         List<FreightView> freight = freightViews(galaxy);
         List<MilitaryView> military = militaryViews(galaxy);
         List<LocalObjectView> local = localObjects(active, galaxy, freight, military);
-        return new GeneratedWorldUiSnapshot(
+        var snapshot = new GeneratedWorldUiSnapshot(
                 worldSeed,
                 runtime.world().getAuthoritativeWorldTick(),
                 active,
@@ -145,6 +145,91 @@ public final class GeneratedWorldUiModel {
                 local,
                 freight,
                 military);
+        return personalPlayer == null ? snapshot : restrictToPersonalKnowledge(snapshot);
+    }
+
+    GeneratedWorldUiSnapshot restrictToPersonalKnowledge(GeneratedWorldUiSnapshot raw) {
+        var player = personalPlayer.get();
+        return new GeneratedWorldUiSnapshot(raw.worldSeed(), raw.worldTick(), raw.activeSystemId(), raw.activeSystemName(),
+                personalGalaxy(raw.galaxy(), player), personalLocalObjects(raw.localObjects(), player),
+                player == null ? List.of() : raw.freight().stream()
+                        .filter(f -> player.ownedFleetIds().contains(new FleetId(f.fleetId()))).toList(),
+                player == null ? List.of() : raw.military().stream()
+                        .filter(f -> player.ownedFleetIds().contains(new FleetId(f.fleetId()))).toList());
+    }
+
+    private GalaxyStrategicMapSnapshot personalGalaxy(GalaxyStrategicMapSnapshot raw,
+            com.spacesim.player.PlayerState player) {
+        Set<StarSystemId> known = player == null ? Set.of() : Set.copyOf(player.discoveredSystemIds());
+        var edges = raw.edges().stream().filter(e -> known.contains(e.first()) && known.contains(e.second())).toList();
+        var systems = raw.systems().stream().filter(s -> known.contains(s.id())).map(s -> {
+            boolean own = player != null && player.factionContentId() != null
+                    && player.factionContentId().equals(s.controllerFactionId());
+            int neighbors = (int) edges.stream().filter(e -> e.first().equals(s.id()) || e.second().equals(s.id())).count();
+            return new GalaxyStrategicMapSnapshot.SystemView(s.id(), s.name(), s.sectorId(), s.sectorName(),
+                    s.galaxyX(), s.galaxyY(), own ? s.controllerFactionId() : null,
+                    own ? s.controllerDisplayName() : "Нет личных сведений о контроле", neighbors, s.active(), s.selectedNeighbor());
+        }).toList();
+        var factions = player == null || player.factionContentId() == null ? List.<GalaxyStrategicMapSnapshot.FactionView>of()
+                : raw.factions().stream().filter(f -> f.factionId().equals(player.factionContentId())).toList();
+        return new GalaxyStrategicMapSnapshot(raw.galaxyName(), systems, edges, factions,
+                raw.activeSystemId() != null && known.contains(raw.activeSystemId()) ? raw.activeSystemId() : null,
+                raw.selectedNeighborId() != null && known.contains(raw.selectedNeighborId()) ? raw.selectedNeighborId() : null);
+    }
+
+    private List<LocalObjectView> personalLocalObjects(List<LocalObjectView> raw,
+            com.spacesim.player.PlayerState player) {
+        if (player == null) return List.of();
+        var knowledge = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+        List<LocalObjectView> result = new ArrayList<>();
+        for (var object : raw) {
+            if (object.kind() == ObjectKind.FLEET) {
+                if (object.stableId().startsWith("fleet:") && player.ownedFleetIds()
+                        .contains(new FleetId(Long.parseLong(object.stableId().substring(6))))) result.add(object);
+                continue;
+            }
+            String id = object.stableId().substring(object.stableId().indexOf(':') + 1);
+            if (object.kind() == ObjectKind.EXTRACTION_OUTPOST) {
+                var outpost = runtime.industry().sourceOutposts().outposts().stream()
+                        .filter(o -> o.site().siteId().equals(id)).findFirst().orElse(null);
+                if (outpost == null) continue;
+                var source = outpost.source();
+                var sample = knowledge.entries().stream().filter(k -> k.object().systemId().equals(object.systemId())
+                        && k.object().objectId().equals(source.sourceId()) && k.knownLocation().isPresent()).findFirst();
+                if (sample.isEmpty()) continue;
+                var sprite = Stage20MinimumPlayableSpriteCatalog.resolveResource(source.sourceState().sourceTypeId(), 180d, 140d);
+                result.add(new LocalObjectView("resource:" + source.sourceId(), ObjectKind.RESOURCE,
+                        "Наблюдённый ресурс", "Личное открытие", object.systemId(), sample.orElseThrow().knownLocation().orElseThrow(),
+                        "", "Нет личных сведений о владельце", sprite.binding(), List.of(personalResourceSection(source))).withScale(sprite));
+                continue;
+            }
+            var observed = knowledge.entries().stream().filter(k -> k.object().systemId().equals(object.systemId())
+                    && k.object().objectId().equals(id) && k.knownLocation().isPresent()).findFirst();
+            if (observed.isEmpty()) continue;
+            var saved = observed.orElseThrow();
+            List<InfoSection> sections = object.sections();
+            if (object.kind() == ObjectKind.RESOURCE) {
+                sections = List.of(personalResourceSection(runtime.industry().sourceOutposts().sources().source(id)));
+            } else if (object.kind() == ObjectKind.STATION && !personallyOwnsStation(id)) {
+                sections = List.of(InfoSection.of("Личные сведения", "Положение", "Сохранённая статическая координата",
+                        "Наблюдение", duration(saved.lastUpdatedSeconds()),
+                        "Запасы и оборудование", "Нет доступа к внутренним системам"));
+                var sprite = Stage20MinimumPlayableSpriteCatalog.resolveStation(saved.classificationId().orElseThrow(), false, stationGeometry);
+                result.add(new LocalObjectView(object.stableId(), object.kind(), object.name(), "Известная станция",
+                        object.systemId(), saved.knownLocation().orElseThrow(), "", "Нет личных сведений о владельце",
+                        sprite.binding(), sections).withScale(sprite));
+                continue;
+            } else if (object.kind() != ObjectKind.RESOURCE && object.kind() != ObjectKind.STATION) {
+                sections = List.of(InfoSection.of("Личные сведения", "Положение", "Сохранённая статическая координата",
+                        "Наблюдение", duration(saved.lastUpdatedSeconds())));
+            }
+            result.add(new LocalObjectView(object.stableId(), object.kind(), object.name(), object.subtitle(),
+                    object.systemId(), saved.knownLocation().orElseThrow(),
+                    object.kind() == ObjectKind.STATION && personallyOwnsStation(id) ? object.factionId() : "",
+                    object.kind() == ObjectKind.STATION && personallyOwnsStation(id) ? object.factionName() : "Нет личных сведений о владельце",
+                    object.sprite(), sections, object.physicalLengthM(), object.physicalWidthM(), 0d, 0d));
+        }
+        return List.copyOf(result);
     }
 
     private List<LocalObjectView> localObjects(

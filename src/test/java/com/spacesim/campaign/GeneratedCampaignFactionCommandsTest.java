@@ -12,6 +12,15 @@ class GeneratedCampaignFactionCommandsTest {
 
     @Test void policiesUseOwnSharedRulesAndPreservePhysicalOwnersMoneyAndClock() {
         var c = founded(); var before = c.captureState(); var freight = c.coordinator().runtime().captureState().freight();
+        var model = new com.spacesim.ui.GeneratedWorldUiModel(1, c.coordinator().runtime(), c.coordinator().content(),
+                com.spacesim.ui.GeneratedWorldUiModel.CarrierUiSource.none(), () -> c.playerState().orElse(null));
+        var worldView = model.capture();
+        assertTrue(worldView.galaxy().factions().stream().allMatch(f -> f.factionId().equals(OWN)),
+                "Foreign balances must remain outside the personal map");
+        var controls = com.spacesim.ui.GeneratedCampaignFactionUi.rows(c, worldView);
+        assertTrue(controls.stream().anyMatch(r -> r.selection().stableId().equals("player-government|embargo|" + FOREIGN)),
+                "Public counterparties must remain available without borrowing their private map summaries");
+        assertEquals(before, c.captureState());
         var doctrine = new FactionDoctrineState(75,60,45,70,80,25,90);
         var preview = c.previewPlayerFactionPolicy(new FactionPolicyCommand.UpdateDoctrine(doctrine));
         assertTrue(preview.allowed()); assertEquals(before,c.captureState());

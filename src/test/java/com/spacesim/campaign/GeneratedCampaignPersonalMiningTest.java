@@ -95,6 +95,14 @@ class GeneratedCampaignPersonalMiningTest {
         runtime.industry().sourceOutposts().outposts().stream().filter(o -> o.source().sourceId().equals(source.sourceId()))
                 .forEach(o -> keys.add("outpost:" + o.site().siteId()));
         var projection = model.capture();
+        boolean observed = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+                .entries().stream().anyMatch(k -> k.object().objectId().equals(source.sourceId()) && k.knownLocation().isPresent());
+        if (!observed) {
+            assertTrue(projection.localObjects().stream().noneMatch(o -> keys.contains(o.stableId())),
+                    "An unobserved source must not disclose its position through the map");
+            assertEquals(baseline, c.captureState());
+            return;
+        }
         var resource = projection.localObjects().stream().filter(o -> keys.contains(o.stableId())).findFirst()
                 .orElseThrow(() -> new AssertionError("Missing occurrence " + keys + " in viewed " + projection.activeSystemId()
                         + "; occurrence system=" + source.systemId()));

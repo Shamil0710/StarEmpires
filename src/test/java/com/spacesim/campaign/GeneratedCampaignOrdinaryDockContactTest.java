@@ -25,6 +25,11 @@ class GeneratedCampaignOrdinaryDockContactTest {
         var model = new GeneratedWorldUiModel(1, runtime, campaign.coordinator().content());
         var projector = new ProductionUiProjector("faction.beta");
         var rows = projector.capture(campaign, model.capture()).rows(Tab.LOGISTICS);
+        assertTrue(projector.capture(campaign, model.capture()).rows(Tab.SHIPS).stream()
+                .noneMatch(r -> r.selection().stableId().startsWith("pilot-reserve|")),
+                "An undocked pilot cannot read another faction's reserve manifest");
+        assertTrue(runtime.freight().capture().freighters().stream()
+                .noneMatch(f -> campaign.canViewPersonalReserveOffer(f.fleetId())));
         var contact = rows.stream().filter(r -> r.selection().stableId().equals("pilot-station|" + station)).findFirst().orElseThrow();
         assertEquals("Местный док", contact.name());
         assertEquals("В пределах стыковки", contact.summary());
@@ -39,6 +44,23 @@ class GeneratedCampaignOrdinaryDockContactTest {
         var dock = campaign.previewPilotAction("DOCK", station, "", 0);
         assertTrue(dock.allowed()); assertEquals(before, campaign.captureState());
         campaign.submitPilotAction(dock);
+        var reserveRows = projector.capture(campaign, model.capture()).rows(Tab.SHIPS).stream()
+                .filter(r -> r.selection().stableId().startsWith("pilot-reserve|")).toList();
+        var seller = runtime.freight().findFreighter(fleet.id()).orElseThrow().stableFactionId();
+        var expectedOffers = runtime.freight().capture().freighters().stream()
+                .filter(f -> !f.fleetId().equals(fleet.id()) && f.stableFactionId().equals(seller)
+                        && f.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                        && f.cargoMassKg() == 0d)
+                .filter(f -> runtime.world().findFleet(f.fleetId()).orElseThrow().systemId().equals(fleet.systemId()))
+                .toList();
+        assertFalse(expectedOffers.isEmpty(), "The ordinary seller has another real reserve offer");
+        assertEquals(expectedOffers.size(), reserveRows.size());
+        for (var offered : expectedOffers) assertTrue(campaign.canViewPersonalReserveOffer(offered.fleetId()));
+        for (var row : reserveRows) {
+            assertNull(row.focusSystem(), "Sale disclosure is not physical detection of the fleet");
+            assertEquals(0, row.focusFleet());
+        }
+        assertFalse(campaign.canViewPersonalReserveOffer(new com.spacesim.world.FleetId(Long.MAX_VALUE)));
         assertFalse(campaign.canDockAtPersonalStation(station), "An already docked ship cannot initiate another docking");
         var personal = runtime.discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
         assertTrue(personal.entries().stream().anyMatch(e -> e.object().objectId().equals(station)
