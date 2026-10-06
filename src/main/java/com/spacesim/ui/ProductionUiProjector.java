@@ -115,20 +115,25 @@ public final class ProductionUiProjector {
                 var knownStation = stationKnowledge.entries().stream().filter(entry -> entry.object().systemId().equals(endpoint.systemId())
                         && entry.object().kind() == com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE
                         && entry.object().objectId().equals(endpoint.stationId()) && entry.knownLocation().isPresent()).findFirst();
-                if (knownStation.isEmpty()) continue;
+                boolean immediateDockContact = campaign.canDockAtPersonalStation(endpoint.stationId());
+                if (knownStation.isEmpty() && !immediateDockContact) continue;
                 String name = GeneratedWorldUiModel.endpointDisplayName(endpoint);
                 var ref = campaign.pilotMarketReference(endpoint.stationId()).orElseThrow();
                 boolean docked = ref.equals(player.dockedAt());
                 long marketMoney = runtime.world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
                         .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
-                logistics.add(row("pilot-station|" + endpoint.stationId(), name, "Личные рынки", docked ? "Корабль пристыкован" : "Требуется стыковка",
-                        List.of(InfoSection.of("Доступ к рынку", "Расстояние до известного положения", String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(knownStation.orElseThrow().knownLocation().orElseThrow())),
+                logistics.add(row("pilot-station|" + endpoint.stationId(), knownStation.isPresent() ? name : "Местный док", "Личные рынки",
+                        docked ? "Корабль пристыкован" : immediateDockContact ? "В пределах стыковки" : "Требуется стыковка",
+                        List.of(InfoSection.of("Доступ к рынку", "Расстояние до известного положения", knownStation.isPresent()
+                                ? String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(knownStation.orElseThrow().knownLocation().orElseThrow()))
+                                : "Положение ещё не записано; доступен непосредственный контакт с доком",
                                 "Скорость корабля", String.format(Locale.ROOT, "%.2f м/с", Math.hypot(physical.velocityXMps(), physical.velocityYMps())),
                                 "Условия стыковки", "Не далее 1 км; скорость не выше 1 м/с",
                                 "Управление тягой", "WASD в системе; X — торможение; без тяги — движение по инерции",
                                 "Кошелёк", credits(player.walletMilliCredits()))),
-                        "Собственное сохранённое положение станции, положение и скорость личного корабля; состояние стыковки",
-                        endpoint.systemId(), 0, world.worldTick()));
+                        knownStation.isPresent() ? "Собственное сохранённое положение станции, положение и скорость личного корабля; состояние стыковки"
+                                : "Фактический доступ к местному доку; посещение и координаты записываются только после подтверждённой стыковки",
+                        knownStation.isPresent() ? endpoint.systemId() : null, 0, world.worldTick()));
                 if (hold == null || !docked) continue;
                 boolean ownStation = campaign.ownsProductionStation(endpoint.stationId());
                 for (var definition : ontology.getCommodities()) {

@@ -709,6 +709,27 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
+     * Checks immediate access to an existing local dock without recording station knowledge.
+     * This is the physical docking boundary, not a remote observation or coordinate grant.
+     * @param stationId existing commissioned endpoint
+     * @return whether the active owned undocked ship can contact this dock now
+     */
+    public boolean canDockAtPersonalStation(String stationId) {
+        if (playerState == null || playerState.docked() || playerState.activeFleetId() == null
+                || !playerState.ownedFleetIds().contains(playerState.activeFleetId())) return false;
+        var runtime = coordinator.runtime();
+        var fleet = runtime.world().findFleet(playerState.activeFleetId()).orElse(null);
+        if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || runtime.world().findFleetJump(fleet.id()).isPresent()) return false;
+        var endpoint = runtime.infrastructure().endpoints().stream().filter(e -> e.stationId().equals(stationId)
+                && e.systemId().equals(fleet.systemId())).findFirst().orElse(null);
+        if (endpoint == null || pilotMarketReference(stationId).isEmpty()) return false;
+        var physical = runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElse(null);
+        return physical != null && physical.position().distanceTo(endpoint.position()) <= 1000d
+                && Math.hypot(physical.velocityXMps(), physical.velocityYMps()) <= 1d;
+    }
+
+    /**
      * Existing ordinary-state preview used for docking and physical cargo trades.
      * @param action docking, trade, flight, asset, finance, mining, supply, report or manufacturing verb
      * @param stationId endpoint, destination for JUMP, fleet for PURCHASE/SWITCH, or milli-credits for CAPITALIZE/WITHDRAW; ignored by UNDOCK
@@ -1163,6 +1184,7 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException("Dock requires a local ship within 1 km and at most 1 m/s");
         if ("DOCK".equals(action)) {
             if (playerState.docked()) throw new IllegalStateException("Already docked");
+            if (!canDockAtPersonalStation(stationId)) throw new IllegalStateException("No immediate personal dock contact");
             var discovered = new java.util.ArrayList<>(playerState.discoveredObjects());
             if (!discovered.contains(ref)) discovered.add(ref);
             replacePilotFinancialDocking(playerState.walletMilliCredits(), ref, discovered);
