@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "yards": [
+    {"yardDefinitionId": "yard.orbital_escort_v1", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 100000000.0},
+    {"yardDefinitionId": "yard.empire_capital_service_v1", "profileId": "construction.profile.high_tech", "installedMassKg": 500000000.0},
+    {"yardDefinitionId": "yard.industrial_union.series_complex_v1", "profileId": "construction.profile.heavy_industrial", "installedMassKg": 350000000.0}
+  ]
+}

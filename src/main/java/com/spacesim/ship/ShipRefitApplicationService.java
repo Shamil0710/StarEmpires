@@ -55,6 +55,19 @@ public final class ShipRefitApplicationService {
             EntityId liveAssetId,
             EngineeringComponent component,
             Completion completion) {
+        return apply(liveAssetId, component, completion, Map.of());
+    }
+
+    /**
+     * Applies a settled refit using condition-preserved individual incoming modules.
+     * @param liveAssetId unchanged physical ship
+     * @param component actual source component
+     * @param completion handoff with installed incoming damage and age
+     * @param incoming exact paid incoming condition by changed target mount
+     * @return same updated component
+     */
+    public EngineeringComponent apply(EntityId liveAssetId, EngineeringComponent component, Completion completion,
+            Map<String, ShipyardRefitContinuity.RemovedModuleState> incoming) {
         EntityId checkedId = Objects.requireNonNull(liveAssetId, "liveAssetId");
         EngineeringComponent checked = Objects.requireNonNull(component, "component");
         Completion result = Objects.requireNonNull(completion, "completion");
@@ -64,6 +77,7 @@ public final class ShipRefitApplicationService {
         InstalledFit oldFit = Objects.requireNonNull(checked.fit, "component.fit");
         RuntimeState oldRuntime = Objects.requireNonNull(checked.runtimeState, "component.runtimeState");
         ShipInstanceRuntimeState oldInstance = Objects.requireNonNull(checked.instanceState, "component.instanceState");
+        ShipyardRefitContinuity.validateSource(result, oldFit, oldInstance.damage(), oldInstance.maintenance(), incoming);
         InstalledFit targetFit = result.fit();
         DamageState targetDamage = result.installedDamage().moduleDamage();
         Map<String, String> oldModules = moduleIds(oldFit);

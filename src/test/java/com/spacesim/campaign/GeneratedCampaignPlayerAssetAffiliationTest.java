@@ -34,7 +34,7 @@ class GeneratedCampaignPlayerAssetAffiliationTest {
     @Test void genuineV2FreightAdoptsOnlyTheOriginalLegalMirrorWithoutTouchingInputOrResources() throws Exception {
         byte[] old;try(var in=new GZIPInputStream(getClass().getResourceAsStream("/campaign/stage23b-freight-v2.s20f.gz"))){old=in.readAllBytes();}
         assertEquals(2,java.nio.ByteBuffer.wrap(old).getInt(8));var bytes=old.clone();
-        var adopted=Stage20FreightPersistenceCodec.decode(old);assertEquals(3,adopted.schemaVersion());
+        var adopted=Stage20FreightPersistenceCodec.decode(old);assertEquals(Stage20FreightPersistentState.CURRENT_VERSION,adopted.schemaVersion());
         assertTrue(adopted.freighters().stream().allMatch(f->f.legalFactionId().equals(f.stableFactionId())));
         assertArrayEquals(bytes,old);assertEquals(adopted,Stage20FreightPersistenceCodec.decode(Stage20FreightPersistenceCodec.encode(adopted)));
         var fresh=Stage228CampaignAuthority.create(1).coordinator().runtime().freight().capture();assertEquals(fresh,adopted);

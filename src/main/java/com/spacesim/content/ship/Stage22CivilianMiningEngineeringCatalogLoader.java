@@ -25,6 +25,8 @@ public final class Stage22CivilianMiningEngineeringCatalogLoader {
     public static final String BASE_SUPPORT_FIT_ID = "fit.industrial_union.fleet_support.repair_v1";
     /** Shared M22.5 asteroid-excavation module ID. */
     public static final String MINING_MODULE_ID = "module.civilian.miners.asteroid_excavation_section_v1";
+    /** Freight conversion variant with dedicated ore and excavation-supplies compartments. */
+    public static final String FREIGHT_MINING_MODULE_ID = "module.civilian.miners.freight_excavation_section_v1";
     /** Shared M22.5 physically buildable mining fit ID. */
     public static final String MINING_FIT_ID = "fit.civilian.miners.asteroid_excavator_v1";
     /** Authored available process power exposed to Stage-18 extraction. */
@@ -35,6 +37,14 @@ public final class Stage22CivilianMiningEngineeringCatalogLoader {
     public static final String PARAM_MAINTENANCE_WORK_RATE = "extraction_maintenance_work_rate";
     /** Authored maximum source throughput of the excavation section. */
     public static final String PARAM_MAX_SOURCE_KG_S = "extraction_max_source_kg_s";
+    /** Explicit SI envelope for the local excavation section, independent of legacy map units. */
+    public static final String PARAM_WORKING_RANGE_M = "extraction_working_range_m";
+    /** Maximum drift while the section is in physical contact with its fixed source. */
+    public static final String PARAM_MAX_DRIFT_M_S = "extraction_max_drift_m_s";
+    /** Dedicated ore space; shares the original nine-million-kilogram section envelope with stores. */
+    public static final double ORE_CAPACITY_KG = 8_000_000d;
+    /** Dedicated excavation supplies, separate from ore space within the same physical envelope. */
+    public static final double EXCAVATION_STORES_CAPACITY_KG = 1_000_000d;
 
     private Stage22CivilianMiningEngineeringCatalogLoader() {
         throw new AssertionError("utility class");
@@ -83,7 +93,9 @@ public final class Stage22CivilianMiningEngineeringCatalogLoader {
                         PARAM_AVAILABLE_POWER_W, 4_000_000d,
                         PARAM_WORK_RATE, 2.5d,
                         PARAM_MAINTENANCE_WORK_RATE, 0.125d,
-                        PARAM_MAX_SOURCE_KG_S, 25d));
+                        PARAM_MAX_SOURCE_KG_S, 25d,
+                        PARAM_WORKING_RANGE_M, 5_000d,
+                        PARAM_MAX_DRIFT_M_S, 1d));
 
         List<InstalledModuleDefinition> installed = new ArrayList<>();
         int replaced = 0;
@@ -103,6 +115,16 @@ public final class Stage22CivilianMiningEngineeringCatalogLoader {
 
         List<ModuleDefinition> modules = new ArrayList<>(base.getModules());
         modules.add(miningModule);
+        var freightParameters = new java.util.TreeMap<>(miningModule.capabilityParameters());
+        freightParameters.put("cargo_capacity_kg", ORE_CAPACITY_KG);
+        modules.add(new ModuleDefinition(FREIGHT_MINING_MODULE_ID, "Freight Asteroid Excavation Section",
+                miningModule.family(), miningModule.integrationCategories(), miningModule.compatibleHardpointSizes(),
+                miningModule.physicalDimensionsM(), miningModule.massKg(), miningModule.occupiedVolumeM3(), miningModule.requiredMountStrengthN(),
+                miningModule.continuousPowerSupplyW(), miningModule.continuousPowerDemandW(), miningModule.peakPowerDemandW(),
+                miningModule.storedEnergyCapacityJ(), miningModule.wasteHeatW(), miningModule.localThermalCapacityJ(),
+                miningModule.coolantTransferDemandW(), miningModule.heatRejectionW(), miningModule.crewRequirement(), miningModule.automationRequirement(),
+                List.of(new InterfaceDefinition(InterfaceKind.CONSUMABLE, "excavation_stores", EXCAVATION_STORES_CAPACITY_KG)),
+                miningModule.signatureContributions(), miningModule.constructionInputs(), miningModule.maintenance(), Map.copyOf(freightParameters)));
         List<DemonstratorFitDefinition> fits = new ArrayList<>(base.getDemonstratorFits());
         fits.add(miningFit);
         return new ShipEngineeringCatalog(

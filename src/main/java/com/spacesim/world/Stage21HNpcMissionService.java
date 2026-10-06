@@ -147,6 +147,43 @@ public final class Stage21HNpcMissionService {
     }
 
     /**
+     * Receives a reviewed freight fact while retaining exact evidence referenced by contracts.
+     * Unreferenced older observations of the same subject are replaced, rather than accumulated.
+     * @param npcId actual affiliated recipient
+     * @param snapshot reviewed faction-local observations
+     * @param observation exact current observation
+     * @param factId identity of this reviewed evidence
+     * @return retained current fact
+     */
+    public NpcKnowledgeFact refreshActorObservation(String npcId, FactionActorObservationSnapshot snapshot,
+            ActorObservation observation, String factId) {
+        NpcState npc = requireNpc(npcId);
+        Objects.requireNonNull(snapshot); Objects.requireNonNull(observation);
+        requireAdvancingOrEqualTick(snapshot.observedAtTick());
+        if (!npc.factionContentId().equals(snapshot.factionContentId())
+                || !snapshot.currentObservations().contains(observation))
+            throw new IllegalArgumentException("NPC observation must belong to its reviewed faction snapshot");
+        NpcKnowledgeFact fact = new NpcKnowledgeFact(factId, observation.targetId(), KnowledgeKind.ACTOR_OBSERVATION,
+                observation.domain().name() + "." + observation.interestKind().name(),
+                observation.severityBasisPoints(), observation.evidence().provenanceId(),
+                snapshot.observedAtTick(), observation.evidence().freshUntilTick());
+        var sameId = npc.knowledge().stream().filter(k -> k.factId().equals(factId)).findFirst();
+        if (sameId.isPresent()) {
+            if (!sameId.orElseThrow().equals(fact)) throw new IllegalArgumentException("Reviewed fact identity cannot change evidence");
+            return sameId.orElseThrow();
+        }
+        var referenced = state.missions().stream().filter(m -> m.issuerNpcId().equals(npcId))
+                .flatMap(m -> m.sourceKnowledgeFactIds().stream()).collect(java.util.stream.Collectors.toSet());
+        var retained = new ArrayList<NpcKnowledgeFact>(npc.knowledge().stream().filter(k ->
+                k.kind() != KnowledgeKind.ACTOR_OBSERVATION || !k.subjectId().equals(observation.targetId())
+                        || referenced.contains(k.factId())).toList());
+        retained.add(fact);
+        replaceNpc(new NpcState(npc.npcId(), npc.nameKey(), npc.role(), npc.factionContentId(),
+                npc.locationSystemId(), npc.availability(), retained), snapshot.observedAtTick());
+        return fact;
+    }
+
+    /**
      * Delivers one exact owner-local Stage-20 static discovery row to an affiliated NPC.
      *
      * @param npcId receiving NPC
@@ -712,6 +749,108 @@ public final class Stage21HNpcMissionService {
                 chain.chainId(), chain.currentStep(), chain.totalSteps(), status, chain.missionIds());
         replaceStoryChain(replacement);
         return replacement;
+    }
+
+    /**
+     * Settles an accepted supply contract from an exact one-use physical delivery.
+     * Inventory snapshots and another actor's deliveries cannot authorize this payout.
+     * @param world actual campaign clock and legal operator authority
+     * @param freight live freight owner of the receipt
+     * @param industry actual receiving storage registry
+     * @param issuerDiscovery actual issuer archive
+     * @param player actual human ownership and docking state
+     * @param missionId accepted contract identity
+     * @param receipt committed delivery evidence
+     * @param recipient personal wallet
+     * @return completed contract, or empty without consuming a nonqualifying receipt
+     */
+    public java.util.Optional<MissionContract> tryCompletePersonalSupplyDelivery(WorldSimulation world,
+            com.spacesim.persistence.Stage20FreightRuntime freight, Stage18IndustrialState industry,
+            Stage20DiscoveryKnowledgeState issuerDiscovery, PlayerState player, String missionId,
+            com.spacesim.persistence.Stage20FreightRuntime.PersonalCommodityDeliveryReceipt receipt,
+            WalletComponent recipient) {
+        Objects.requireNonNull(world); Objects.requireNonNull(freight); Objects.requireNonNull(player);
+        Objects.requireNonNull(receipt); Objects.requireNonNull(recipient);
+        var mission = requireMission(missionId);
+        var objective = mission.objective();
+        long tick = world.getAuthoritativeWorldTick();
+        requireAdvancingOrEqualTick(tick);
+        if (mission.status() != MissionStatus.ACCEPTED || tick > mission.deadlineTick()
+                || objective.kind() != Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
+                || !objective.subjectId().equals(receipt.stationId()) || !objective.requiredState().equals(receipt.commodityId())
+                || !player.ownedFleetIds().contains(receipt.fleetId()) || !receipt.fleetId().equals(player.activeFleetId())
+                || player.dockedAt() == null || player.dockedAt().systemId().value() != objective.systemId())
+            return java.util.Optional.empty();
+        float step = world.findSession(player.dockedAt().systemId()).orElseThrow().getClock().getFixedStepSeconds();
+        if (receipt.simulationSeconds() != tick * step || receipt.simulationSeconds() <= mission.statusUpdatedTick() * step)
+            return java.util.Optional.empty();
+        double supplied = receipt.deliveredLots().stream().filter(l -> !l.sourceEndpointId().equals(receipt.stationId()))
+                .mapToDouble(com.spacesim.persistence.Stage20FreightPersistentState.CargoLotState::massKg).sum();
+        if (supplied + 1e-9 < objective.threshold() || recipient.getBalanceMilliCredits() > Long.MAX_VALUE - mission.rewardMilliCredits())
+            return java.util.Optional.empty();
+        try {
+            Stage21HMissionAuthority.requireIssuerAuthority(world, freight.capture(), industry, issuerDiscovery,
+                    StrategicOperationState.empty(), mission.issuerFactionId(), objective);
+        } catch (IllegalStateException exception) {
+            return java.util.Optional.empty();
+        }
+        var session = world.findSession(player.dockedAt().systemId()).orElseThrow();
+        var berth = session.getEntityRegistry().require(player.dockedAt().entityId());
+        var identity = berth.getComponent(com.spacesim.components.IdentityComponent.class);
+        if (identity == null || !identity.name.equals("Generated market v2 " + receipt.stationId()))
+            return java.util.Optional.empty();
+        var escrow = requireEscrow(mission);
+        if (!freight.claimPersonalDelivery(receipt)) return java.util.Optional.empty();
+        if (!escrow.transferTo(recipient, mission.rewardMilliCredits()))
+            throw new IllegalStateException("Preflighted supply escrow payout failed");
+        escrowByMissionId.remove(missionId);
+        var completed = copyMission(mission, MissionStatus.COMPLETED, tick, 0L,
+                "personal-supply.external-cargo-delivered", List.of());
+        replaceMission(completed, tick);
+        addReputationEvent(mission.issuerNpcId(), Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID,
+                new ReputationEvent("reputation." + missionId + ".completed", ReputationEventKind.CONTRACT_COMPLETED,
+                        10, tick, missionId), tick);
+        return java.util.Optional.of(requireMission(missionId));
+    }
+
+    /**
+     * Replaces an unaccepted supply proposal with a smaller separately funded invoice.
+     * The old escrow is returned in full; funding provenance remains exact for both contracts.
+     * @param world actual treasury and clock
+     * @param freight actual freight state
+     * @param industry actual industrial state
+     * @param discovery issuer archive
+     * @param operations ordinary operations
+     * @param missionId offered supply proposal
+     * @param kilograms positive smaller delivery size
+     * @return replacement funded offer
+     */
+    public MissionContract offerPersonalSupplyPortion(WorldSimulation world, Stage20FreightPersistentState freight,
+            Stage18IndustrialState industry, Stage20DiscoveryKnowledgeState discovery, StrategicOperationState operations,
+            String missionId, long kilograms) {
+        long tick = world.getAuthoritativeWorldTick();
+        var current = validatePlayerCommand(PlayerCommand.ACCEPT, missionId, tick);
+        if (current.objective().kind() != Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
+                || kilograms <= 0 || kilograms >= current.objective().threshold())
+            throw new IllegalArgumentException("Supply portion must be positive and smaller than its offered invoice");
+        var npc = requireNpc(current.issuerNpcId());
+        if (npc.availability() != NpcAvailability.AVAILABLE || state.nextMissionSequence() == Long.MAX_VALUE || current.deadlineTick() <= tick)
+            throw new IllegalStateException("Supply proposal cannot currently be replaced");
+        for (String id : current.sourceKnowledgeFactIds())
+            if (npc.currentKnowledge(tick).stream().noneMatch(k -> k.factId().equals(id)))
+                throw new IllegalStateException("Supply source evidence is no longer current");
+        var objective = new MissionObjective(current.objective().authority(), current.objective().kind(),
+                current.objective().subjectId(), current.objective().systemId(), kilograms, current.objective().requiredState());
+        Stage21HMissionAuthority.requireIssuerAuthority(world, freight, industry, discovery, operations, current.issuerFactionId(), objective);
+        long reward = java.math.BigInteger.valueOf(current.rewardMilliCredits()).multiply(java.math.BigInteger.valueOf(kilograms))
+                .divide(java.math.BigInteger.valueOf(current.objective().threshold())).longValueExact();
+        var economy = world.findFactionEconomicState(current.issuerFactionId()).orElseThrow();
+        long refundedTreasury = Math.addExact(economy.treasuryMilliCredits(), current.escrowMilliCredits());
+        if (reward <= 0 || refundedTreasury - economy.treasuryReserveFloorMilliCredits() < reward)
+            throw new IllegalStateException("Supply portion cannot be funded under the current reserve floor");
+        refundAndTerminate(world, current, MissionStatus.REJECTED, tick, "personal-supply.replaced-by-smaller-invoice");
+        return offerMission(world, freight, industry, discovery, operations, current.issuerNpcId(), current.template(),
+                objective, current.sourceKnowledgeFactIds(), current.deadlineTick(), reward);
     }
 
     private MissionContract refundAndTerminate(

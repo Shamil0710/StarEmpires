@@ -73,17 +73,39 @@ public final class Stage18StationProductionBridge {
             FacilityCapabilitySnapshot facility,
             double durationSeconds) {
         Objects.requireNonNull(stationStorage, "stationStorage");
+        var capability = facilityRuntime.toExtractionCapability(Objects.requireNonNull(facility, "facility"));
+        return extractToStorage(source, methodId, requestedSourceMassKg, stationStorage,
+                capability, capability.openInterval(durationSeconds));
+    }
+
+    /**
+     * Extracts into the canonical physical store using an already allocated interval budget.
+     * Suitable for installed ship equipment as well as station facilities; repeated calls share
+     * the same remaining energy, work and maintenance rather than opening another interval.
+     * @param source actual finite source
+     * @param methodId authored extraction method
+     * @param requestedSourceMassKg requested gross source mass
+     * @param stationStorage actual canonical destination, including a ship hold
+     * @param capability installed equipment capability
+     * @param budget caller-owned shared interval budget
+     * @return ordinary extraction settlement
+     */
+    public ExtractionResult extractToStorage(
+            PhysicalSourceState source, String methodId, double requestedSourceMassKg,
+            Stage18StationStorage stationStorage,
+            Stage18ExtractionRuntime.ExtractionCapability capability,
+            Stage18ExtractionRuntime.IntervalBudget budget) {
+        Objects.requireNonNull(stationStorage, "stationStorage");
         PhysicalCargoStore staged = new PhysicalCargoStore(
                 ontology,
                 stationStorage.commodityLayerCapacityByStorageClassKg(),
                 stationStorage.snapshotCommodityMassByIdKg());
-        var capability = facilityRuntime.toExtractionCapability(Objects.requireNonNull(facility, "facility"));
         ExtractionResult result = extractionRuntime.extract(
                 source,
                 methodId,
                 requestedSourceMassKg,
                 capability,
-                capability.openInterval(durationSeconds),
+                budget,
                 staged);
         if (result.committed()) {
             stationStorage.replaceContents(
@@ -171,13 +193,32 @@ public final class Stage18StationProductionBridge {
             Stage18StationStorage stationStorage,
             FacilityCapabilitySnapshot facility,
             double durationSeconds) {
-        ManufacturingInventory staged = manufacturingInventory(stationStorage);
         var capability = facilityRuntime.toManufacturingCapability(Objects.requireNonNull(facility, "facility"));
+        return manufactureProductAtStorage(productContentId, requestedUnitCount, stationStorage,
+                capability.openInterval(durationSeconds));
+    }
+
+    /**
+     * Settles finished products against canonical storage using the caller's allocated budget.
+     * Multiple orders on the same production line must share this budget for the completed tick.
+     * Rejections preserve both storage and the remaining budget.
+     * @param productContentId authored finished product
+     * @param requestedUnitCount positive whole-unit count
+     * @param stationStorage actual canonical inventory
+     * @param budget shared finite manufacturing interval
+     * @return ordinary manufacturing settlement
+     */
+    public ManufacturingResult manufactureProductAtStorage(
+            String productContentId, int requestedUnitCount,
+            Stage18StationStorage stationStorage,
+            Stage18ManufacturingRuntime.IntervalBudget budget) {
+        Objects.requireNonNull(budget, "budget");
+        ManufacturingInventory staged = manufacturingInventory(stationStorage);
         ManufacturingResult result = manufacturingRuntime.manufactureProduct(
                 productContentId,
                 requestedUnitCount,
                 staged,
-                capability.openInterval(durationSeconds));
+                budget);
         commitManufacturingIfAccepted(stationStorage, staged, result);
         return result;
     }
@@ -187,7 +228,7 @@ public final class Stage18StationProductionBridge {
         return new ManufacturingInventory(
                 ontology,
                 products,
-                storage.snapshotCapacityByStorageClassKg(),
+                storage.manufacturingLayerCapacityByStorageClassKg(),
                 storage.snapshotCommodityMassByIdKg(),
                 storage.snapshotProductCountById());
     }

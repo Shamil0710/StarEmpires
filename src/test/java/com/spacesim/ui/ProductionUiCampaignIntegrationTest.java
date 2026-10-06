@@ -34,6 +34,8 @@ final class ProductionUiCampaignIntegrationTest {
         assertFalse(projected.rows(Tab.SHIPS).isEmpty());
         assertFalse(projected.rows(Tab.INDUSTRY).isEmpty());
         assertFalse(projected.rows(Tab.INTELLIGENCE).isEmpty());
+        assertTrue(projected.rows(Tab.INTELLIGENCE).stream().noneMatch(row -> row.name().contains("StarSystemId[")),
+                "territorial labels should use actual system names");
         assertTrue(projected.rows(Tab.CONTACTS).isEmpty(), "no synthetic NPCs/contracts in migrated fresh state");
         assertTrue(projected.rows(Tab.HISTORY).isEmpty(), "no fake events");
         for (var faction : projected.rows(Tab.FACTIONS)) {

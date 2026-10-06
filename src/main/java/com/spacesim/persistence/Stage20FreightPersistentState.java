@@ -32,6 +32,8 @@ import java.util.Set;
  * @param freighters complete finite freight fleet state
  * @param cargoLots physical aboard-cargo provenance rows
  * @param orders ordinary persistent transport orders
+ * @param personalMiningOrders actual persistent personal excavation intents
+ * @param productLots provenance of actual countable finished goods aboard personal fleets
  */
 @SuppressWarnings("doclint:missing")
 public record Stage20FreightPersistentState(
@@ -45,10 +47,115 @@ public record Stage20FreightPersistentState(
         long nextCargoLotOrdinal,
         List<FreighterState> freighters,
         List<CargoLotState> cargoLots,
-        List<TransportOrderState> orders) {
+        List<TransportOrderState> orders,
+        List<PersonalMiningOrder> personalMiningOrders,
+        List<ProductCargoLotState> productLots) {
     /** Current physical-freight persistence schema. */
-    public static final int CURRENT_VERSION = 3;
+    public static final int CURRENT_VERSION = 7;
     private static final double EPSILON = 1.0e-9d;
+
+    /**
+     * Source-compatible constructor for checkpoints without finished-product cargo.
+     * @param schemaVersion owning freight schema
+     * @param rootSeed exact generated seed
+     * @param generatorVersion exact generated version
+     * @param worldFingerprint exact world fingerprint
+     * @param materializationVersion materialization authority version
+     * @param compatibilityAuthorityVersion physical hull/fit authority version
+     * @param nextFleetIdValue next persistent fleet identity
+     * @param nextCargoLotOrdinal next shared cargo-lot ordinal
+     * @param freighters physical fleet owners
+     * @param cargoLots raw commodity provenance
+     * @param orders ordinary freight routes
+     * @param personalMiningOrders personal mining work
+     */
+    public Stage20FreightPersistentState(int schemaVersion, long rootSeed, String generatorVersion,
+            String worldFingerprint, String materializationVersion, String compatibilityAuthorityVersion,
+            long nextFleetIdValue, long nextCargoLotOrdinal, List<FreighterState> freighters,
+            List<CargoLotState> cargoLots, List<TransportOrderState> orders, List<PersonalMiningOrder> personalMiningOrders) {
+        this(schemaVersion, rootSeed, generatorVersion, worldFingerprint, materializationVersion,
+                compatibilityAuthorityVersion, nextFleetIdValue, nextCargoLotOrdinal, freighters,
+                cargoLots, orders, personalMiningOrders, List.of());
+    }
+
+    /**
+     * Physical countable products, distinct from raw commodity mass and individual used modules.
+     * @param lotId globally unique shared cargo identity
+     * @param fleetId actual carrying fleet
+     * @param productId authored countable product
+     * @param count positive retained whole units
+     * @param sourceEndpointId actual original loading station
+     * @param loadedAtSimulationSeconds original authoritative loading time
+     */
+    public record ProductCargoLotState(String lotId, FleetId fleetId, String productId, int count,
+            String sourceEndpointId, double loadedAtSimulationSeconds) {
+        /**
+         * Validates finite source evidence for an existing physical product lot.
+         * @param lotId globally unique shared cargo identity
+         * @param fleetId actual carrying fleet
+         * @param productId authored countable product
+         * @param count positive retained whole units
+         * @param sourceEndpointId actual original loading station
+         * @param loadedAtSimulationSeconds original authoritative loading time
+         */
+        public ProductCargoLotState {
+            lotId = requireText(lotId, "product lot ID"); Objects.requireNonNull(fleetId);
+            productId = requireText(productId, "product ID"); sourceEndpointId = requireText(sourceEndpointId, "source endpoint");
+            if (count <= 0 || com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts().findProduct(productId) == null)
+                throw new IllegalArgumentException("Unknown or empty finished product lot");
+            requireNonNegativeFinite(loadedAtSimulationSeconds, "product loading time");
+            parseLotOrdinal(lotId);
+        }
+    }
+
+    /**
+     * Source-compatible constructor for checkpoints without personal mining work.
+     * @param schemaVersion freight schema
+     * @param rootSeed generated seed
+     * @param generatorVersion generated-world version
+     * @param worldFingerprint generated-world fingerprint
+     * @param materializationVersion materialization version
+     * @param compatibilityAuthorityVersion hull/fit authority version
+     * @param nextFleetIdValue next unused fleet identity
+     * @param nextCargoLotOrdinal next unused cargo-lot ordinal
+     * @param freighters exact finite fleets
+     * @param cargoLots exact aboard cargo
+     * @param orders exact transport orders
+     */
+    public Stage20FreightPersistentState(int schemaVersion, long rootSeed, String generatorVersion,
+            String worldFingerprint, String materializationVersion, String compatibilityAuthorityVersion,
+            long nextFleetIdValue, long nextCargoLotOrdinal, List<FreighterState> freighters,
+            List<CargoLotState> cargoLots, List<TransportOrderState> orders) {
+        this(schemaVersion, rootSeed, generatorVersion, worldFingerprint, materializationVersion,
+                compatibilityAuthorityVersion, nextFleetIdValue, nextCargoLotOrdinal, freighters,
+                cargoLots, orders, List.of());
+    }
+
+    /**
+     * SI extraction intent; creation awards no inventory, work or discovery.
+     * @param fleetId actual personal fleet
+     * @param sourceId contacted occurrence
+     * @param methodId authored extraction method
+     * @param requestedSourceKgPerTick gross-mass request per tick
+     * @param lastProcessedTick last completed or assigned tick
+     */
+    public record PersonalMiningOrder(FleetId fleetId, String sourceId, String methodId,
+            double requestedSourceKgPerTick, long lastProcessedTick) {
+        /**
+         * Validates an immutable excavation intent.
+         * @param fleetId actual personal fleet
+         * @param sourceId contacted occurrence
+         * @param methodId authored extraction method
+         * @param requestedSourceKgPerTick finite positive gross-mass request
+         * @param lastProcessedTick non-negative tick watermark
+         */
+        public PersonalMiningOrder {
+            Objects.requireNonNull(fleetId, "fleetId");
+            sourceId = requireText(sourceId, "sourceId"); methodId = requireText(methodId, "methodId");
+            requirePositiveFinite(requestedSourceKgPerTick, "requestedSourceKgPerTick");
+            if (lastProcessedTick < 0) throw new IllegalArgumentException("Negative mining tick");
+        }
+    }
 
     /** Physical route lifecycle for one real freighter. */
     public enum FreightPhase {
@@ -96,7 +203,29 @@ public record Stage20FreightPersistentState(
             String activeOrderId,
             int routeIndex,
             StationStorageSnapshot cargoStorage,
-            String legalFactionId) {
+            String legalFactionId, double carriedEquipmentMassKg) {
+        /**
+         * Source-compatible commodity-only cargo; grants no carried equipment.
+         * @param fleetId actual fleet
+         * @param stableFactionId original pool faction
+         * @param ownershipOrdinal original slot
+         * @param hullId original hull
+         * @param fitId actual fitting identifier
+         * @param cargoCapacityKg full hold capacity
+         * @param currentSystemId physical system
+         * @param physicalState actual kinematics
+         * @param phase actual freight lifecycle
+         * @param activeOrderId ordinary route order
+         * @param routeIndex actual route progress
+         * @param cargoStorage commodity hold
+         * @param legalFactionId actual legal affiliation
+         */
+        public FreighterState(FleetId fleetId, String stableFactionId, int ownershipOrdinal, String hullId,
+                String fitId, double cargoCapacityKg, StarSystemId currentSystemId, LocalPhysicalKinematics physicalState,
+                FreightPhase phase, String activeOrderId, int routeIndex, StationStorageSnapshot cargoStorage, String legalFactionId) {
+            this(fleetId, stableFactionId, ownershipOrdinal, hullId, fitId, cargoCapacityKg, currentSystemId,
+                    physicalState, phase, activeOrderId, routeIndex, cargoStorage, legalFactionId, 0);
+        }
         /**
          * Source-compatible bootstrap constructor; original pool faction is also initial legal faction.
          * @param fleetId ordinary fleet identity
@@ -136,6 +265,7 @@ public record Stage20FreightPersistentState(
          * @param routeIndex current order route index
          * @param cargoStorage exact Stage-18 cargo-hold snapshot
          * @param legalFactionId exact canonical world legal affiliation mirror
+         * @param carriedEquipmentMassKg full mass of individually tracked equipment in the composed campaign
          */
         public FreighterState {
             Objects.requireNonNull(fleetId, "fleetId");
@@ -155,19 +285,19 @@ public record Stage20FreightPersistentState(
                 throw new IllegalArgumentException("routeIndex must be non-negative");
             }
             Objects.requireNonNull(cargoStorage, "cargoStorage");
+            requireNonNegativeFinite(carriedEquipmentMassKg, "carriedEquipmentMassKg");
+            if (carriedEquipmentMassKg > 0 && phase != FreightPhase.IDLE)
+                throw new IllegalArgumentException("Individual equipment requires an operational personal idle freight fleet");
             if (!cargoStorage.stationId().equals(cargoHoldId(fleetId))) {
                 throw new IllegalArgumentException("cargo storage identity must derive from FleetId");
             }
             double storedMass = cargoStorage.commodityMassByIdKg().values().stream()
                     .mapToDouble(Double::doubleValue)
                     .sum();
-            for (Map.Entry<String, Integer> product : cargoStorage.productCountById().entrySet()) {
-                if (product.getValue() != 0) {
-                    throw new IllegalArgumentException(
-                            "Stage-20.5B freight hold currently persists commodity mass only");
-                }
-            }
-            if (storedMass > cargoCapacityKg + EPSILON) {
+            storedMass += productMassKg(cargoStorage.productCountById());
+            if (!cargoStorage.productCountById().isEmpty() && phase != FreightPhase.IDLE)
+                throw new IllegalArgumentException("Finished-product cargo requires an idle personal freight fleet");
+            if (storedMass + carriedEquipmentMassKg > cargoCapacityKg + EPSILON) {
                 throw new IllegalArgumentException("freighter cargo exceeds physical capacity");
             }
             if (phase == FreightPhase.IDLE && !activeOrderId.isEmpty()) {
@@ -179,11 +309,11 @@ public record Stage20FreightPersistentState(
             }
         }
 
-        /** @return total physical commodity mass aboard this fleet */
+        /** @return total physical commodity and individual equipment mass aboard this fleet */
         public double cargoMassKg() {
             return cargoStorage.commodityMassByIdKg().values().stream()
                     .mapToDouble(Double::doubleValue)
-                    .sum();
+                    .sum() + productMassKg(cargoStorage.productCountById()) + carriedEquipmentMassKg;
         }
 
         /** @return whether this physical asset can still execute orders */
@@ -335,12 +465,22 @@ public record Stage20FreightPersistentState(
      * @param freighters complete finite freight fleet
      * @param cargoLots current physical cargo provenance
      * @param orders ordinary persistent transport orders
+     * @param personalMiningOrders actual persistent personal excavation intents
+     * @param productLots actual countable finished-product provenance
      */
     public Stage20FreightPersistentState {
-        if (schemaVersion != CURRENT_VERSION && schemaVersion != 1 && schemaVersion != 2) {
+        if (schemaVersion < 1 || schemaVersion > CURRENT_VERSION) {
             throw new IllegalArgumentException("Unsupported Stage-20.5B freight schema: " + schemaVersion);
         }
         boolean historical = schemaVersion == 1;
+        if (schemaVersion < 7 && (!Objects.requireNonNull(productLots).isEmpty()
+                || freighters.stream().anyMatch(f -> !f.cargoStorage().productCountById().isEmpty())))
+            throw new IllegalArgumentException("Finished-product cargo requires freight schema 7");
+        if (schemaVersion < 6 && freighters.stream().anyMatch(f -> f.carriedEquipmentMassKg() != 0))
+            throw new IllegalArgumentException("Individual equipment requires freight schema 6");
+        boolean supportsExtraction = schemaVersion >= 4;
+        if (schemaVersion < 5 && !Objects.requireNonNull(personalMiningOrders, "personalMiningOrders").isEmpty())
+            throw new IllegalArgumentException("Personal mining work requires freight schema v5");
         if (schemaVersion < 3 && freighters.stream().anyMatch(f -> !f.legalFactionId().equals(f.stableFactionId())))
             throw new IllegalArgumentException("Historical freight cannot contain explicit legal affiliation");
         schemaVersion = CURRENT_VERSION;
@@ -381,6 +521,15 @@ public record Stage20FreightPersistentState(
         if (nextFleetIdValue <= maxFleetId) {
             throw new IllegalArgumentException("nextFleetIdValue must exceed every materialized fleet ID");
         }
+        var miningCopy = new ArrayList<>(Objects.requireNonNull(personalMiningOrders, "personalMiningOrders"));
+        miningCopy.sort(Comparator.comparing(PersonalMiningOrder::fleetId));
+        var miningFleetIds = new HashSet<FleetId>();
+        for (var mining : miningCopy) {
+            var fleet = fleetsById.get(mining.fleetId());
+            if (fleet == null || fleet.phase() != FreightPhase.IDLE || !miningFleetIds.add(mining.fleetId()))
+                throw new IllegalArgumentException("Mining requires a unique idle physical fleet");
+        }
+        personalMiningOrders = List.copyOf(miningCopy);
 
         Map<String, TransportOrderState> ordersById = new HashMap<>();
         Set<FleetId> orderedFleetIds = new HashSet<>();
@@ -400,13 +549,30 @@ public record Stage20FreightPersistentState(
                 throw new IllegalArgumentException("fleet current system differs from route index");
             }
         }
+
+        Set<String> lotIds = new HashSet<>();
+        var productCopy = new ArrayList<>(Objects.requireNonNull(productLots));
+        productCopy.sort(Comparator.comparing(ProductCargoLotState::lotId));
+        var countsByFleet = new HashMap<FleetId, Map<String, Integer>>();
+        for (var lot : productCopy) {
+            var fleet = fleetsById.get(lot.fleetId());
+            if (fleet == null || fleet.phase() != FreightPhase.IDLE || !lotIds.add(lot.lotId()))
+                throw new IllegalArgumentException("Finished-product provenance requires a unique existing personal cargo owner");
+            countsByFleet.computeIfAbsent(lot.fleetId(), ignored -> new java.util.TreeMap<>())
+                    .merge(lot.productId(), lot.count(), Math::addExact);
+            if (nextCargoLotOrdinal <= parseLotOrdinal(lot.lotId()))
+                throw new IllegalArgumentException("Product lot allocator must exceed retained identities");
+        }
+        for (var fleet : fleetCopy) if (!fleet.cargoStorage().productCountById()
+                .equals(countsByFleet.getOrDefault(fleet.fleetId(), Map.of())))
+            throw new IllegalArgumentException("Finished-product provenance differs from the physical hold");
+        productLots = List.copyOf(productCopy);
         for (FreighterState fleet : fleetCopy) {
             if (!fleet.activeOrderId().isEmpty() && !ordersById.containsKey(fleet.activeOrderId())) {
                 throw new IllegalArgumentException("fleet references an absent transport order");
             }
         }
 
-        Set<String> lotIds = new HashSet<>();
         Map<FleetId, Map<String, Double>> lotMassByFleetCommodity = new HashMap<>();
         long maxLotOrdinal = 0L;
         for (CargoLotState lot : lotCopy) {
@@ -415,8 +581,12 @@ public record Stage20FreightPersistentState(
             boolean manual = fleet != null && fleet.phase() == FreightPhase.IDLE
                     && lot.orderId().equals(manualCargoOrderId(fleet.fleetId()))
                     && lot.sourceProvenanceId().equals("player-market:" + lot.sourceEndpointId());
+            boolean extracted = fleet != null && fleet.phase() == FreightPhase.IDLE
+                    && lot.orderId().equals(personalExtractionOrderId(fleet.fleetId()))
+                    && lot.sourceProvenanceId().equals("player-extraction:" + lot.sourceEndpointId());
             if (historical && manual) throw new IllegalArgumentException("Manual cargo requires freight schema v2");
-            if (fleet == null || !manual && (order == null || !order.fleetId().equals(lot.fleetId())
+            if (extracted && !supportsExtraction) throw new IllegalArgumentException("Extracted personal cargo requires freight schema v4");
+            if (fleet == null || !manual && !extracted && (order == null || !order.fleetId().equals(lot.fleetId())
                     || !order.commodityId().equals(lot.commodityId())) || !lotIds.add(lot.lotId())) {
                 throw new IllegalArgumentException("cargo lot must match one existing fleet order");
             }
@@ -449,12 +619,31 @@ public record Stage20FreightPersistentState(
         return "freight-hold:" + Objects.requireNonNull(fleetId, "fleetId").value();
     }
 
+    private static double productMassKg(Map<String, Integer> counts) {
+        var products = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts();
+        double mass = 0d;
+        for (var entry : counts.entrySet()) {
+            var product = products.findProduct(entry.getKey());
+            if (product == null || entry.getValue() <= 0) throw new IllegalArgumentException("Invalid finished-product cargo");
+            mass += product.unitMassKg() * entry.getValue();
+        }
+        if (!Double.isFinite(mass)) throw new IllegalArgumentException("Finished-product cargo mass overflow");
+        return mass;
+    }
+
     /**
      * Identifies manually purchased cargo on one existing reserve fleet.
      * @param fleetId carrying reserve fleet
      * @return ordinary manually purchased cargo provenance identity
      */
     public static String manualCargoOrderId(FleetId fleetId) { return "player-market-cargo:" + fleetId.value(); }
+
+    /**
+     * Identifies physical extraction lots without disguising them as purchased cargo.
+     * @param fleetId carrying fleet
+     * @return personal extraction provenance bucket
+     */
+    public static String personalExtractionOrderId(FleetId fleetId) { return "player-extraction-cargo:" + fleetId.value(); }
 
     private static boolean sameMassMap(Map<String, Double> left, Map<String, Double> right) {
         Set<String> keys = new HashSet<>(left.keySet());

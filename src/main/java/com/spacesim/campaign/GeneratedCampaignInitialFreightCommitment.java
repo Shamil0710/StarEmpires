@@ -78,7 +78,7 @@ final class GeneratedCampaignInitialFreightCommitment {
                 freight.nextCargoLotOrdinal(),
                 freight.freighters(),
                 freight.cargoLots(),
-                orders);
+                orders, freight.personalMiningOrders(), freight.productLots());
 
         return new Stage20GeneratedWorldRuntimePersistentState(
                 source.schemaVersion(),

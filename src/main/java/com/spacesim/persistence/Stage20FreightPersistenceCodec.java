@@ -125,6 +125,7 @@ public final class Stage20FreightPersistenceCodec {
             output.writeInt(fleet.routeIndex());
             writeStorage(output, fleet.cargoStorage());
             writeText(output, fleet.legalFactionId());
+            output.writeDouble(fleet.carriedEquipmentMassKg());
         }
 
         writeCount(output, state.cargoLots().size(), "cargo lots", MAX_ROWS);
@@ -159,6 +160,17 @@ public final class Stage20FreightPersistenceCodec {
             output.writeDouble(order.deliveredMassKg());
             output.writeLong(order.delayedDeliveryCount());
         }
+        writeCount(output, state.personalMiningOrders().size(), "personal mining orders", MAX_ROWS);
+        for (var order : state.personalMiningOrders()) {
+            output.writeLong(order.fleetId().value()); writeText(output, order.sourceId());
+            writeText(output, order.methodId()); output.writeDouble(order.requestedSourceKgPerTick());
+            output.writeLong(order.lastProcessedTick());
+        }
+        writeCount(output, state.productLots().size(), "finished-product lots", MAX_ROWS);
+        for (var lot : state.productLots()) {
+            writeText(output, lot.lotId()); output.writeLong(lot.fleetId().value()); writeText(output, lot.productId());
+            output.writeInt(lot.count()); writeText(output, lot.sourceEndpointId()); output.writeDouble(lot.loadedAtSimulationSeconds());
+        }
     }
 
     private static Stage20FreightPersistentState readState(DataInputStream input) throws IOException {
@@ -191,7 +203,8 @@ public final class Stage20FreightPersistenceCodec {
                     readText(input, "activeOrderId"),
                     input.readInt(),
                     readStorage(input),
-                    schemaVersion >= 3 ? readText(input, "legalFactionId") : originFaction));
+                    schemaVersion >= 3 ? readText(input, "legalFactionId") : originFaction,
+                    schemaVersion >= 6 ? input.readDouble() : 0));
         }
 
         int lotCount = readCount(input, "cargo lots", MAX_ROWS);
@@ -241,6 +254,20 @@ public final class Stage20FreightPersistenceCodec {
                     input.readDouble(),
                     input.readLong()));
         }
+        var mining = new ArrayList<Stage20FreightPersistentState.PersonalMiningOrder>();
+        if (schemaVersion >= 5) {
+            int count = readCount(input, "personal mining orders", MAX_ROWS);
+            for (int i = 0; i < count; i++) mining.add(new Stage20FreightPersistentState.PersonalMiningOrder(
+                    new FleetId(input.readLong()), readText(input, "sourceId"), readText(input, "methodId"),
+                    input.readDouble(), input.readLong()));
+        }
+        var productLots = new ArrayList<Stage20FreightPersistentState.ProductCargoLotState>();
+        if (schemaVersion >= 7) {
+            int count = readCount(input, "finished-product lots", MAX_ROWS);
+            for (int i = 0; i < count; i++) productLots.add(new Stage20FreightPersistentState.ProductCargoLotState(
+                    readText(input, "product lot ID"), new FleetId(input.readLong()), readText(input, "product ID"),
+                    input.readInt(), readText(input, "product source endpoint"), input.readDouble()));
+        }
         return new Stage20FreightPersistentState(
                 schemaVersion,
                 rootSeed,
@@ -252,7 +279,7 @@ public final class Stage20FreightPersistenceCodec {
                 nextLotOrdinal,
                 fleets,
                 lots,
-                orders);
+                orders, mining, productLots);
     }
 
     private static void writeKinematics(DataOutputStream output, LocalPhysicalKinematics value)

@@ -17,6 +17,10 @@ import java.util.TreeMap;
  * <p>Stage-18 commodity mass and countable finished modules/ammunition share the same capacity by
  * storage class. This class intentionally does not reinterpret the legacy integer
  * {@code InventoryComponent}; migration between those models requires an explicit policy.</p>
+ * <p>Reserved process materials retain capacity occupancy. Their exact custody lives in the
+ * owning Stage18 process checkpoint and must be rebound by that queue on composed restore.</p>
+ * <p>Individual removed equipment also occupies physical capacity. Its identity and condition
+ * live in the campaign module-custody checkpoint; it is rebound separately from process reserves.</p>
  */
 public final class Stage18StationStorage {
     private static final double EPSILON = 1e-9d;
@@ -27,6 +31,16 @@ public final class Stage18StationStorage {
     private final Map<String, Double> capacityByStorageClassKg;
     private final Map<String, Double> commodityMassByIdKg;
     private final Map<String, Integer> productCountById;
+    // Process custody is persisted in Stage18 process orders, not duplicated in this snapshot.
+    private Map<String, Double> processReservationMassByStorageClassKg = Map.of();
+    // Individual used equipment is persisted by its custody owner, never as pristine counts.
+    private Map<String, Double> moduleCustodyMassByStorageClassKg = Map.of();
+    private Map<String, Double> repairReservationMassByStorageClassKg = Map.of();
+    private Map<String, Double> refitReservationMassByStorageClassKg = Map.of();
+    private Map<String, Double> constructionReservationMassByStorageClassKg = Map.of();
+    private Map<String, Double> yardConstructionReservationMassByStorageClassKg = Map.of();
+    // Finished goods remain in the physical count owner during pending handling.
+    private Map<String, Integer> productHandlingReservedCounts = Map.of();
 
     /**
      * Creates or restores one physical station storage state.
@@ -95,21 +109,21 @@ public final class Stage18StationStorage {
     }
 
     /**
-     * Returns stored finished-product count.
+     * Returns finished-product units available outside pending physical handling.
      *
      * @param productContentId existing module/ammunition content ID
      * @return non-negative unit count
      */
     public int productCount(String productContentId) {
         requireText(productContentId, "productContentId");
-        return productCountById.getOrDefault(productContentId, 0);
+        return productCountById.getOrDefault(productContentId, 0) - productHandlingReservedCounts.getOrDefault(productContentId, 0);
     }
 
     /**
      * Returns total occupied mass in one physical storage class.
      *
      * @param storageClassId Stage-18 storage class ID
-     * @return occupied mass in kilograms, including commodities and finished products
+     * @return occupied kilograms including process reserves, removed equipment, commodities and products
      */
     public double usedCapacityKg(String storageClassId) {
         requireKnownStorageClass(storageClassId);
@@ -126,7 +140,12 @@ public final class Stage18StationStorage {
                 used += product.unitMassKg() * entry.getValue();
             }
         }
-        return used;
+        return used + processReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + moduleCustodyMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + repairReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + refitReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + constructionReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + yardConstructionReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d);
     }
 
     /**
@@ -157,7 +176,7 @@ public final class Stage18StationStorage {
     /**
      * Captures a deterministic persistence-friendly storage snapshot.
      *
-     * @return immutable snapshot containing capacities and all physical inventory
+     * @return immutable capacities and available stock; process and equipment custody have separate owners
      */
     public StationStorageSnapshot snapshot() {
         return new StationStorageSnapshot(
@@ -232,7 +251,8 @@ public final class Stage18StationStorage {
         ProductDefinition product = requireProduct(productContentId);
         requirePositiveCount(count);
         double massKg = finiteProduct(product.unitMassKg(), count, "finished product mass");
-        return remainingCapacityKg(product.storageClassId()) + EPSILON >= massKg;
+        return count <= Integer.MAX_VALUE - productCountById.getOrDefault(productContentId, 0)
+                && remainingCapacityKg(product.storageClassId()) + EPSILON >= massKg;
     }
 
     void addProduct(String productContentId, int count) {
@@ -249,7 +269,7 @@ public final class Stage18StationStorage {
         if (stored < count) {
             throw new IllegalStateException("Insufficient station product count: " + productContentId);
         }
-        int remaining = stored - count;
+        int remaining = productCountById.getOrDefault(productContentId, 0) - count;
         if (remaining == 0) {
             productCountById.remove(productContentId);
         } else {
@@ -261,9 +281,150 @@ public final class Stage18StationStorage {
         TreeMap<String, Double> result = new TreeMap<>();
         for (Map.Entry<String, Double> capacity : capacityByStorageClassKg.entrySet()) {
             double productMass = productMassInStorageClassKg(capacity.getKey());
-            result.put(capacity.getKey(), Math.max(0d, capacity.getValue() - productMass));
+            result.put(capacity.getKey(), Math.max(0d, capacity.getValue() - productMass
+                    - processReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - moduleCustodyMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - repairReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - refitReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - constructionReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - yardConstructionReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)));
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    Map<String, Double> manufacturingLayerCapacityByStorageClassKg() {
+        var result = new TreeMap<>(capacityByStorageClassKg);
+        processReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        moduleCustodyMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        repairReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        refitReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        constructionReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        yardConstructionReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        return result;
+    }
+
+    void validateModuleCustodyReservation(Map<String, Double> masses) {
+        masses.forEach((id, mass) -> {
+            requireKnownStorageClass(id);
+            requireCapacityEntry(id, "removed module");
+            requireNonNegative(mass, "removed module mass");
+            double ordinary = usedCapacityKg(id) - moduleCustodyMassByStorageClassKg.getOrDefault(id, 0d);
+            if (ordinary + mass > capacityByStorageClassKg.get(id) + EPSILON)
+                throw new IllegalArgumentException("Removed modules exceed physical storage capacity: " + id);
+        });
+    }
+
+    void replaceModuleCustodyReservation(Map<String, Double> masses) {
+        validateModuleCustodyReservation(masses);
+        moduleCustodyMassByStorageClassKg = Collections.unmodifiableMap(new TreeMap<>(masses));
+    }
+
+    Map<String, Double> moduleCustodyReservation() { return moduleCustodyMassByStorageClassKg; }
+
+    void preflightRefitReservation(Map<String, Double> raw, Map<String, Integer> counts,
+            Map<String, Double> reserved, Map<String, Double> custody) {
+        var proposed = new Stage18StationStorage(ontology, products, stationId, capacityByStorageClassKg,
+                snapshotCommodityMassByIdKg(), snapshotProductCountById());
+        proposed.processReservationMassByStorageClassKg = processReservationMassByStorageClassKg;
+        proposed.moduleCustodyMassByStorageClassKg = moduleCustodyMassByStorageClassKg;
+        proposed.repairReservationMassByStorageClassKg = repairReservationMassByStorageClassKg;
+        proposed.refitReservationMassByStorageClassKg = refitReservationMassByStorageClassKg;
+        proposed.constructionReservationMassByStorageClassKg = constructionReservationMassByStorageClassKg;
+        proposed.yardConstructionReservationMassByStorageClassKg = yardConstructionReservationMassByStorageClassKg;
+        proposed.productHandlingReservedCounts = productHandlingReservedCounts;
+        proposed.replaceContentsWithRefitReservation(raw, counts, reserved, custody);
+    }
+
+    void replaceContentsWithRefitReservation(Map<String, Double> raw, Map<String, Integer> productCounts,
+            Map<String, Double> reserved, Map<String, Double> custody) {
+        var checked = new TreeMap<String, Double>();
+        reserved.forEach((id, mass) -> {
+            requireKnownStorageClass(id); requireCapacityEntry(id, "refit equipment");
+            requireNonNegative(mass, "refit reservation"); checked.put(id, mass);
+        });
+        var checkedCustody = new TreeMap<String, Double>();
+        custody.forEach((id, mass) -> {
+            requireKnownStorageClass(id); requireCapacityEntry(id, "removed equipment");
+            requireNonNegative(mass, "module custody"); checkedCustody.put(id, mass);
+        });
+        var previous = refitReservationMassByStorageClassKg; var previousCustody = moduleCustodyMassByStorageClassKg;
+        refitReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        moduleCustodyMassByStorageClassKg = Collections.unmodifiableMap(checkedCustody);
+        try { replaceContents(raw, productCounts); }
+        catch (RuntimeException failure) { refitReservationMassByStorageClassKg = previous; moduleCustodyMassByStorageClassKg = previousCustody; throw failure; }
+    }
+
+    void replaceContentsWithRepairReservation(Map<String, Double> raw, Map<String, Integer> products,
+            Map<String, Double> reserved) {
+        var checked = new TreeMap<String, Double>();
+        reserved.forEach((id, mass) -> {
+            requireKnownStorageClass(id); requireCapacityEntry(id, "repair material");
+            requireNonNegative(mass, "repair reservation"); checked.put(id, mass);
+        });
+        var previous = repairReservationMassByStorageClassKg;
+        repairReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        try { replaceContents(raw, products); }
+        catch (RuntimeException failure) { repairReservationMassByStorageClassKg = previous; throw failure; }
+    }
+
+    void replaceContentsWithConstructionReservation(Map<String, Double> commodities, Map<String, Integer> productCounts,
+            Map<String, Double> reservations) {
+        var checked = new TreeMap<String, Double>();
+        reservations.forEach((id, mass) -> {
+            requireKnownStorageClass(id);
+            requireCapacityEntry(id, "construction material");
+            requireNonNegative(mass, "construction reservation");
+            checked.put(id, mass);
+        });
+        var previous = constructionReservationMassByStorageClassKg;
+        constructionReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        try { replaceContents(commodities, productCounts); }
+        catch (RuntimeException failure) { constructionReservationMassByStorageClassKg = previous; throw failure; }
+    }
+
+    void replaceContentsWithYardConstructionReservation(Map<String, Double> commodities, Map<String, Integer> productCounts,
+            Map<String, Double> reservations) {
+        var checked = new TreeMap<String, Double>();
+        reservations.forEach((id, mass) -> {
+            requireKnownStorageClass(id); requireCapacityEntry(id, "yard construction material");
+            requireNonNegative(mass, "yard construction reservation"); checked.put(id, mass);
+        });
+        var previous = yardConstructionReservationMassByStorageClassKg;
+        yardConstructionReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        try { replaceContents(commodities, productCounts); }
+        catch (RuntimeException failure) { yardConstructionReservationMassByStorageClassKg = previous; throw failure; }
+    }
+
+    void replaceContentsWithProcessReservation(Map<String, Double> commodities, Map<String, Integer> productCounts,
+            Map<String, Double> reservations) {
+        var checked = new TreeMap<String, Double>();
+        reservations.forEach((id, mass) -> {
+            requireKnownStorageClass(id);
+            requireNonNegative(mass, "reserved process mass");
+            requireCapacityEntry(id, "reserved process material");
+            checked.put(id, mass);
+        });
+        var previous = processReservationMassByStorageClassKg;
+        processReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        try { replaceContents(commodities, productCounts); }
+        catch (RuntimeException failure) { processReservationMassByStorageClassKg = previous; throw failure; }
+    }
+
+    void bindProductHandlingReservations(Map<String, Integer> reserved) {
+        var checked = new TreeMap<String, Integer>();
+        reserved.forEach((id, count) -> {
+            requireProduct(id);
+            if (count == null || count <= 0 || count > productCountById.getOrDefault(id, 0))
+                throw new IllegalArgumentException("Finished-product reservation exceeds its physical source");
+            checked.put(id, count);
+        });
+        productHandlingReservedCounts = Map.copyOf(checked);
     }
 
     void replaceContents(Map<String, Double> commodityMasses, Map<String, Integer> productCounts) {
@@ -293,6 +454,9 @@ public final class Stage18StationStorage {
         }
 
         Map<String, Double> oldMasses = new TreeMap<>(commodityMassByIdKg);
+        for (var reserved : productHandlingReservedCounts.entrySet())
+            if (reserved.getValue() > checkedProducts.getOrDefault(reserved.getKey(), 0))
+                throw new IllegalArgumentException("Contents cannot consume reserved finished-product handling custody");
         Map<String, Integer> oldProducts = new TreeMap<>(productCountById);
         commodityMassByIdKg.clear();
         commodityMassByIdKg.putAll(checkedMasses);

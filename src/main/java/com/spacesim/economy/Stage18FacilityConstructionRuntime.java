@@ -222,7 +222,13 @@ public final class Stage18FacilityConstructionRuntime {
             return remainingWorkSeconds;
         }
 
-        private void consume(double workSeconds) {
+        /**
+         * Spends actual available work for another physical construction consumer sharing this interval.
+         * @param workSeconds finite non-negative amount no greater than the remaining budget
+         */
+        public void consume(double workSeconds) {
+            if (!Double.isFinite(workSeconds) || workSeconds < 0 || workSeconds > remainingWorkSeconds)
+                throw new IllegalArgumentException("Construction work exceeds its finite shared interval");
             remainingWorkSeconds = Math.max(0d, remainingWorkSeconds - workSeconds);
         }
     }

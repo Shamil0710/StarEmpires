@@ -87,7 +87,13 @@ public final class GeneratedCampaignCoordinator {
      * @return ordinary production campaign coordinator
      */
     public static GeneratedCampaignCoordinator create(long rootSeed) {
-        GeneratedCampaignSession initial = GeneratedCampaignSession.create(rootSeed);
+        return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
+    }
+
+    /** Creates explicit new-game asset manifests; restore retains its accepted exact checkpoint. */
+    public static GeneratedCampaignCoordinator create(long rootSeed,
+            com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
+        GeneratedCampaignSession initial = GeneratedCampaignSession.create(rootSeed, reservePolicy);
         Stage21IGeneratedWorldRuntimePersistentState initialized =
                 Stage21IGeneratedWorldRuntimeMigration.migrate(initial.captureState());
         Stage21IGeneratedWorldRuntimePersistentState nativeCheckpoint =
@@ -324,6 +330,7 @@ public final class GeneratedCampaignCoordinator {
                         authoritativeTick));
         for (ReviewResult review : batch.reviews()) {
             latestDecisionTraceByFaction.put(review.updatedState().factionContentId(), review.trace());
+            GeneratedCampaignNpcPlacement.review(this, review.updatedState().factionContentId(), authoritativeTick);
         }
     }
 }

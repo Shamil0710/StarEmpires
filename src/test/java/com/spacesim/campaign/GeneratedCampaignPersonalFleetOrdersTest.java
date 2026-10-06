@@ -19,6 +19,9 @@ class GeneratedCampaignPersonalFleetOrdersTest {
         var adopted=c.submitPlayerFactionCommand(preview);assertEquals(before,c.captureState());
         assertNull(adopted.playerState().orElseThrow().factionContentId());
         assertEquals(PlayerFleetOrderState.hold(id),adopted.playerState().orElseThrow().fleetOrders().get(0));
+        var receipt=adopted.playerJournal().entries().get(adopted.playerJournal().entries().size()-1);
+        assertEquals("FLEET_HOLD",receipt.action());assertEquals(id.value(),receipt.fleetId());
+        assertEquals(0,receipt.walletDeltaMilliCredits());assertEquals(adopted.coordinator().runtime().world().getAuthoritativeWorldTick(),receipt.tick());
         assertThrows(IllegalStateException.class,()->c.submitPlayerFactionCommand(preview));roundtrip(adopted);
         assertFalse(c.previewPlayerFleetOrder(PlayerFleetOrderState.hold(c.playerState().orElseThrow().activeFleetId())).allowed());
         var foreign=c.coordinator().runtime().freight().capture().freighters().stream().filter(f->!c.playerState().orElseThrow().ownedFleetIds().contains(f.fleetId())).findFirst().orElseThrow();

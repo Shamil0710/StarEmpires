@@ -28,6 +28,9 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
     /** Industrial Union inter-system bulk freight fit. */
     public static final String UNION_FREIGHT_STRATEGIC_FIT =
             "fit.industrial_union.freight.strategic_v1";
+    /** Same Union strategic freight hull with its cargo section replaced by excavation equipment. */
+    public static final String UNION_MINING_FREIGHT_STRATEGIC_FIT =
+            "fit.industrial_union.freight.strategic_mining_v1";
     /** Empire freight-only long-haul drive package. */
     public static final String EMPIRE_LONG_HAUL_DRIVE =
             "module.empire_drive_longhaul_freight_v1";
@@ -58,6 +61,11 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
     public static ShipEngineeringCatalog loadDefault() {
         ShipEngineeringCatalog base = Stage22CorePairEngineeringCatalogLoader.loadDefault();
         ArrayList<ModuleDefinition> modules = new ArrayList<>(base.getModules());
+        // Admit the already authored civilian mining hardware to the common runtime catalog.
+        // Existing fits are untouched; this supplies no installed equipment or new physical asset.
+        ShipEngineeringCatalog mining = Stage22CivilianMiningEngineeringCatalogLoader.loadDefault();
+        modules.add(Objects.requireNonNull(mining.findModule(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID)));
+        modules.add(Objects.requireNonNull(mining.findModule(Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID)));
         modules.add(longHaulDrive(
                 base, EMPIRE_BASE_DRIVE, EMPIRE_LONG_HAUL_DRIVE,
                 "Imperial Long-Haul Freight Drive"));
@@ -66,10 +74,12 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
                 "Union Long-Haul Freight Drive"));
 
         ArrayList<DemonstratorFitDefinition> fits = new ArrayList<>(base.getDemonstratorFits());
+        fits.add(Objects.requireNonNull(mining.findDemonstratorFit(Stage22CivilianMiningEngineeringCatalogLoader.MINING_FIT_ID)));
         fits.add(strategicFreight(
                 base, EMPIRE_BASE, EMPIRE_FREIGHT_STRATEGIC_FIT, EMPIRE_LONG_HAUL_DRIVE));
         fits.add(strategicFreight(
                 base, UNION_BASE, UNION_FREIGHT_STRATEGIC_FIT, UNION_LONG_HAUL_DRIVE));
+        fits.add(miningFreight(fits.get(fits.size() - 1)));
         return new ShipEngineeringCatalog(
                 base.getSchemaVersion(),
                 base.getMigrationVersion(),
@@ -79,6 +89,25 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
                 base.getHulls(),
                 List.copyOf(modules),
                 List.copyOf(fits));
+    }
+
+    private static DemonstratorFitDefinition miningFreight(DemonstratorFitDefinition source) {
+        ArrayList<InstalledModuleDefinition> installed = new ArrayList<>();
+        int replaced = 0;
+        for (InstalledModuleDefinition assignment : source.installedModules()) {
+            if ("module.industrial_union_cargo_section_v1".equals(assignment.moduleId())) {
+                installed.add(new InstalledModuleDefinition(assignment.mountId(),
+                        Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID));
+                replaced++;
+            } else {
+                installed.add(assignment);
+            }
+        }
+        if (replaced != 1) {
+            throw new IllegalStateException("Mining freight refit requires exactly one cargo section");
+        }
+        return new DemonstratorFitDefinition(UNION_MINING_FREIGHT_STRATEGIC_FIT,
+                source.hullId(), List.copyOf(installed));
     }
 
     private static ModuleDefinition longHaulDrive(

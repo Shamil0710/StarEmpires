@@ -64,12 +64,19 @@ public final class GeneratedCampaignSession {
      * @return ordinary long-lived campaign session
      */
     public static GeneratedCampaignSession create(long rootSeed) {
-        var generated = Stage20PlayableGeneratedWorldFactory.create(rootSeed);
+        return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
+    }
+
+    /** Starts explicit new-game capital loadouts without reconfiguring resumed assets. */
+    public static GeneratedCampaignSession create(long rootSeed,
+            com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
+        var generated = Stage20PlayableGeneratedWorldFactory.create(rootSeed, reservePolicy);
         Stage20GeneratedWorldRuntimePersistentState berthed =
                 GeneratedCampaignInitialTrafficBerth.apply(generated.runtime().captureState());
         Stage20GeneratedWorldRuntimePersistentState prepared =
                 GeneratedCampaignInitialFreightCommitment.apply(berthed);
-        LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(prepared);
+        LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(prepared,
+                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
         return new GeneratedCampaignSession(generated.rootSeed(), generated.content(), runtime);
     }
 
@@ -81,7 +88,8 @@ public final class GeneratedCampaignSession {
      */
     public static GeneratedCampaignSession restore(Stage20GeneratedWorldRuntimePersistentState checkpoint) {
         Stage20GeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(checkpoint, "checkpoint");
-        LiveRuntime restored = Stage20GeneratedWorldRuntimeBridge.restore(saved);
+        LiveRuntime restored = Stage20GeneratedWorldRuntimeBridge.restore(saved,
+                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
         return new GeneratedCampaignSession(
                 saved.campaign().generationIdentity().worldSeed(),
                 ContentCatalogLoader.loadDefault(),

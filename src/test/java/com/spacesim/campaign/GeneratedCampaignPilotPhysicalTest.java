@@ -91,7 +91,8 @@ class GeneratedCampaignPilotPhysicalTest {
     }
 
     @Test void historicalFreightSchemaMigratesWithoutCargoAndManualCargoCannotLosePersonalOwner() throws Exception {
-        var c = Stage228CampaignAuthority.create(1);
+        var c = Stage228CampaignAuthority.create(1, java.util.List.of(),
+                com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
         var freight = c.coordinator().runtime().freight().capture();
         byte[] old;
         try (var in = new java.util.zip.GZIPInputStream(getClass().getResourceAsStream("/campaign/stage23b-freight-v2.s20f.gz"))) { old = in.readAllBytes(); }
@@ -99,10 +100,10 @@ class GeneratedCampaignPilotPhysicalTest {
         java.nio.ByteBuffer.wrap(old).putInt(8, 1);
         var original = old.clone();
         assertEquals(freight, Stage20FreightPersistenceCodec.decode(old));
-        assertEquals(3, Stage20FreightPersistenceCodec.decode(old).schemaVersion());
+        assertEquals(Stage20FreightPersistentState.CURRENT_VERSION, Stage20FreightPersistenceCodec.decode(old).schemaVersion());
         assertArrayEquals(original, old);
         byte[] future = Stage20FreightPersistenceCodec.encode(freight);
-        java.nio.ByteBuffer.wrap(future).putInt(8, 4);
+        java.nio.ByteBuffer.wrap(future).putInt(8, Stage20FreightPersistentState.CURRENT_VERSION + 1);
         assertThrows(IllegalArgumentException.class, () -> Stage20FreightPersistenceCodec.decode(future));
         c.submitIndependentPilotStart(c.previewIndependentPilotStart()); var endpoint = market(c);
         position(c, LocalPhysicalKinematics.stationary(endpoint.position().translated(500, 0)));

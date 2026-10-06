@@ -85,6 +85,7 @@ public final class Stage21HMissionAuthority {
         MissionObjective checked = Objects.requireNonNull(objective, "Mission objective not set");
         long tick = checkedWorld.getAuthoritativeWorldTick();
         return switch (checked.kind()) {
+            case PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> new Observation(Result.PENDING, "personal-supply.awaiting-physical-receipt", tick);
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> freightDelivered(freight, checked, tick);
             case FLEET_PRESENT_IN_SYSTEM -> fleetPresent(checkedWorld, checked, tick);
             case FLEET_ABSENT -> fleetAbsent(checkedWorld, checked, tick);
@@ -127,6 +128,7 @@ public final class Stage21HMissionAuthority {
         String issuer = requireText(issuerFactionId, "Issuer faction");
         MissionObjective checked = Objects.requireNonNull(objective, "Mission objective not set");
         switch (checked.kind()) {
+            case PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> requirePersonalSupplyStation(checkedWorld, industry, discovery, issuer, checked);
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> {
                 TransportOrderState order = requireFreightOrder(freight, checked.subjectId());
                 if (!issuer.equals(order.stableFactionId())) {
@@ -175,6 +177,25 @@ public final class Stage21HMissionAuthority {
                 }
             }
         }
+    }
+
+    private static void requirePersonalSupplyStation(WorldSimulation world, Stage18IndustrialState industry,
+            Stage20DiscoveryKnowledgeState discovery, String issuer, MissionObjective objective) {
+        requireDiscoveryOwner(discovery, issuer);
+        if (com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault().findCommodity(objective.requiredState()) == null)
+            throw new IllegalStateException("Supply contract requires an authored physical commodity");
+        var ref = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(
+                new StarSystemId(objective.systemId()), com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE,
+                objective.subjectId());
+        if (discovery.knowledge(ref).filter(k -> k.knownLocation().isPresent()).isEmpty()
+                || industry.stationStorages().stream().noneMatch(s -> s.stationId().equals(objective.subjectId())))
+            throw new IllegalStateException("Supply issuer requires its archived actual receiving storage");
+        int owner = world.findFactionRuntimeId(issuer).orElseThrow();
+        boolean legal = world.snapshot().systems().stream().filter(s -> s.systemId().value() == objective.systemId())
+                .flatMap(s -> s.simulationState().entities().stream()).anyMatch(e -> e.market() != null && e.identity() != null
+                        && e.identity().name().equals("Generated market v2 " + objective.subjectId())
+                        && e.faction() != null && e.faction().factionId() == owner);
+        if (!legal) throw new IllegalStateException("Supply contract requires its actual legally registered receiving operator");
     }
 
     private static Observation freightDelivered(

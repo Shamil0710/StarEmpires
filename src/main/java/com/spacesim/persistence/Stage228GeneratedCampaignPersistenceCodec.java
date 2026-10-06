@@ -15,15 +15,16 @@ import java.util.Objects;
 /**
  * Deterministic bounded file codec for the evolving M22.8 campaign envelope.
  *
- * <p>Version 5 embeds the accepted Stage-21I checkpoint unchanged plus independently versioned
- * A/B/C and M operations sidecars plus the existing optional player contract. Native v1(A), v2(B),
- * v3(C) and v4(M) files migrate explicitly without
+ * <p>Version 11 embeds the accepted Stage-21I checkpoint unchanged plus independently versioned
+ * A/B/C and M operations sidecars, the existing optional player contract, bounded personal journal
+ * and individual used-equipment custody, pending repair and refit work. Native v1(A), v2(B),
+ * v3(C), v4(M), v5(player), v6(journal), v7(equipment custody) and v8(repair) files migrate explicitly without
  * synthesizing later state. Supported Stage-20.5/21A-I files still migrate through the accepted
  * Stage-21I chain and receive empty non-granting M22.8 sidecars.</p>
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 5;
+    private static final int FILE_VERSION = 16;
     private static final int M22_8M_FILE_VERSION = 4;
     private static final String M22_8M_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
     private static final int MAX_PLAYER_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -59,6 +60,13 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         byte[] flightDeck = Stage228FlightDeckPersistenceCodec.encode(checked.flightDeck());
         byte[] operations = Stage228OperationsPersistenceCodec.encode(checked.operations());
         byte[] player = GeneratedCampaignPlayerStateCodec.encode(checked.playerState());
+        byte[] journal = PlayerJournalPersistenceCodec.encode(checked.playerJournal());
+        byte[] custody = ShipyardModuleCustodyPersistenceCodec.encode(checked.moduleCustody());
+        byte[] repairs = ShipyardRepairQueuePersistenceCodec.encode(checked.repairQueue());
+        byte[] refits = ShipyardRefitQueuePersistenceCodec.encode(checked.refitQueue());
+        byte[] transfers = ShipyardModuleTransferQueuePersistenceCodec.encode(checked.moduleTransfers());
+        byte[] products = FinishedProductTransferQueuePersistenceCodec.encode(checked.productTransfers());
+        byte[] yards = Stage23YardConstructionPersistenceCodec.encode(checked.yardConstruction());
         requirePayload(stage21, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime");
         requirePayload(smallCraft, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft");
         requirePayload(hangars, MAX_HANGAR_PAYLOAD_BYTES, "M22.8B hangars");
@@ -78,6 +86,13 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 writePayload(out, flightDeck);
                 writePayload(out, operations);
                 writePayload(out, player);
+                writePayload(out, journal);
+                writePayload(out, custody);
+                writePayload(out, repairs);
+                writePayload(out, refits);
+                writePayload(out, transfers);
+                writePayload(out, products);
+                writePayload(out, yards);
             }
             byte[] result = buffer.toByteArray();
             if (result.length <= 0 || result.length > MAX_BYTES) {
@@ -90,9 +105,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         }
     }
 
-    /** Decodes native M22.8A/B/C/M and migrates older native layouts to current v5.
+    /** Decodes native M22.8A/B/C/M and migrates older native layouts to the current envelope.
      * @param bytes native M22.8 checkpoint bytes
-     * @return validated current v5 envelope
+     * @return validated current envelope
      */
     public static Stage228GeneratedCampaignPersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
@@ -104,15 +119,22 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 throw new IllegalArgumentException("Invalid M22.8 checkpoint magic");
             }
             int fileVersion = in.readInt();
-            return switch (fileVersion) {
+            var decoded = switch (fileVersion) {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
                 case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case M22_8C_FILE_VERSION -> decodeM22_8C(in);
-                case M22_8M_FILE_VERSION -> decodeCurrent(in, false);
-                case FILE_VERSION -> decodeCurrent(in, true);
+                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, FILE_VERSION -> decodeCurrent(in, fileVersion);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
             };
+            var stage20 = decoded.stage21Runtime().stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
+                    .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
+            if (fileVersion < 16 && stage20.freight().materializationVersion().equals(Stage20FreightRuntimeMaterializer.MINING_RESERVE_VERSION))
+                throw new IllegalArgumentException("Initial NPC mining reserve manifest requires native campaign v16");
+            if (fileVersion < 15 && decoded.stage21Runtime().stage21HRuntime().npcMissionState().missions().stream().anyMatch(m ->
+                    m.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST))
+                throw new IllegalArgumentException("Personal physical supply contracts require native campaign v15");
+            return decoded;
         } catch (EOFException exception) {
             throw new IllegalArgumentException("M22.8 checkpoint is truncated", exception);
         } catch (IOException | RuntimeException exception) {
@@ -125,7 +147,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
 
     /** Decodes native M22.8 or adopts any source supported by final Stage-21 migration.
      * @param bytes native M22.8 or supported Stage-20.5/21A-I bytes
-     * @return current v5 envelope
+     * @return current envelope
      */
     public static Stage228GeneratedCampaignPersistentState decodeOrMigrate(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
@@ -187,7 +209,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
 
     /** Reads native M22.8 or adopts any source supported by final Stage-21 migration.
      * @param path native or supported legacy checkpoint
-     * @return current v5 checkpoint
+     * @return current checkpoint
      * @throws IOException when bytes cannot be read
      */
     public static Stage228GeneratedCampaignPersistentState readOrMigrate(Path path)
@@ -265,14 +287,13 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 stage21, smallCraft, hangars, flightDeck);
     }
 
-    private static Stage228GeneratedCampaignPersistentState decodeCurrent(DataInputStream in, boolean hasPlayerPayload)
+    private static Stage228GeneratedCampaignPersistentState decodeCurrent(DataInputStream in, int fileVersion)
             throws IOException {
         int schemaVersion = in.readInt();
         String runtimeVersion = in.readUTF();
-        int expectedSchema = hasPlayerPayload
-                ? Stage228GeneratedCampaignPersistentState.CURRENT_VERSION : M22_8M_FILE_VERSION;
-        String expectedRuntime = hasPlayerPayload
-                ? Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION : M22_8M_RUNTIME_VERSION;
+        boolean hasPlayerPayload = fileVersion >= 5;
+        int expectedSchema = fileVersion;
+        String expectedRuntime = "m22.8.generated-campaign.v" + fileVersion;
         if (schemaVersion != expectedSchema || !expectedRuntime.equals(runtimeVersion)) {
             throw new IllegalArgumentException(
                     "Unsupported current M22.8 envelope identity: "
@@ -292,9 +313,43 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         com.spacesim.player.PlayerState player = hasPlayerPayload
                 ? GeneratedCampaignPlayerStateCodec.decode(
                         readPayload(in, MAX_PLAYER_PAYLOAD_BYTES, "Player state")) : null;
+        var journal = fileVersion >= 6 ? PlayerJournalPersistenceCodec.decode(
+                readPayload(in, PlayerJournalPersistenceCodec.MAX_BYTES, "Player journal"))
+                : com.spacesim.player.PlayerJournalState.empty();
+        var custody = fileVersion >= 7 ? ShipyardModuleCustodyPersistenceCodec.decode(
+                readPayload(in, ShipyardModuleCustodyPersistenceCodec.MAX_BYTES, "Individual module custody"))
+                : com.spacesim.economy.ShipyardModuleCustodyState.empty();
+        var repairs = fileVersion >= 8 ? ShipyardRepairQueuePersistenceCodec.decode(
+                readPayload(in, ShipyardRepairQueuePersistenceCodec.MAX_BYTES, "Repair work queue"))
+                : com.spacesim.economy.ShipyardRepairQueueState.empty();
+        var refits = fileVersion >= 9 ? ShipyardRefitQueuePersistenceCodec.decode(
+                readPayload(in, ShipyardRefitQueuePersistenceCodec.MAX_BYTES, "Refit work queue"))
+                : com.spacesim.economy.ShipyardRefitQueueState.empty();
+        var transfers = fileVersion >= 10 ? ShipyardModuleTransferQueuePersistenceCodec.decode(
+                readPayload(in, ShipyardModuleTransferQueuePersistenceCodec.MAX_BYTES, "Individual module handling"))
+                : com.spacesim.economy.ShipyardModuleTransferWorkQueue.State.empty();
+        var products = fileVersion >= 11 ? FinishedProductTransferQueuePersistenceCodec.decode(
+                readPayload(in, FinishedProductTransferQueuePersistenceCodec.MAX_BYTES, "Finished product handling"))
+                : com.spacesim.economy.FinishedProductTransferWorkQueue.State.empty();
+        var yards = fileVersion >= 12 ? Stage23YardConstructionPersistenceCodec.decode(
+                readPayload(in, Stage23YardConstructionPersistenceCodec.MAX_BYTES, "Physical yard construction"))
+                : com.spacesim.economy.Stage23YardConstructionWorkQueue.State.empty();
+        if (fileVersion < 10 && custody.modules().stream().anyMatch(row -> row.stationId().startsWith("freight-hold:")))
+            throw new IllegalArgumentException("Aboard equipment requires native campaign v10");
+        if (fileVersion < 13 && repairs.orders().stream().anyMatch(order -> order.servicePayment() != null))
+            throw new IllegalArgumentException("Held foreign repair money requires native campaign v13");
+        if (fileVersion < 14 && (refits.orders().stream().anyMatch(order -> order.servicePayment() != null)
+                || custody.modules().stream().anyMatch(module -> module.ownerActorId() != null)
+                || refits.orders().stream().flatMap(order -> order.reservedUsedModulesByTargetMount().values().stream())
+                        .anyMatch(module -> module.ownerActorId() != null)))
+            throw new IllegalArgumentException("Paid refit and explicit equipment rights require native campaign v14");
+        if (fileVersion < 15 && stage21.stage21HRuntime().npcMissionState().missions().stream().anyMatch(m ->
+                m.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST))
+            throw new IllegalArgumentException("Personal physical supply contracts require native campaign v15");
         requireEnd(in);
-        return Stage228GeneratedCampaignPersistentState.compose(
-                stage21, smallCraft, hangars, flightDeck, operations, player);
+        return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
+                Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
+                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards);
     }
 
     private static void requireEnd(DataInputStream in) throws IOException {

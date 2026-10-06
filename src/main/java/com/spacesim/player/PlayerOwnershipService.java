@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Stage-12B atomic ownership transfer service for existing physical world fleets.
+ * Atomic ownership transfer service for existing physical world fleets and stations.
  *
- * <p>Ownership is represented only by PlayerState FleetIds and is deliberately independent from a
+ * <p>Ownership is represented by PlayerState FleetIds/OwnedStationRefs and is deliberately independent from a
  * fleet's faction/legal components. Purchase and sale transfer existing money between the player
  * wallet and an explicit persistent counterparty wallet; no entity is spawned or duplicated.</p>
  */
@@ -49,6 +49,38 @@ public final class PlayerOwnershipService {
         WalletComponent payer = new WalletComponent(previous.walletMilliCredits());
         if (!runtime.world().transferToFactionTreasury(sellerFactionId, payer, PLAYER_LEDGER_NAME,
                 priceMilliCredits, "player-reserve-fleet-purchase")) return false;
+        runtime.replacePlayerState(candidate);
+        return true;
+    }
+
+    /**
+     * Acquires an existing station after the caller has validated its ordinary sale offer.
+     * Personal ownership changes independently of legal faction affiliation, as for fleet assets.
+     * @param stationRef exact persistent station identity
+     * @param sellerFactionId actual legal seller receiving consideration
+     * @param priceMilliCredits positive disclosed sale price
+     * @return whether money and station ownership committed without creating any assets
+     */
+    public boolean purchaseFactionStation(OwnedStationRef stationRef, String sellerFactionId, long priceMilliCredits) {
+        Objects.requireNonNull(stationRef);
+        PlayerState previous = runtime.player();
+        var session = runtime.world().findSession(stationRef.systemId()).orElse(null);
+        var entity = session == null ? null : session.getEntityRegistry().find(stationRef.stationEntityId());
+        var identity = entity == null ? null : entity.getComponent(com.spacesim.components.IdentityComponent.class);
+        var faction = entity == null ? null : entity.getComponent(com.spacesim.components.FactionComponent.class);
+        var seller = runtime.world().findFactionRuntimeId(sellerFactionId);
+        if (priceMilliCredits <= 0 || previous.walletMilliCredits() < priceMilliCredits
+                || previous.ownedStations().contains(stationRef) || identity == null
+                || identity.kind != com.spacesim.components.IdentityComponent.Kind.STATION
+                || faction == null || seller.isEmpty() || faction.factionId != seller.get()) return false;
+        var owned = new ArrayList<>(previous.ownedStations()); owned.add(stationRef);
+        var candidate = new PlayerState(previous.walletMilliCredits() - priceMilliCredits, previous.factionContentId(),
+                previous.reputations(), previous.ownedFleetIds(), previous.activeFleetId(), previous.discoveredSystemIds(),
+                previous.discoveredObjects(), previous.homeSystemId(), previous.dockedAt(), previous.fleetOrders(),
+                previous.threatIntel(), previous.ownedConstructionProjectIds(), owned);
+        var payer = new WalletComponent(previous.walletMilliCredits());
+        if (!runtime.world().transferToFactionTreasury(sellerFactionId, payer, PLAYER_LEDGER_NAME,
+                priceMilliCredits, "player-existing-station-purchase")) return false;
         runtime.replacePlayerState(candidate);
         return true;
     }

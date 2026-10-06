@@ -32,6 +32,66 @@ class Stage20IndustrialEntityMaterializerTest {
     private static volatile CadenceFixture sharedFixture;
 
     @Test
+    void completedYardAdoptionPreservesExistingResourcesAndRejectsUnpaidOrConflictingStructures() {
+        var fixture = fixture();
+        var initial = savedState(fixture, Stage18IndustrialState.empty(0L));
+        var registry = Stage20IndustrialEntityMaterializer.materializeBootstrap(initial, fixture.specialization());
+        var station = registry.stations().stream()
+                .filter(s -> s.stationNode().locationTag().equals("location.orbital_station") && !s.yards().isEmpty()).findFirst().orElseThrow();
+        var catalog = Stage23YardConstructionCatalog.loadDefault();
+        var spec = catalog.find("yard.orbital_escort_v1");
+        // Explicit completed-work fixture tests admission; real material custody is covered by the queue test.
+        var completed = new com.spacesim.economy.Stage23YardConstructionWorkQueue.Order("yard-admission", "new-yard",
+                spec.yardDefinitionId(), station.stationId(), station.stationNode().locationTag(), 1, spec.requiredWorkSeconds());
+        var queue = new com.spacesim.economy.Stage23YardConstructionWorkQueue(catalog, Stage18ResourceOntologyLoader.loadDefault(),
+                new com.spacesim.economy.Stage23YardConstructionWorkQueue.State(catalog.fingerprint(), 2, List.of(completed)));
+        var updated = registry.adoptCompletedYardConstruction(List.of(completed), queue);
+        var installedStation = updated.station(station.stationId());
+        assertEquals(station.storage().snapshot(), installedStation.storage().snapshot());
+        assertEquals(station.facilities(), installedStation.facilities());
+        assertEquals(station.facilityCapabilities(), installedStation.facilityCapabilities());
+        assertEquals(station.yards().size() + 1, installedStation.yards().size());
+        var installed = installedStation.yards().stream().filter(y -> y.yardInstanceId().equals("new-yard")).findFirst().orElseThrow();
+        assertFalse(installed.enabled()); assertEquals(1d, installed.conditionFraction());
+        assertEquals(0d, installed.allocatedIntegrationPowerW()); assertEquals(0d, installed.availableIntegrationWorkRate());
+        assertEquals(0, installed.availableLaborCapacity()); assertEquals(0, installed.availableAutomationCapacity());
+        assertFalse(installedStation.yardCapabilities().stream().filter(y -> y.yardInstanceId().equals("new-yard")).findFirst().orElseThrow().active());
+        assertEquals(updated, updated.adoptCompletedYardConstruction(List.of(completed), queue));
+        var working = updated.allocateYardResources(station.stationId(), "new-yard");
+        var workingStation = working.station(station.stationId());
+        assertTrue(workingStation.yardCapabilities().stream().filter(y -> y.yardInstanceId().equals("new-yard")).findFirst().orElseThrow().active());
+        assertEquals(installedStation.yards().stream().mapToDouble(y -> y.allocatedIntegrationPowerW()).sum(),
+                workingStation.yards().stream().mapToDouble(y -> y.allocatedIntegrationPowerW()).sum(), 1e-6);
+        assertEquals(installedStation.yards().stream().mapToDouble(y -> y.availableIntegrationWorkRate()).sum(),
+                workingStation.yards().stream().mapToDouble(y -> y.availableIntegrationWorkRate()).sum(), 1e-6);
+        assertEquals(installedStation.yards().stream().mapToLong(y -> y.availableLaborCapacity()).sum(),
+                workingStation.yards().stream().mapToLong(y -> y.availableLaborCapacity()).sum());
+        assertEquals(installedStation.yards().stream().mapToLong(y -> y.availableAutomationCapacity()).sum(),
+                workingStation.yards().stream().mapToLong(y -> y.availableAutomationCapacity()).sum());
+        assertEquals(working, working.adoptCompletedYardConstruction(List.of(completed), queue), "Re-admission must retain allocated operating resources");
+        var workingCheckpoint = working.captureIndustrialState(initial.industrialState());
+        assertEquals(workingCheckpoint, Stage20IndustrialEntityMaterializer.restore(replaceIndustry(initial, workingCheckpoint))
+                .captureIndustrialState(initial.industrialState()));
+        assertEquals(updated.captureIndustrialState(initial.industrialState()),
+                Stage20IndustrialEntityMaterializer.restore(replaceIndustry(initial,
+                        updated.captureIndustrialState(initial.industrialState()))).captureIndustrialState(initial.industrialState()));
+        var partial = new com.spacesim.economy.Stage23YardConstructionWorkQueue.Order(completed.orderId(), completed.yardInstanceId(),
+                completed.yardDefinitionId(), completed.stationId(), completed.locationTag(), 1, 0);
+        assertThrows(IllegalArgumentException.class, () -> registry.adoptCompletedYardConstruction(List.of(partial), queue));
+        var existing = station.yards().get(0);
+        {
+            var otherDesign = catalog.specifications().stream()
+                    .filter(s -> !s.yardDefinitionId().equals(existing.yardDefinitionId())).findFirst().orElseThrow();
+            var conflicting = new com.spacesim.economy.Stage23YardConstructionWorkQueue.Order("conflict", existing.yardInstanceId(),
+                    otherDesign.yardDefinitionId(), station.stationId(), station.stationNode().locationTag(), 1,
+                    otherDesign.requiredWorkSeconds());
+            var conflictQueue = new com.spacesim.economy.Stage23YardConstructionWorkQueue(catalog, Stage18ResourceOntologyLoader.loadDefault(),
+                    new com.spacesim.economy.Stage23YardConstructionWorkQueue.State(catalog.fingerprint(), 2, List.of(conflicting)));
+            assertThrows(IllegalArgumentException.class, () -> updated.adoptCompletedYardConstruction(List.of(conflicting), conflictQueue));
+        }
+    }
+
+    @Test
     void acceptedSpecializationMaterializesExactStage18StationFacilityStorageAndYardState() {
         CadenceFixture fixture = fixture();
         Stage20GeneratedCampaignPersistentState saved = savedState(

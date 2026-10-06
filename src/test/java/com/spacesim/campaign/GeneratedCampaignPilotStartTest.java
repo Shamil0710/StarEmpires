@@ -41,9 +41,57 @@ class GeneratedCampaignPilotStartTest {
         assertEquals(paused, campaign.captureState());
     }
 
+    @Test void paidSaleCopiesOnlyArchivedSellerCivilianStationCoordinatesAndPersistsItsReceipt() {
+        var campaign = Stage228CampaignAuthority.create(1);
+        var runtime = campaign.coordinator().runtime();
+        var baseline = campaign.captureState();
+        var offer = campaign.previewIndependentPilotStart();
+        assertTrue(offer.allowed(), "Real archive transfer must leave the conserved starter purchase available");
+        assertEquals(baseline, campaign.captureState(), "Preview must not deliver intelligence");
+        var seller = runtime.freight().findFreighter(offer.fleetId()).orElseThrow().stableFactionId();
+        var archive = runtime.discoveryState().knowledgeFor(seller);
+        var industrial = runtime.captureState().campaign().industrialState();
+        var expected = archive.entries().stream().filter(e -> e.knownLocation().isPresent()
+                && runtime.industry().industrial().stations().stream().anyMatch(s ->
+                    s.stationId().equals(e.object().objectId()) && s.systemId().equals(e.object().systemId())
+                    && s.stableFactionId().equals(seller)
+                    && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0))
+                .toList();
+        assertFalse(expected.isEmpty(), "Ordinary start must have a real seller archive to disclose");
+        campaign.submitIndependentPilotStart(offer);
+        assertEquals(archive, runtime.discoveryState().knowledgeFor(seller));
+        assertEquals(industrial, runtime.captureState().campaign().industrialState(), "Briefing cannot issue stock, facilities or work");
+        var received = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+        var briefing = received.entries().stream().filter(e -> e.evidence().stream().anyMatch(v ->
+                v.source() == com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE
+                && v.provenanceId().startsWith("paid-ship-briefing:"))).toList();
+        assertEquals(expected.size(), briefing.size());
+        assertEquals(expected.size(), received.entries().size(), "No other faction or resource knowledge may be copied");
+        for (var entry : briefing) {
+            var source = expected.stream().filter(e -> e.object().equals(entry.object())).findFirst().orElseThrow();
+            assertEquals(source.knownLocation(), entry.knownLocation());
+            assertEquals(source.classificationId(), entry.classificationId());
+            assertEquals(com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(), entry.resourceKnowledge());
+            assertTrue(campaign.playerState().orElseThrow().discoveredSystemIds().contains(entry.object().systemId()));
+        }
+        assertEquals("PILOT_START", campaign.playerJournal().entries().get(0).action());
+        var receipt = campaign.playerJournal().entries().get(1);
+        assertEquals("SELLER_STATION_BRIEFING", receipt.action());
+        assertEquals(expected.size(), receipt.quantity());
+        var model = new GeneratedWorldUiModel(1, runtime, campaign.coordinator().content());
+        var rows = new ProductionUiProjector("faction.beta").capture(campaign, model.capture()).rows(Tab.INTELLIGENCE);
+        assertTrue(rows.stream().filter(row -> row.selection().stableId().startsWith("station:"))
+                .anyMatch(row -> row.summary().equals("Известная станция")));
+        assertFalse(rows.stream().anyMatch(row -> row.summary().equals("Посещённая станция")));
+        var saved = campaign.captureState();
+        assertEquals(saved, Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
+                Stage228GeneratedCampaignPersistenceCodec.encode(saved))).captureState());
+    }
+
     @Test void saveLoadNeverIssuesMoneyOrShipAndComposedAdapterCannotAdvanceClock() {
         var campaign = Stage228CampaignAuthority.create(1);
         var historical = Stage228CampaignAuthority.restore(campaign.captureState());
+        assertEquals(campaign.captureState(), historical.captureState(), "Resume must preserve the accepted archive without issuing a briefing");
         assertFalse(historical.canStartIndependentPilot());
         assertFalse(historical.previewIndependentPilotStart().allowed());
         campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());

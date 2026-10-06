@@ -103,7 +103,7 @@ final class GeneratedCampaignInitialTrafficBerth {
                 freight.nextCargoLotOrdinal(),
                 movedFreighters,
                 freight.cargoLots(),
-                freight.orders());
+                freight.orders(), freight.personalMiningOrders(), freight.productLots());
 
         List<LocalFleetPhysicalState> movedPhysical = source.localFleetPhysicalStates().stream()
                 .map(state -> {

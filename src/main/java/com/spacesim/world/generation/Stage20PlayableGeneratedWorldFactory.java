@@ -99,11 +99,18 @@ public final class Stage20PlayableGeneratedWorldFactory {
      * @return live generated-world runtime plus immutable bootstrap authority
      */
     public static GeneratedWorld create(long rootSeed) {
+        return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
+    }
+
+    /** Creates explicit initial NPC loadouts; supported saves retain their exact stored fleet. */
+    public static GeneratedWorld create(long rootSeed,
+            com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
         BootstrapFixture fixture = operationalFixture(rootSeed);
         Stage20GeneratedCampaignPersistentState campaign = campaign(fixture);
         WorldSimulation world = ordinaryWorld(fixture.resolved());
         LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.materializeBootstrap(
-                campaign, fixture.specialization(), world);
+                campaign, fixture.specialization(), world, com.spacesim.content.Stage18ManufacturingProductRegistry.loadDefault(),
+                reservePolicy);
         GeneratedFactionMilitaryBootstrap.materialize(
                 runtime,
                 fixture.resolved().generation().placement().orElseThrow().assignments());
@@ -246,15 +253,23 @@ public final class Stage20PlayableGeneratedWorldFactory {
         SimulationSession session = SimulationSession.createDemo(fixture.resolved().rootSeed());
         Stage20MaterializationPersistentState physical = Stage20MaterializationPersistence.capture(
                 session, Stage20MaterializationService.forSession(session));
+        var specials = Stage20SpecialLocationGenerator.generateCurrent(fixture.resolved());
+        var snapshot = Stage20GeneratedCampaignPersistence.captureMaterializedWorld(
+                fixture.resolved(), specials, fixture.specialization(),
+                Stage18IndustrialState.empty(0L));
+        var knowledge = new ArrayList<>(com.spacesim.world.Stage20GeneratedDiscoveryBootstrapPlan.plan(
+                fixture.resolved(), fixture.specialization(),
+                new com.spacesim.world.Stage20GeneratedDiscoveryBootstrapPlan.BootstrapAuthority(
+                        "stage23b.new-campaign-owned-station-archives.v1", fixture.resolved().rootSeed(),
+                        snapshot.worldFingerprint(), 0d, 86_400d, List.of())).ownerKnowledge());
+        knowledge.add(new Stage20DiscoveryKnowledgeState("faction.playable-generated-world.observer", List.of()));
         return Stage20GeneratedCampaignPersistence.capture(
                 fixture.resolved(),
-                Stage20SpecialLocationGenerator.generateCurrent(fixture.resolved()),
+                specials,
                 fixture.specialization(),
                 physical,
                 Stage18IndustrialState.empty(0L),
-                List.of(new Stage20DiscoveryKnowledgeState(
-                        "faction.playable-generated-world.observer",
-                        List.of())));
+                knowledge);
     }
 
     private static WorldSimulation ordinaryWorld(ResolvedProbeResult resolved) {

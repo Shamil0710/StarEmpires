@@ -36,6 +36,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Stage21HNpcMissionServiceTest {
     private static final long REWARD = 1_000L;
 
+    @Test void reviewedFactsReplaceUnreferencedHistoryButPreserveContractEvidence() {
+        var fixture = fixture();
+        ensureSpendable(fixture.world(), fixture.order().stableFactionId(), REWARD);
+        var service = service(fixture);
+        var mission = offer(service, fixture);
+        for (long tick = 1; tick <= 20; tick++) {
+            var observation = new FactionActorObservationSnapshot.ActorObservation(
+                    FactionActorObservationSnapshot.Domain.ECONOMIC,
+                    FactionActorObservationSnapshot.InterestKind.SUPPLY_DEPENDENCY,
+                    fixture.order().orderId(), 3500,
+                    new FactionActorObservationSnapshot.ObservationEvidence(
+                            FactionActorObservationSnapshot.ObservationChannel.ECONOMIC_LEDGER,
+                            fixture.order().orderId(), tick, -1));
+            var snapshot = new FactionActorObservationSnapshot(fixture.order().stableFactionId(), tick,
+                    List.of(observation), List.of(), List.of(), List.of());
+            String id = "review." + tick;
+            var fact = service.refreshActorObservation(fixture.npc().npcId(), snapshot, observation, id);
+            assertEquals(fact, service.refreshActorObservation(fixture.npc().npcId(), snapshot, observation, id));
+            var retained = service.snapshot().npcs().get(0).knowledge();
+            assertEquals(2, retained.size());
+            assertTrue(retained.contains(fixture.fact()), "Original funded-contract evidence remains immutable");
+            assertTrue(retained.contains(fact));
+        }
+        assertEquals(mission, service.snapshot().missions().get(0));
+        assertEquals(service.snapshot(), new Stage21HNpcMissionService(service.snapshot()).snapshot());
+    }
+
     @Test
     void offerFundsExactEscrowAndRejectRestoresTreasury() {
         Fixture fixture = fixture();

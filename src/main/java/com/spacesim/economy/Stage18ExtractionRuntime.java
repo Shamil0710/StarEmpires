@@ -250,12 +250,25 @@ public final class Stage18ExtractionRuntime {
          * @return mutable interval budget owned by the caller
          */
         public IntervalBudget openInterval(double durationSeconds) {
+            return openInterval(durationSeconds, Double.MAX_VALUE);
+        }
+
+        /**
+         * Opens an interval additionally bounded by the installed equipment's gross throughput.
+         * @param durationSeconds actual finite simulation interval
+         * @param maximumSourceKgPerSecond installed damage-aware gross throughput
+         * @return shared work and throughput budget
+         */
+        public IntervalBudget openInterval(double durationSeconds, double maximumSourceKgPerSecond) {
             requirePositive(durationSeconds, "durationSeconds");
+            requirePositive(maximumSourceKgPerSecond, "maximumSourceKgPerSecond");
             return new IntervalBudget(
                     durationSeconds,
                     finiteProduct(availablePowerW, durationSeconds, "interval energy"),
                     finiteProduct(workRate, durationSeconds, "interval work"),
-                    finiteProduct(maintenanceWorkRate, durationSeconds, "interval maintenance work"));
+                    finiteProduct(maintenanceWorkRate, durationSeconds, "interval maintenance work"),
+                    maximumSourceKgPerSecond > Double.MAX_VALUE / durationSeconds
+                            ? Double.MAX_VALUE : maximumSourceKgPerSecond * durationSeconds);
         }
     }
 
@@ -265,16 +278,19 @@ public final class Stage18ExtractionRuntime {
         private double remainingEnergyJ;
         private double remainingWorkSeconds;
         private double remainingMaintenanceWorkSeconds;
+        private final Map<String, Double> removedMassByMethodKg = new TreeMap<>();
+        private double remainingSourceMassKg;
 
         private IntervalBudget(
                 double durationSeconds,
                 double remainingEnergyJ,
                 double remainingWorkSeconds,
-                double remainingMaintenanceWorkSeconds) {
+                double remainingMaintenanceWorkSeconds, double remainingSourceMassKg) {
             this.durationSeconds = durationSeconds;
             this.remainingEnergyJ = remainingEnergyJ;
             this.remainingWorkSeconds = remainingWorkSeconds;
             this.remainingMaintenanceWorkSeconds = remainingMaintenanceWorkSeconds;
+            this.remainingSourceMassKg = remainingSourceMassKg;
         }
 
         /** @return simulation duration represented by this shared budget */
@@ -297,7 +313,9 @@ public final class Stage18ExtractionRuntime {
             return remainingMaintenanceWorkSeconds;
         }
 
-        private void consume(double energyJ, double workSeconds, double maintenanceWorkSeconds) {
+        private void consume(String methodId, double massKg, double energyJ, double workSeconds, double maintenanceWorkSeconds) {
+            remainingSourceMassKg = clampZero(remainingSourceMassKg - massKg);
+            removedMassByMethodKg.merge(methodId, massKg, Double::sum);
             remainingEnergyJ = clampZero(remainingEnergyJ - energyJ);
             remainingWorkSeconds = clampZero(remainingWorkSeconds - workSeconds);
             remainingMaintenanceWorkSeconds = clampZero(
@@ -525,7 +543,8 @@ public final class Stage18ExtractionRuntime {
         double sourceMassKg = Math.min(requestedSourceMassKg, source.remainingAccessibleMassKg());
         double intervalThroughputKg = finiteProduct(
                 method.maxSourceKgPerSecond(), budget.durationSeconds(), "method interval throughput");
-        if (sourceMassKg > intervalThroughputKg + EPSILON) {
+        if (sourceMassKg > budget.remainingSourceMassKg + EPSILON
+                || sourceMassKg + budget.removedMassByMethodKg.getOrDefault(method.id(), 0d) > intervalThroughputKg + EPSILON) {
             return rejected(Status.THROUGHPUT_LIMIT);
         }
 
@@ -559,7 +578,7 @@ public final class Stage18ExtractionRuntime {
         }
 
         source.removeMass(sourceMassKg);
-        budget.consume(energyJ, workSeconds, maintenanceWorkSeconds);
+        budget.consume(method.id(), sourceMassKg, energyJ, workSeconds, maintenanceWorkSeconds);
         destination.add(output.id(), outputMassKg);
         Status status = source.isDepleted() ? Status.EXTRACTED_DEPLETED : Status.EXTRACTED;
         return new ExtractionResult(

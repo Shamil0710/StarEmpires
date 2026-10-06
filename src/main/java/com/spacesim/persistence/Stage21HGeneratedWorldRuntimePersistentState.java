@@ -179,7 +179,7 @@ public record Stage21HGeneratedWorldRuntimePersistentState(
                                     + mission.missionId());
                 }
             }
-            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST, DISCOVERY_AT_LEAST -> {
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST, DISCOVERY_AT_LEAST, PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> {
                 // Stable string identities are validated structurally by the Stage-21H sidecar.
             }
         }

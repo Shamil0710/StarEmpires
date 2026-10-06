@@ -116,7 +116,9 @@ public record Stage21HNpcMissionState(
         /** An ordinary construction project must be terminal COMPLETED. */ CONSTRUCTION_COMPLETED,
         /** Existing diplomacy must currently grant legal market access. */ MARKET_ACCESS_ALLOWED,
         /** A Stage-21E operation must reach the requested terminal status. */ OPERATION_STATUS,
-        /** A faction treasury must retain at least the requested amount. */ FACTION_TREASURY_AT_LEAST
+        /** A faction treasury must retain at least the requested amount. */ FACTION_TREASURY_AT_LEAST,
+        /** One accepted personal delivery must supply external-origin cargo to its exact station. */
+        PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
     }
 
     /** Observed RPG reputation event families. */
@@ -699,7 +701,7 @@ public record Stage21HNpcMissionState(
      */
     public static ObjectiveAuthority expectedAuthority(ObjectiveKind kind) {
         return switch (Objects.requireNonNull(kind, "Objective kind not set")) {
-            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> ObjectiveAuthority.FREIGHT;
+            case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST, PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> ObjectiveAuthority.FREIGHT;
             case FLEET_PRESENT_IN_SYSTEM,
                     FLEET_ABSENT,
                     ESCORT_FLEETS_PRESENT_IN_SYSTEM,
@@ -722,6 +724,8 @@ public record Stage21HNpcMissionState(
             long threshold,
             String requiredState) {
         boolean validParameters = switch (kind) {
+            case PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> systemId > 0L && threshold > 0L
+                    && requiredState.startsWith("commodity.") && !requiredState.contains("|");
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST ->
                     systemId == 0L && threshold > 0L && requiredState.isEmpty();
             case FLEET_PRESENT_IN_SYSTEM -> systemId > 0L && threshold == 0L && requiredState.isEmpty();
@@ -757,7 +761,8 @@ public record Stage21HNpcMissionState(
         Objects.requireNonNull(kind, "Objective kind not set");
         boolean valid = switch (template) {
             case EMERGENCY_SUPPLY_DELIVERY, ORDINARY_MARKET_PROCUREMENT ->
-                    kind == ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST;
+                    kind == ObjectiveKind.FREIGHT_ORDER_DELIVERED_KG_AT_LEAST
+                            || kind == ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST;
             case CONVOY_ESCORT -> kind == ObjectiveKind.ESCORT_FLEETS_PRESENT_IN_SYSTEM;
             case STRANDED_FLEET_RESCUE_REFUEL -> kind == ObjectiveKind.FLEET_REACTION_MASS_KG_AT_LEAST;
             case SYSTEM_OBJECT_RECONNAISSANCE -> kind == ObjectiveKind.DISCOVERY_AT_LEAST;

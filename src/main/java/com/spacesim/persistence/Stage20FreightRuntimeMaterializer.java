@@ -52,8 +52,15 @@ import java.util.TreeSet;
  */
 @SuppressWarnings("doclint:missing")
 public final class Stage20FreightRuntimeMaterializer {
+    /** New-game asset manifests; checkpoint restoration never applies a loadout policy. */
+    public enum ReserveLoadoutPolicy {
+        /** Preserve the accepted uniform freight reserve manifest. */ BASELINE,
+        /** Configure one existing spare Union reserve as the authored mining vessel. */ CIVILIAN_MINING_RESERVE
+    }
     /** Stable Stage-20.5B materialization contract. */
     public static final String CURRENT_VERSION = "stage20_5.freight-runtime-materialization.v1";
+    /** Explicit new-game manifest containing the reserved Union mining loadout. */
+    public static final String MINING_RESERVE_VERSION = "stage23b.freight-initial-mining-reserve.v1";
     /** Explicit provisional hull/fit mapping pending the Stage-22 content pass. */
     public static final String PROVISIONAL_AUTHORITY_VERSION =
             "stage20_5.freight-compatibility.test-bulk-freighter.v1";
@@ -158,6 +165,24 @@ public final class Stage20FreightRuntimeMaterializer {
             long firstFleetIdValue,
             FreighterCompatibilityAuthority compatibility,
             ShipEngineeringCatalog engineering) {
+        return materializeBootstrap(saved, specialization, firstFleetIdValue, compatibility, engineering, ReserveLoadoutPolicy.BASELINE);
+    }
+
+    /**
+     * Materializes initial capital assets with an explicit, new-game-only reserve manifest.
+     * @param saved accepted generated campaign
+     * @param specialization closed operating and ownership authority
+     * @param firstFleetIdValue existing world allocator start
+     * @param compatibility accepted freight compatibility envelope
+     * @param engineering compatibility engineering vocabulary
+     * @param reservePolicy explicit initial NPC reserve loadouts
+     * @return exact initial owned fleet pool, without changing commitments or fleet count
+     */
+    public static Stage20FreightPersistentState materializeBootstrap(
+            Stage20GeneratedCampaignPersistentState saved, OperationalSpecializationReport specialization,
+            long firstFleetIdValue, FreighterCompatibilityAuthority compatibility, ShipEngineeringCatalog engineering,
+            ReserveLoadoutPolicy reservePolicy) {
+        Objects.requireNonNull(reservePolicy, "reservePolicy");
         Stage20GeneratedCampaignPersistentState state = requireBase(saved);
         OperationalSpecializationReport operations = Objects.requireNonNull(
                 specialization, "specialization");
@@ -196,6 +221,12 @@ public final class Stage20FreightRuntimeMaterializer {
         ArrayList<TransportOrderState> orders = new ArrayList<>();
         long fleetIdValue = firstFleetIdValue;
         for (FactionFleetOwnership faction : ownership.factions()) {
+            var freeSlots = faction.materializationSlots().stream().filter(s -> s.commitment().isEmpty()
+                    && !industrialBySlot.containsKey(new OwnerSlotKey(s.stableFactionId(), s.ownershipOrdinal()))).toList();
+            int miningOrdinal = reservePolicy == ReserveLoadoutPolicy.CIVILIAN_MINING_RESERVE
+                    && faction.stableFactionId().equals("faction.beta") && freeSlots.size() >= 2
+                    && authority.fitId().equals("fit.test_bulk_freighter_baseline_v1")
+                    ? freeSlots.stream().mapToInt(s -> s.ownershipOrdinal()).max().orElseThrow() : -1;
             for (OwnershipSlot slot : faction.materializationSlots()) {
                 FleetId fleetId = new FleetId(fleetIdValue++);
                 OwnerSlotKey key = new OwnerSlotKey(slot.stableFactionId(), slot.ownershipOrdinal());
@@ -231,13 +262,25 @@ public final class Stage20FreightRuntimeMaterializer {
                 }
                 LocalPhysicalPosition spawn = world.majorHubPosition(initialSystem);
                 StationStorageSnapshot emptyHold = emptyHold(fleetId, authority);
+                boolean mining = phase == FreightPhase.IDLE && slot.ownershipOrdinal() == miningOrdinal;
+                String initialFit = authority.fitId(); double capacity = authority.cargoCapacityKg();
+                if (mining) {
+                    initialFit = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT;
+                    var catalog = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
+                    if (!catalog.findDemonstratorFit(initialFit).hullId().equals(catalog.findDemonstratorFit(
+                            com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_FREIGHT_STRATEGIC_FIT).hullId()))
+                        throw new IllegalStateException("Initial mining reserve must retain its actual Union freight hull");
+                    capacity = com.spacesim.content.ship.Stage22CivilianMiningEngineeringCatalogLoader.ORE_CAPACITY_KG;
+                    emptyHold = new StationStorageSnapshot(Stage20FreightPersistentState.cargoHoldId(fleetId),
+                            Map.of("storage.dry_bulk", capacity), Map.of(), Map.of());
+                }
                 freighters.add(new FreighterState(
                         fleetId,
                         slot.stableFactionId(),
                         slot.ownershipOrdinal(),
                         authority.hullId(),
-                        authority.fitId(),
-                        authority.cargoCapacityKg(),
+                        initialFit,
+                        capacity,
                         initialSystem,
                         LocalPhysicalKinematics.stationary(spawn),
                         phase,
@@ -260,7 +303,7 @@ public final class Stage20FreightRuntimeMaterializer {
                 state.generationIdentity().worldSeed(),
                 state.generationIdentity().generatorVersion(),
                 state.materializedWorld().worldFingerprint(),
-                CURRENT_VERSION,
+                reservePolicy == ReserveLoadoutPolicy.CIVILIAN_MINING_RESERVE ? MINING_RESERVE_VERSION : CURRENT_VERSION,
                 authority.version(),
                 fleetIdValue,
                 1L,
@@ -312,7 +355,7 @@ public final class Stage20FreightRuntimeMaterializer {
         if (persisted.rootSeed() != state.generationIdentity().worldSeed()
                 || !persisted.generatorVersion().equals(state.generationIdentity().generatorVersion())
                 || !persisted.worldFingerprint().equals(state.materializedWorld().worldFingerprint())
-                || !persisted.materializationVersion().equals(CURRENT_VERSION)
+                || !(persisted.materializationVersion().equals(CURRENT_VERSION) || persisted.materializationVersion().equals(MINING_RESERVE_VERSION))
                 || !persisted.compatibilityAuthorityVersion().equals(authority.version())) {
             throw new IllegalArgumentException("freight sidecar differs from saved generated authority");
         }
@@ -328,9 +371,7 @@ public final class Stage20FreightRuntimeMaterializer {
         Set<OwnerSlotKey> persistedSlots = new HashSet<>();
         for (FreighterState ship : persisted.freighters()) {
             persistedSlots.add(new OwnerSlotKey(ship.stableFactionId(), ship.ownershipOrdinal()));
-            if (!ship.hullId().equals(authority.hullId())
-                    || !ship.fitId().equals(authority.fitId())
-                    || Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) != 0) {
+            if (!compatibleFitting(ship, authority, engineering)) {
                 throw new IllegalArgumentException("persisted freighter differs from compatibility authority");
             }
         }
@@ -365,7 +406,7 @@ public final class Stage20FreightRuntimeMaterializer {
         if (persisted.rootSeed() != state.generationIdentity().worldSeed()
                 || !persisted.generatorVersion().equals(state.generationIdentity().generatorVersion())
                 || !persisted.worldFingerprint().equals(state.materializedWorld().worldFingerprint())
-                || !persisted.materializationVersion().equals(CURRENT_VERSION)
+                || !(persisted.materializationVersion().equals(CURRENT_VERSION) || persisted.materializationVersion().equals(MINING_RESERVE_VERSION))
                 || !persisted.compatibilityAuthorityVersion().equals(authority.version())) {
             throw new IllegalArgumentException("freight sidecar differs from saved generated authority");
         }
@@ -386,9 +427,7 @@ public final class Stage20FreightRuntimeMaterializer {
         Set<OwnerSlotKey> persistedSlots = new HashSet<>();
         for (FreighterState ship : persisted.freighters()) {
             persistedSlots.add(new OwnerSlotKey(ship.stableFactionId(), ship.ownershipOrdinal()));
-            if (!ship.hullId().equals(authority.hullId())
-                    || !ship.fitId().equals(authority.fitId())
-                    || Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) != 0) {
+            if (!compatibleFitting(ship, authority, engineering)) {
                 throw new IllegalArgumentException("persisted freighter differs from compatibility authority");
             }
         }
@@ -417,6 +456,22 @@ public final class Stage20FreightRuntimeMaterializer {
             }
         }
         return persisted;
+    }
+
+    private static boolean compatibleFitting(FreighterState ship, FreighterCompatibilityAuthority authority,
+            ShipEngineeringCatalog engineering) {
+        if (!ship.hullId().equals(authority.hullId())) return false;
+        if (ship.fitId().equals(authority.fitId()))
+            return Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) == 0;
+        if (!authority.fitId().equals("fit.test_bulk_freighter_baseline_v1") || !ship.stableFactionId().equals("faction.beta")
+                || !ship.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
+                || Double.compare(ship.cargoCapacityKg(), com.spacesim.content.ship.Stage22CivilianMiningEngineeringCatalogLoader.ORE_CAPACITY_KG) != 0)
+            return false;
+        var definition = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault()
+                .findDemonstratorFit(ship.fitId());
+        return definition != null && definition.hullId().equals("hull.industrial_union_freight_v1")
+                && ship.cargoStorage().capacityByStorageClassKg().values().stream()
+                .allMatch(capacity -> Double.compare(capacity, ship.cargoCapacityKg()) == 0);
     }
 
     private static Stage20GeneratedCampaignPersistentState requireBase(

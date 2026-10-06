@@ -170,6 +170,22 @@ final class ProductionUiWorkspaceTest {
     }
 
     @Test
+    void historyDefaultsToNewestAndPreservesCommitOrderWithinOneTick() {
+        var latest = row("personal-event:3", "Альфа", "Личный журнал", 8);
+        var lastSameTick = row("personal-event:2", "Янтарь", "Личный журнал", 4);
+        var firstSameTick = row("personal-event:1", "Бета", "Личный журнал", 4);
+        var data = snapshot(List.of(latest, lastSameTick, firstSameTick));
+        var ui = new ProductionUiWorkspace(); ui.navigate(Tab.HISTORY);
+        assertEquals(ProductionUiWorkspace.Sort.RECENT, ui.view().sort());
+        assertEquals(List.of(latest, lastSameTick, firstSameTick), ui.page(data, 5).rows());
+        ui.cycleSort();
+        assertEquals(ProductionUiWorkspace.Sort.NAME, ui.view().sort());
+        assertEquals(List.of(latest, firstSameTick, lastSameTick), ui.page(data, 5).rows());
+        ui.navigate(Tab.SHIPS); assertEquals(ProductionUiWorkspace.Sort.NAME, ui.view().sort());
+        ui.goBack(); assertEquals(ProductionUiWorkspace.Sort.NAME, ui.view().sort());
+    }
+
+    @Test
     void textEditingAndResetAreBoundedPresentationOnlyOperations() {
         var ui = new ProductionUiWorkspace();
         ui.type('a');

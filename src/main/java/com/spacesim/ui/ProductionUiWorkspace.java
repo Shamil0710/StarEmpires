@@ -108,7 +108,10 @@ public final class ProductionUiWorkspace {
      *
      * @return current presentation state
      */
-    public ViewState view() { return views.getOrDefault(tab, ViewState.initial()); }
+    public ViewState view() {
+        return views.getOrDefault(tab, tab == Tab.HISTORY
+                ? new ViewState(UiSelection.none(), "", "", Sort.RECENT, 0, 0) : ViewState.initial());
+    }
     /**
      * Reads current row spacing.
      *
@@ -327,7 +330,8 @@ public final class ProductionUiWorkspace {
         Comparator<Row> sort = switch (state.sort()) {
             case NAME -> names;
             case CATEGORY -> Comparator.comparing(Row::category).thenComparing(names);
-            case RECENT -> Comparator.comparingLong(Row::chronologicalTick).reversed().thenComparing(names);
+            case RECENT -> tab == Tab.HISTORY ? Comparator.comparingLong(Row::chronologicalTick).reversed()
+                    : Comparator.comparingLong(Row::chronologicalTick).reversed().thenComparing(names);
         };
         return snapshot.rows(tab).stream()
                 .filter(row -> state.category().isEmpty() || state.category().equals(row.category()))

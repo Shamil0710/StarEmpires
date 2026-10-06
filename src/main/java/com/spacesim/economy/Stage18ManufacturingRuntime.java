@@ -168,6 +168,20 @@ public final class Stage18ManufacturingRuntime {
             return remainingMaintenanceWorkSeconds;
         }
 
+        /**
+         * Pays a real electrical service from this same installed facility interval.
+         * Other services and manufacturing retain only the remaining energy; work and maintenance
+         * are unchanged. An unavailable reservation has no effects.
+         * @param energyJ finite positive physical electrical energy requested by the service
+         * @return whether the same remaining interval paid the entire demand
+         */
+        public boolean reserveElectricalEnergyJ(double energyJ) {
+            if (!Double.isFinite(energyJ) || energyJ <= 0)
+                throw new IllegalArgumentException("Electrical service requires finite positive energy");
+            if (energyJ > remainingEnergyJ) return false;
+            consume(energyJ, 0d, 0d); return true;
+        }
+
         private void consume(double energyJ, double workSeconds, double maintenanceWorkSeconds) {
             remainingEnergyJ = clampZero(remainingEnergyJ - energyJ);
             remainingWorkSeconds = clampZero(remainingWorkSeconds - workSeconds);
@@ -480,6 +494,37 @@ public final class Stage18ManufacturingRuntime {
                 inventory,
                 budget,
                 false);
+    }
+
+    /**
+     * Allocates a proportional amount of real line work to a reserved product batch.
+     * Materials remain in the queue's physical custody until assembly finishes. No product is
+     * created here, and the supplied interval is shared with competing orders.
+     * @param productId authored finished product
+     * @param units whole batch count
+     * @param remainingFraction uncompleted fraction in (0,1]
+     * @param budget actual shared line interval
+     * @return fraction of the whole batch completed by this allocation
+     */
+    public double allocateProductWork(String productId, int units, double remainingFraction, IntervalBudget budget) {
+        Objects.requireNonNull(budget, "budget");
+        if (units <= 0 || !Double.isFinite(remainingFraction) || remainingFraction <= 0 || remainingFraction > 1)
+            throw new IllegalArgumentException("Invalid remaining product batch");
+        var product = products.findProduct(productId);
+        var binding = catalog.findProductBinding(productId);
+        if (product == null || binding == null) throw new IllegalArgumentException("Unknown manufacturing product");
+        var profile = Objects.requireNonNull(catalog.findProductProfile(binding.profileId()));
+        if (!budget.capabilityTags.containsAll(profile.requiredCapabilityTags())) return 0;
+        double mass = finiteProduct(product.unitMassKg(), units, "batch mass");
+        double energy = finiteProduct(mass, profile.energyJPerOutputKg(), "batch energy");
+        double work = finiteProduct(mass, profile.workSecondsPerOutputKg(), "batch work");
+        double maintenance = finiteProduct(mass, profile.maintenanceWorkSecondsPerOutputKg(), "batch maintenance");
+        double fraction = remainingFraction;
+        if (energy > 0) fraction = Math.min(fraction, budget.remainingEnergyJ / energy);
+        if (work > 0) fraction = Math.min(fraction, budget.remainingWorkSeconds / work);
+        if (maintenance > 0) fraction = Math.min(fraction, budget.remainingMaintenanceWorkSeconds / maintenance);
+        budget.consume(energy * fraction, work * fraction, maintenance * fraction);
+        return fraction;
     }
 
     private ManufacturingResult settle(

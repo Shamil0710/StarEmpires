@@ -194,17 +194,22 @@ class GeneratedCampaignPlayerPersistenceTest {
     void currentEnvelopeRejectsMissingOrOversizedPlayerPayloadAndFutureFile() {
         var state = GeneratedCampaignFixture.checkpoint();
         byte[] valid = Stage228GeneratedCampaignPersistenceCodec.encode(state);
-        int playerLength = GeneratedCampaignPlayerStateCodec.encode(null).length;
-        byte[] missing = Arrays.copyOf(valid, valid.length - playerLength - Integer.BYTES);
+        int playerOffset = valid.length - PlayerJournalPersistenceCodec.encode(state.playerJournal()).length
+                - Integer.BYTES - GeneratedCampaignPlayerStateCodec.encode(null).length - Integer.BYTES
+                - ShipyardModuleCustodyPersistenceCodec.encode(state.moduleCustody()).length - Integer.BYTES
+                - ShipyardRepairQueuePersistenceCodec.encode(state.repairQueue()).length - Integer.BYTES
+                - ShipyardRefitQueuePersistenceCodec.encode(state.refitQueue()).length - Integer.BYTES
+                - ShipyardModuleTransferQueuePersistenceCodec.encode(state.moduleTransfers()).length - Integer.BYTES;
+        byte[] missing = Arrays.copyOf(valid, playerOffset);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage228GeneratedCampaignPersistenceCodec.decode(missing));
         byte[] corruptLength = valid.clone();
-        ByteBuffer.wrap(corruptLength).putInt(valid.length - playerLength - Integer.BYTES,
+        ByteBuffer.wrap(corruptLength).putInt(playerOffset,
                 Integer.MAX_VALUE);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage228GeneratedCampaignPersistenceCodec.decode(corruptLength));
         byte[] future = valid.clone();
-        ByteBuffer.wrap(future).putInt(4, 6);
+        ByteBuffer.wrap(future).putInt(4, Stage228GeneratedCampaignPersistentState.CURRENT_VERSION + 1);
         assertThrows(IllegalArgumentException.class,
                 () -> Stage228GeneratedCampaignPersistenceCodec.decode(future));
     }

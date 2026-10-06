@@ -22,6 +22,8 @@ import com.spacesim.ship.ShipyardEngineeringService.ShipyardCapability;
 import com.spacesim.ship.ShipyardEngineeringService.WorkKind;
 import com.spacesim.ship.ShipyardEngineeringService.WorkPlan;
 import com.spacesim.ship.ShipyardEngineeringService.WorkSettlement;
+import com.spacesim.ship.ShipyardRefitContinuity;
+import com.spacesim.ship.ShipyardRefitContinuity.Completion;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,7 +93,8 @@ public final class Stage18ShipyardRuntime {
         /** Canonical station storage lacks required Stage-18 commodity mass. */ INSUFFICIENT_COMMODITY,
         /** Canonical station storage lacks a required finished Stage-18D module. */ INSUFFICIENT_PRODUCT,
         /** Yard cannot physically exchange with a required storage class. */ STORAGE_CLASS_INCOMPATIBLE,
-        /** A finished module exceeds the yard's single-unit handling envelope. */ UNIT_HANDLING_LIMIT
+        /** A finished module exceeds the yard's single-unit handling envelope. */ UNIT_HANDLING_LIMIT,
+        /** Removed equipment cannot fit in the actual receiving station. */ INSUFFICIENT_STORAGE
     }
 
     /**
@@ -220,6 +223,18 @@ public final class Stage18ShipyardRuntime {
         /** @return remaining Stage-17.5G engineering work-seconds */
         public double remainingWorkSeconds() {
             return remainingWorkSeconds;
+        }
+
+        /**
+         * Allocates a bounded portion of this actual shared interval to persistent work.
+         * @param requestedWorkSeconds remaining real engineering work
+         * @return work consumed once from this interval
+         */
+        public double allocate(double requestedWorkSeconds) {
+            requireNonNegative(requestedWorkSeconds, "requestedWorkSeconds");
+            double allocated = Math.min(requestedWorkSeconds, remainingWorkSeconds);
+            consume(allocated);
+            return allocated;
         }
 
         private void consume(double workSeconds) {
@@ -442,6 +457,90 @@ public final class Stage18ShipyardRuntime {
     }
 
     /**
+     * Physical refit settlement with an exact condition-preserving inventory handoff.
+     * @param settlement actual stock and work outcome
+     * @param custody unchanged inventory on rejection, updated inventory on success
+     * @param completion actual condition handoff on success; null on rejection
+     */
+    public record RefitCustodySettlement(SettlementResult settlement, ShipyardModuleCustodyState custody,
+            Completion completion) {
+        /**
+         * Rejects a handoff inconsistent with the actual physical settlement.
+         * @param settlement physical outcome
+         * @param custody exact equipment inventory
+         * @param completion completion only for successful settlement
+         */
+        public RefitCustodySettlement {
+            Objects.requireNonNull(settlement, "settlement");
+            Objects.requireNonNull(custody, "custody");
+            if (settlement.settled() != (completion != null))
+                throw new IllegalArgumentException("Refit custody handoff must match physical settlement");
+        }
+    }
+
+    /**
+     * Settles refit and deposits removed equipment into finite, condition-aware station custody.
+     * The caller must retain the returned custody with the completed ship in one checkpoint.
+     * Capacity, continuity and duplicate identities are checked before spending stock or yard work.
+     * @param plan physical refit plan
+     * @param sourceDamage actual source damage
+     * @param sourceMaintenance actual source service ages
+     * @param planner common engineering completion service
+     * @param storage canonical station stock with existing custody rebound
+     * @param yard installed physical yard projection
+     * @param budget shared finite actual work budget
+     * @param custody existing individual equipment inventory
+     * @param operationId stable unique physical refit identity
+     * @param tick actual removal tick
+     * @return physical settlement and exact custody handoff
+     */
+    public RefitCustodySettlement settleRefitWithCustody(WorkPlan plan, Snapshot sourceDamage,
+            MaintenanceState sourceMaintenance, ShipyardEngineeringService planner, Stage18StationStorage storage,
+            YardCapabilitySnapshot yard, YardWorkBudget budget, ShipyardModuleCustodyState custody,
+            String operationId, long tick) {
+        Objects.requireNonNull(custody, "custody");
+        if (!validKind(plan, WorkKind.REFIT) || !plan.feasibility().feasible())
+            return new RefitCustodySettlement(rejected(SettlementStatus.PLAN_INFEASIBLE, "REFIT"), custody, null);
+        // This pure staged handoff is published only after the real physical settlement succeeds.
+        Completion completion = ShipyardRefitContinuity.complete(planner, plan, compatibilitySettlement(plan),
+                sourceDamage, sourceMaintenance);
+        var next = custody.deposit(operationId, storage.stationId(), completion, tick);
+        var previousMass = ShipyardModuleCustodyStorage.massByStation(custody, products)
+                .getOrDefault(storage.stationId(), Map.of());
+        if (!previousMass.equals(storage.moduleCustodyReservation()))
+            throw new IllegalArgumentException("Existing module custody must match canonical station reservation");
+        var nextMass = ShipyardModuleCustodyStorage.massByStation(next, products)
+                .getOrDefault(storage.stationId(), Map.of());
+        var incomingMass = new TreeMap<String, Double>();
+        var before = modulesByMount(plan.sourceFit());
+        for (var assignment : plan.targetFit().installedModules()) {
+            if (assignment.moduleId().equals(before.get(assignment.mountId()))) continue;
+            var product = products.findProduct(assignment.moduleId());
+            if (product == null || product.kind() != ProductKind.MODULE)
+                return new RefitCustodySettlement(rejected(SettlementStatus.PROFILE_NOT_FOUND, assignment.moduleId()), custody, null);
+            incomingMass.merge(product.storageClassId(), product.unitMassKg(), Double::sum);
+        }
+        for (var removed : completion.removedModules()) {
+            var product = products.findProduct(removed.assignment().moduleId());
+            if (!yard.handledStorageClassIds().contains(product.storageClassId()))
+                return new RefitCustodySettlement(rejected(SettlementStatus.STORAGE_CLASS_INCOMPATIBLE, product.contentId()), custody, null);
+            if (product.unitMassKg() > yard.maxHandledUnitMassKg() + EPSILON)
+                return new RefitCustodySettlement(rejected(SettlementStatus.UNIT_HANDLING_LIMIT, product.contentId()), custody, null);
+        }
+        for (var mass : nextMass.entrySet()) {
+            double occupiedAfter = storage.usedCapacityKg(mass.getKey()) - incomingMass.getOrDefault(mass.getKey(), 0d)
+                    - previousMass.getOrDefault(mass.getKey(), 0d) + mass.getValue();
+            if (!storage.snapshotCapacityByStorageClassKg().containsKey(mass.getKey())
+                    || occupiedAfter > storage.snapshotCapacityByStorageClassKg().get(mass.getKey()) + EPSILON)
+                return new RefitCustodySettlement(rejected(SettlementStatus.INSUFFICIENT_STORAGE, mass.getKey()), custody, null);
+        }
+        var settled = settleRefit(plan, storage, yard, budget);
+        if (!settled.settled()) return new RefitCustodySettlement(settled, custody, null);
+        storage.replaceModuleCustodyReservation(nextMass);
+        return new RefitCustodySettlement(settled, next, completion);
+    }
+
+    /**
      * Settles damage-scaled Stage-18 materials/components for one repair plan.
      *
      * @param plan feasible REPAIR plan
@@ -460,10 +559,31 @@ public final class Stage18ShipyardRuntime {
         if (!validKind(plan, WorkKind.REPAIR) || plan.sourceFit() == null || sourceDamage == null) {
             return rejected(SettlementStatus.INVALID_REQUEST, "REPAIR");
         }
+        RequirementSet requirements;
+        try { requirements = repairRequirements(plan, sourceDamage); }
+        catch (IllegalArgumentException missingProfile) {
+            return rejected(SettlementStatus.PROFILE_NOT_FOUND, plan.sourceFit().hullId());
+        }
+        return settle(plan, storage, yard, budget, requirements);
+    }
+
+    /**
+     * Quotes actual damage-scaled kilograms without consuming materials or repairing hardware.
+     * @param plan common engineering repair plan
+     * @param sourceDamage physical source condition
+     * @return exact authored physical material requirements
+     */
+    public Map<String, Double> repairMaterialRequirements(WorkPlan plan, Snapshot sourceDamage) {
+        if (!validKind(plan, WorkKind.REPAIR) || sourceDamage == null)
+            throw new IllegalArgumentException("Repair quote requires a physical repair plan");
+        return immutableDoubleMap(repairRequirements(plan, sourceDamage).commodityMassKg);
+    }
+
+    private RequirementSet repairRequirements(WorkPlan plan, Snapshot sourceDamage) {
         RequirementSet requirements = new RequirementSet();
         HullPhysicalProfile hull = catalog.findHullProfile(plan.sourceFit().hullId());
         if (hull == null) {
-            return rejected(SettlementStatus.PROFILE_NOT_FOUND, plan.sourceFit().hullId());
+            throw new IllegalArgumentException("Missing physical repair hull profile: " + plan.sourceFit().hullId());
         }
         for (Map.Entry<String, Double> entry : sourceDamage.compartmentIntegrityById().entrySet()) {
             double loss = clamp01(1d - entry.getValue());
@@ -472,7 +592,7 @@ public final class Stage18ShipyardRuntime {
             }
             CompartmentRepairProfile profile = hull.findCompartmentRepair(entry.getKey());
             if (profile == null) {
-                return rejected(SettlementStatus.PROFILE_NOT_FOUND, entry.getKey());
+                throw new IllegalArgumentException("Missing physical compartment repair profile: " + entry.getKey());
             }
             requirements.addInputs(profile.inputsAtFullLossKg(), loss);
         }
@@ -488,11 +608,11 @@ public final class Stage18ShipyardRuntime {
             }
             ModuleServiceProfile profile = catalog.findModuleProfile(moduleId);
             if (profile == null) {
-                return rejected(SettlementStatus.PROFILE_NOT_FOUND, moduleId);
+                throw new IllegalArgumentException("Missing physical module repair profile: " + moduleId);
             }
             requirements.addInputs(profile.repairInputsAtFullLossKg(), loss);
         }
-        return settle(plan, storage, yard, budget, requirements);
+        return requirements;
     }
 
     /**

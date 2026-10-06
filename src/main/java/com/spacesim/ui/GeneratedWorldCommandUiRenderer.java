@@ -484,7 +484,8 @@ public final class GeneratedWorldCommandUiRenderer {
             hitTargets.add(new HitTarget(HitKind.TAB, "", tab, bounds));
             batch.begin();
             fonts.small().setColor(tab == active ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
-            fonts.small().draw(batch, tab.label(), x, y + rowHeight * 0.72f, tabWidth - 3f * metrics.scale(), Align.center, false);
+            String tabLabel = tab.label() + (tab == Tab.HISTORY && personalNotificationCount > 0 ? " (" + personalNotificationCount + ")" : "");
+            fonts.small().draw(batch, tabLabel, x, y + rowHeight * 0.72f, tabWidth - 3f * metrics.scale(), Align.center, false);
             batch.end();
         }
         batch.begin();
@@ -508,13 +509,13 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
         float x = metrics.outerMargin();
         y = height - metrics.topBarHeight() - 55f * metrics.scale();
-        String[] ids = {"back", "search", "sort", "filter", "density", "pause", "save", "load"};
+        String[] ids = {"back", "search", "sort", "filter", "density", "pause", "save", "load", "focus-player"};
         String[] labels = {"НАЗАД", workspace.searching() ? "ПОИСК: " + workspace.view().query() : "ПОИСК",
                 "СОРТ: " + switch (workspace.view().sort()) {
                     case NAME -> "имя"; case CATEGORY -> "тип"; case RECENT -> "новые";
                 }, "ФИЛЬТР: " + (workspace.view().category().isEmpty() ? "все" : workspace.view().category()),
-                "ПЛОТНОСТЬ", "ПАУЗА", "СОХРАНИТЬ", "ЗАГРУЗИТЬ"};
-        float unit = (width - metrics.outerMargin() * 2f) / 8f;
+                "ПЛОТНОСТЬ", "ПАУЗА", "СОХРАНИТЬ", "ЗАГРУЗИТЬ", "МОЙ КОРАБЛЬ"};
+        float unit = (width - metrics.outerMargin() * 2f) / ids.length;
         for (int i = 0; i < ids.length; i++) {
             Rect bounds = new Rect(x + i * unit, y, unit - 4f * metrics.scale(), 28f * metrics.scale());
             boolean enabled = (i != 0 || workspace.canGoBack()) && (i != 6 || saveAvailable);
@@ -570,7 +571,7 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
         } else {
             boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
-            Rect details = physicalPilotActions || !factionActions.isEmpty() ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
+            Rect details = physicalPilotActions || !factionActions.isEmpty() || supplyMissionQuantity ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 156f * metrics.scale()) : missionActions || pilotStartActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
@@ -615,6 +616,47 @@ public final class GeneratedWorldCommandUiRenderer {
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
     private boolean physicalPilotJump;
+    private boolean physicalPilotSupply;
+    private boolean physicalPilotReport;
+    private String physicalPilotMining = "";
+    private String physicalPilotManufacturing = "";
+    private String physicalPilotRepair = "";
+    private String physicalPilotRefit = "";
+    private String physicalModuleTransfer = "";
+    private String physicalProductTransfer = "";
+    private boolean physicalPilotJournal;
+    private long personalNotificationCount;
+    /** @param count unread retained personal notifications */
+    public void bindPersonalNotificationCount(long count) {
+        if (count < 0) throw new IllegalArgumentException("Negative notification count");
+        personalNotificationCount = count;
+    }
+    /** @param available whether personal notification acknowledgement is selected */
+    public void bindPilotJournalAction(boolean available) { physicalPilotJournal = available; }
+    /** @param action manufacturing or facility-construction start/cancel command, or empty */
+    public void bindPilotManufacturingAction(String action) { physicalPilotManufacturing = action; }
+
+    /**
+     * Binds the actual selected repair command through ordinary confirmation controls.
+     * @param action START_REPAIR, CANCEL_REPAIR, or empty
+     */
+    public void bindPilotRepairAction(String action) { physicalPilotRepair = action; }
+    /** @param action START_REFIT, START_REFIT_USED, CANCEL_REFIT, or empty */
+    public void bindPilotRefitAction(String action) { physicalPilotRefit = action; }
+    /** @param action LOAD_MODULE, UNLOAD_MODULE, CANCEL_MODULE_TRANSFER, or empty */
+    public void bindModuleTransferAction(String action) { physicalModuleTransfer = action; }
+
+    /**
+     * Binds the selected finished-product handling command.
+     * @param action loading, unloading, cancellation, or empty selection
+     */
+    public void bindProductTransferAction(String action) { physicalProductTransfer = action; }
+    /** @param action START_MINING, STOP_MINING or empty */
+    public void bindPilotMiningAction(String action) { physicalPilotMining = action; }
+    /** @param report whether the selected row submits a personal discovery report */
+    public void bindPilotReportAction(boolean report) { physicalPilotReport = report; }
+    /** @param supply whether the selected row supplies an existing installed interface */
+    public void bindPilotSupplyAction(boolean supply) { physicalPilotSupply = supply; }
     private String physicalPilotAssetAction = "";
     private boolean physicalPilotConfirmation;
     private int physicalPilotKilograms;
@@ -660,10 +702,78 @@ public final class GeneratedWorldCommandUiRenderer {
         float width = (inspectorRect.width() - 40f * scale) / 3f;
         boolean foundation = physicalPilotAssetAction.equals("FOUNDATION");
         boolean finance = physicalPilotAssetAction.equals("FINANCE");
-        String[] ids = foundation ? new String[]{"pilot.faction-preview"} : finance ? new String[]{"pilot.faction-capitalize", "pilot.faction-withdraw"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "pilot.purchase" : "pilot.switch", "focus"} : physicalPilotJump ? new String[]{"pilot.jump"} : physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
+        String[] ids = physicalPilotSupply ? new String[]{"pilot.less", "pilot.more", "pilot.load-consumable"} : foundation ? new String[]{"pilot.faction-preview"} : finance ? new String[]{"pilot.faction-capitalize", "pilot.faction-withdraw"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "pilot.purchase" : "pilot.switch", "focus"} : physicalPilotJump ? new String[]{"pilot.jump"} : physicalPilotTrade ? new String[]{"pilot.less", "pilot.more", "pilot.buy"}
                 : new String[]{"pilot.dock", "pilot.undock", "focus"};
-        String[] labels = foundation ? new String[]{"ОСНОВАТЬ"} : finance ? new String[]{"ВНЕСТИ 1 000", "ВЕРНУТЬ 1 000"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "КУПИТЬ" : "УПРАВЛЕНИЕ", "НА КАРТЕ"} : physicalPilotJump ? new String[]{"ВЫЛЕТ"} : physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
+        String[] labels = physicalPilotSupply ? new String[]{"- КГ", "+ КГ", "ЗАГРУЗИТЬ " + physicalPilotKilograms + " КГ"} : foundation ? new String[]{"ОСНОВАТЬ"} : finance ? new String[]{"ВНЕСТИ 1 000", "ВЕРНУТЬ 1 000"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "КУПИТЬ" : "УПРАВЛЕНИЕ", "НА КАРТЕ"} : physicalPilotJump ? new String[]{"ВЫЛЕТ"} : physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
                 : new String[]{"СТЫКОВКА", "ОТСТЫКОВКА", "НА КАРТЕ"};
+        if (physicalPilotAssetAction.equals("PURCHASE_STATION")) {
+            ids = new String[]{"pilot.purchase-station", "focus"}; labels = new String[]{"КУПИТЬ СТАНЦИЮ", "НА КАРТЕ"};
+            width = (inspectorRect.width() - 36f * scale) / 2f;
+        }
+        if (physicalPilotReport) {
+            ids = new String[]{"pilot.report-discovery"}; labels = new String[]{"ПЕРЕДАТЬ ОТЧЁТ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (!physicalPilotMining.isEmpty()) {
+            boolean start = physicalPilotMining.equals("START_MINING");
+            ids = new String[]{start ? "pilot.start-mining" : "pilot.stop-mining"};
+            labels = new String[]{start ? "НАЧАТЬ ДОБЫЧУ" : "ОСТАНОВИТЬ ДОБЫЧУ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (!physicalPilotManufacturing.isEmpty()) {
+            boolean yardAllocation = physicalPilotManufacturing.equals("ALLOCATE_YARD_RESOURCES");
+            boolean allocation = physicalPilotManufacturing.equals("ALLOCATE_FACILITY_RESOURCES") || yardAllocation;
+            boolean yardConstruction = physicalPilotManufacturing.endsWith("YARD_CONSTRUCTION");
+            boolean construction = physicalPilotManufacturing.endsWith("FACILITY_CONSTRUCTION") || yardConstruction;
+            boolean start = physicalPilotManufacturing.startsWith("START_");
+            ids = new String[]{allocation ? yardAllocation ? "pilot.allocate-yard-resources" : "pilot.allocate-facility-resources" : yardConstruction ? start ? "pilot.start-yard-construction" : "pilot.cancel-yard-construction"
+                    : construction ? start ? "pilot.start-construction" : "pilot.cancel-construction"
+                    : start ? "pilot.start-manufacturing" : "pilot.cancel-manufacturing"};
+            labels = new String[]{allocation ? "ПЕРЕРАСПРЕДЕЛИТЬ РЕСУРСЫ" : yardConstruction && start ? "ПОСТРОИТЬ ВЕРФЬ"
+                    : construction ? start ? "ПОСТРОИТЬ УСТАНОВКУ" : "ОТМЕНИТЬ СТРОИТЕЛЬСТВО"
+                    : start ? "ИЗГОТОВИТЬ СЕКЦИЮ" : "ОТМЕНИТЬ ИЗГОТОВЛЕНИЕ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (physicalPilotJournal) {
+            ids = new String[]{"pilot.acknowledge-journal"}; labels = new String[]{"ОТМЕТИТЬ ПРОЧИТАННЫМ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (!physicalPilotRepair.isEmpty()) {
+            boolean start = physicalPilotRepair.equals("START_REPAIR");
+            ids = new String[]{start ? "pilot.start-repair" : "pilot.cancel-repair"};
+            labels = new String[]{start ? "НАЧАТЬ РЕМОНТ" : "ОТМЕНИТЬ РЕМОНТ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (!physicalPilotRefit.isEmpty()) {
+            boolean used = physicalPilotRefit.equals("START_REFIT_USED");
+            boolean start = physicalPilotRefit.startsWith("START_REFIT");
+            ids = new String[]{used ? "pilot.start-refit-used" : start ? "pilot.start-refit" : "pilot.cancel-refit"};
+            labels = new String[]{used ? "УСТАНОВИТЬ СНЯТЫЙ МОДУЛЬ" : start ? "НАЧАТЬ ПЕРЕОСНАЩЕНИЕ" : "ОТМЕНИТЬ ПЕРЕОСНАЩЕНИЕ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (!physicalModuleTransfer.isEmpty()) {
+            String transferId = physicalModuleTransfer.equals("LOAD_MODULE") ? "pilot.load-module"
+                    : physicalModuleTransfer.equals("UNLOAD_MODULE") ? "pilot.unload-module" : "pilot.cancel-module-transfer";
+            String transferLabel = physicalModuleTransfer.equals("LOAD_MODULE") ? "ПОГРУЗИТЬ МОДУЛЬ"
+                    : physicalModuleTransfer.equals("UNLOAD_MODULE") ? "ВЫГРУЗИТЬ МОДУЛЬ" : "ОТМЕНИТЬ ОБРАБОТКУ";
+            if (!physicalPilotRefit.isEmpty()) {
+                ids = new String[]{ids[0], transferId}; labels = new String[]{labels[0], transferLabel};
+                width = (inspectorRect.width() - 36f * scale) / 2f;
+            } else {
+                ids = new String[]{transferId}; labels = new String[]{transferLabel}; width = inspectorRect.width() - 32f * scale;
+            }
+        }
+        if (!physicalProductTransfer.isEmpty()) {
+            if (physicalProductTransfer.equals("CANCEL_PRODUCT_TRANSFER")) {
+                ids = new String[]{"pilot.cancel-product-transfer"}; labels = new String[]{"ОТМЕНИТЬ ОБРАБОТКУ"};
+                width = inspectorRect.width() - 32f * scale;
+            } else {
+                boolean loading = physicalProductTransfer.equals("LOAD_PRODUCT");
+                ids = new String[]{"pilot.less", "pilot.more", loading ? "pilot.load-product" : "pilot.unload-product"};
+                labels = new String[]{"− ШТ", "+ ШТ", (loading ? "ПОГРУЗИТЬ " : "ВЫГРУЗИТЬ ") + physicalPilotKilograms + " ШТ"};
+                width = (inspectorRect.width() - 40f * scale) / 3f;
+            }
+        }
         for (int i = 0; i < ids.length; i++) {
             Rect r = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
                     inspectorRect.y() + 106f * scale, width, 36f * scale);
@@ -712,10 +822,30 @@ public final class GeneratedWorldCommandUiRenderer {
         missionConfirmation = confirmationAvailable;
     }
 
+    private boolean supplyMissionQuantity;
+    private int supplyMissionKilograms;
+
+    /**
+     * Binds a player-selected physical delivery portion for a supply offer.
+     * @param available whether a supply offer is currently selected
+     * @param kilograms selected whole kilograms
+     */
+    public void bindSupplyMissionQuantity(boolean available, int kilograms) {
+        supplyMissionQuantity = available; supplyMissionKilograms = kilograms;
+    }
+
     private void drawMissionActions() {
         float scale = metrics.scale();
         float width = (inspectorRect.width() - 40f * scale) / 3f;
         String[] ids = {"mission.accept", "mission.reject", "mission.cancel"};
+        if (supplyMissionQuantity) {
+            for (int i = 0; i < 3; i++) {
+                Rect bounds = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
+                        inspectorRect.y() + 106f * scale, width, 36f * scale);
+                button(bounds, i == 0 ? "- КГ" : i == 2 ? "+ КГ" : supplyMissionKilograms + " КГ", i != 1);
+                if (i != 1) hitTargets.add(new HitTarget(HitKind.ACTION, i == 0 ? "pilot.less" : "pilot.more", null, bounds));
+            }
+        }
         String[] labels = {"ПРИНЯТЬ", "ОТКЛОНИТЬ", "ОТМЕНИТЬ"};
         for (int i = 0; i < ids.length; i++) {
             Rect bounds = new Rect(inspectorRect.x() + 16f * scale + i * (width + 4f * scale),
@@ -883,6 +1013,35 @@ public final class GeneratedWorldCommandUiRenderer {
         }
     }
 
+    private List<StarSystemId> personalRoutePath = List.of();
+    private List<InfoSection> personalRouteSections = List.of();
+    private boolean personalRouteConfirmation;
+
+    /**
+     * Binds explicit personal route diagnostics without calculating or dispatching travel.
+     * @param preview exact first-hop preview, or null when no route is selected
+     * @param topology existing ordinary topology for display names
+     * @param fixedStepSeconds campaign seconds per tick
+     */
+    public void bindPersonalRoute(com.spacesim.campaign.Stage228CampaignAuthority.PilotRoutePreview preview,
+            com.spacesim.world.GalaxyTopology topology, float fixedStepSeconds) {
+        personalRoutePath = preview == null ? List.of() : preview.route().path();
+        personalRouteConfirmation = preview != null && preview.departure().allowed();
+        if (preview == null) { personalRouteSections = List.of(); return; }
+        var route = preview.route();
+        personalRouteSections = List.of(InfoSection.of("Личный маршрут",
+                "Путь", route.path().stream().map(id -> topology.findSystem(id).orElseThrow().name())
+                        .collect(java.util.stream.Collectors.joining(" → ")),
+                "Переходы", Integer.toString(route.path().size() - 1),
+                "Расчётное время", String.format(Locale.ROOT, "%.1f с", route.travelTicks() * fixedStepSeconds),
+                "Неопределённость", String.format(Locale.ROOT, "%.2f условных единиц", route.uncertaintyExposure()),
+                "Сведения об опасности", "Сохранённые личные наблюдения; неизвестные участки не считаются безопасными. Оценка не является вероятностью",
+                "Граница оценки времени", "Модель времени переходов; не включает дозаправку и ожидание готовности двигателя",
+                "Первый вылет", personalRouteConfirmation ? "Проверен; требуется подтверждение" : "Недоступен: проверьте стыковку, топливо и FTL",
+                "Дальнейший путь", "Проверять после каждого прибытия; дозаправка только вручную существующими ресурсами",
+                "Источник", "Общий PlayerFleetRoutePlanner, личные открытия и обычная проверка топлива; подтверждается только первый прыжок"));
+    }
+
     private void drawGalaxy(
             GeneratedWorldUiSnapshot snapshot,
             UiSelection selection,
@@ -905,6 +1064,12 @@ public final class GeneratedWorldCommandUiRenderer {
                 shapes.setColor(edge.touchesActiveSystem() ? ImperialUiPalette.CYAN : ImperialUiPalette.GRID);
                 shapes.line(first.x(), first.y(), second.x(), second.y());
             }
+        }
+        shapes.setColor(ImperialUiPalette.BRASS);
+        for (int i = 1; i < personalRoutePath.size(); i++) {
+            Point first = points.get(personalRoutePath.get(i - 1));
+            Point second = points.get(personalRoutePath.get(i));
+            if (first != null && second != null) shapes.line(first.x(), first.y(), second.x(), second.y());
         }
         shapes.end();
 
@@ -960,7 +1125,7 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(layout.inspector(), "СИСТЕМА НЕ ВЫБРАНА",
                     "Выберите звёздную систему, чтобы увидеть сектор, контролирующую фракцию и прямые переходы.");
         } else {
-            List<InfoSection> sections = List.of(
+            List<InfoSection> sections = new ArrayList<>(List.of(
                     InfoSection.of(
                             "Система",
                             "Название", selected.name(),
@@ -972,13 +1137,16 @@ public final class GeneratedWorldCommandUiRenderer {
                     InfoSection.of(
                             "Статус",
                             "Активная симуляция", selected.active() ? "Да" : "Нет",
-                            "Переход к просмотру", "Кнопка ниже не телепортирует флоты"));
-            drawInspector(layout.inspector(), selected.name(), "Звёздная система",
+                            "Переход к просмотру", "Кнопка ниже не телепортирует флоты")));
+            sections.addAll(personalRouteSections);
+            Rect details = new Rect(layout.inspector().x(), layout.inspector().y() + 116f * metrics.scale(),
+                    layout.inspector().width(), layout.inspector().height() - 116f * metrics.scale());
+            drawInspector(details, selected.name(), "Звёздная система",
                     selected.controllerDisplayName(), sections, detailScrollRows);
-            float buttonHeight = 44f * metrics.scale();
+            float buttonHeight = 32f * metrics.scale();
             Rect button = new Rect(
                     layout.inspector().x() + 16f * metrics.scale(),
-                    layout.inspector().y() + 16f * metrics.scale(),
+                    layout.inspector().y() + 80f * metrics.scale(),
                     layout.inspector().width() - 32f * metrics.scale(),
                     buttonHeight);
             button(button, selected.active() ? "СИСТЕМА УЖЕ АКТИВНА" : "ОТКРЫТЬ СИСТЕМУ",
@@ -990,6 +1158,12 @@ public final class GeneratedWorldCommandUiRenderer {
                         null,
                         button));
             }
+            Rect plan = new Rect(button.x(), layout.inspector().y() + 44f * metrics.scale(), button.width(), buttonHeight);
+            button(plan, "ПРОВЕРИТЬ ЛИЧНЫЙ МАРШРУТ", true);
+            hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.route-preview", null, plan));
+            Rect confirm = new Rect(button.x(), layout.inspector().y() + 8f * metrics.scale(), button.width(), buttonHeight);
+            button(confirm, "ПОДТВЕРДИТЬ ПЕРВЫЙ ВЫЛЕТ", personalRouteConfirmation);
+            if (personalRouteConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.route-confirm", null, confirm));
         }
     }
 

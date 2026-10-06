@@ -132,10 +132,12 @@ public final class Stage18LogisticsRuntime {
     /** Shared finite cargo-handling mass budget for one interval. */
     public static final class TransferBudget {
         private final double durationSeconds;
+        private final double allocatedMassKg;
         private double remainingMassKg;
 
         private TransferBudget(double durationSeconds, double remainingMassKg) {
             this.durationSeconds = durationSeconds;
+            this.allocatedMassKg = remainingMassKg;
             this.remainingMassKg = remainingMassKg;
         }
 
@@ -149,7 +151,11 @@ public final class Stage18LogisticsRuntime {
             return remainingMassKg;
         }
 
-        private void consume(double massKg) {
+        double allocatedMassKg() { return allocatedMassKg; }
+
+        void consume(double massKg) {
+            if (!Double.isFinite(massKg) || massKg <= 0 || massKg > remainingMassKg + EPSILON)
+                throw new IllegalArgumentException("Transfer exceeds remaining physical budget");
             remainingMassKg -= massKg;
             if (remainingMassKg <= EPSILON) {
                 remainingMassKg = 0d;

@@ -53,6 +53,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -120,6 +121,15 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             OperationalSpecializationReport specialization,
             WorldSimulation world,
             Stage18ManufacturingProductRegistry products) {
+        return materializeBootstrap(campaign, specialization, world, products,
+                Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
+    }
+
+    /** Materializes explicit initial NPC loadouts; restoration never invokes this policy. */
+    public static LiveRuntime materializeBootstrap(
+            Stage20GeneratedCampaignPersistentState campaign, OperationalSpecializationReport specialization,
+            WorldSimulation world, Stage18ManufacturingProductRegistry products,
+            Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
         Stage20GeneratedCampaignPersistentState saved = Objects.requireNonNull(campaign, "campaign");
         WorldSimulation runtime = Objects.requireNonNull(world, "world");
         Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
@@ -133,8 +143,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         Stage20FreightPersistentState freightState = Stage20FreightRuntimeMaterializer.materializeBootstrap(
                 saved,
                 specialization,
-                runtime.snapshot().nextFleetIdValue());
-        validateOrderEndpoints(freightState, infrastructure);
+                runtime.snapshot().nextFleetIdValue(),
+                Stage20FreightRuntimeMaterializer.FreighterCompatibilityAuthority.currentProvisional(),
+                com.spacesim.content.ship.Stage175ICombatTestContentPack.load(), reservePolicy);
+        validateOrderEndpoints(freightState, infrastructure, industry);
 
         Stage20LiveArrivalAuthorityIntegration arrival =
                 Stage20LiveArrivalAuthorityIntegration.restoreAndBind(saved, runtime);
@@ -183,7 +195,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 saved.freight(),
                 Stage20FreightRuntimeMaterializer.FreighterCompatibilityAuthority.currentProvisional(),
                 Stage175ICombatTestContentPack.load());
-        validateOrderEndpoints(saved.freight(), infrastructure);
+        validateOrderEndpoints(saved.freight(), infrastructure, industry);
         Stage20LiveArrivalAuthorityIntegration arrival =
                 Stage20LiveArrivalAuthorityIntegration.restoreAndBind(saved.campaign(), world);
         registerRestoredLocalFleetPhysicalStates(
@@ -256,7 +268,8 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      * not an infinite-flight fallback.</p>
      */
     private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
-        String fitId = switch (fleet.stableFactionId()) {
+        String fitId = fleet.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
+                && fleet.stableFactionId().equals("faction.beta") ? fleet.fitId() : switch (fleet.stableFactionId()) {
             case "faction.alpha" ->
                     com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
                             .EMPIRE_FREIGHT_STRATEGIC_FIT;
@@ -408,10 +421,30 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
     private static void validateOrderEndpoints(
             Stage20FreightPersistentState freight,
-            InfrastructureRegistry infrastructure) {
+            InfrastructureRegistry infrastructure, MaterializedGeneratedIndustrialRuntime industry) {
+        var extractedBySource = new java.util.TreeMap<String, Double>();
+        var extractionCatalog = com.spacesim.content.Stage18ExtractionCatalogLoader.loadDefault();
+        for (var lot : freight.productLots()) infrastructure.endpoint(lot.sourceEndpointId());
+        for (var order : freight.personalMiningOrders()) {
+            var source = industry.sourceOutposts().sources().source(order.sourceId()).sourceState();
+            var method = extractionCatalog.findMethod(order.methodId());
+            if (source.sourceKind() != com.spacesim.content.Stage18ExtractionCatalog.SourceKind.NATURAL_OCCURRENCE
+                    || method == null || method.sourceKind() != source.sourceKind())
+                throw new IllegalArgumentException("Mining references an unknown or incompatible physical source/method");
+        }
         for (var lot : freight.cargoLots()) {
             if (lot.orderId().equals(Stage20FreightPersistentState.manualCargoOrderId(lot.fleetId())))
                 infrastructure.endpoint(lot.sourceEndpointId());
+            if (lot.orderId().equals(Stage20FreightPersistentState.personalExtractionOrderId(lot.fleetId()))) {
+                var source = industry.sourceOutposts().sources().source(lot.sourceEndpointId()).sourceState();
+                if (!source.outputCommodityId().equals(lot.commodityId()))
+                    throw new IllegalArgumentException("Extracted cargo commodity differs from physical source");
+                double aboard = extractedBySource.merge(source.sourceId(), lot.massKg(), Double::sum);
+                double maximumRecovered = (source.initialAccessibleMassKg() - source.remainingAccessibleMassKg())
+                        * source.gradeFraction() * source.sourceRecoveryFraction();
+                if (aboard > maximumRecovered + Math.max(1e-9, maximumRecovered * 1e-12))
+                    throw new IllegalArgumentException("Extracted cargo exceeds depleted physical source mass");
+            }
         }
         for (TransportOrderState order : freight.orders()) {
             RuntimeEndpoint source = infrastructure.endpoint(order.sourceEndpointId());
@@ -444,12 +477,15 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      */
     public static final class LiveRuntime {
         private final Stage20GeneratedCampaignPersistentState campaignAuthority;
+        private Stage20DiscoveryPersistentState discovery;
         private final WorldSimulation world;
-        private final MaterializedGeneratedIndustrialRuntime industry;
+        private MaterializedGeneratedIndustrialRuntime industry;
         private final InfrastructureRegistry infrastructure;
         private final Stage20FreightRuntime freight;
         private final Stage20LiveArrivalAuthorityIntegration arrival;
         private final Stage18LogisticsRuntime logistics;
+        private final com.spacesim.economy.Stage18ManufacturingWorkQueue manufacturingQueue;
+        private final com.spacesim.economy.Stage18FacilityConstructionWorkQueue constructionQueue;
 
         private LiveRuntime(
                 Stage20GeneratedCampaignPersistentState campaignAuthority,
@@ -460,6 +496,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 Stage20LiveArrivalAuthorityIntegration arrival,
                 Stage18ManufacturingProductRegistry products) {
             this.campaignAuthority = Objects.requireNonNull(campaignAuthority, "campaignAuthority");
+            this.discovery = campaignAuthority.discoveryState();
             this.world = Objects.requireNonNull(world, "world");
             this.industry = Objects.requireNonNull(industry, "industry");
             this.infrastructure = Objects.requireNonNull(infrastructure, "infrastructure");
@@ -468,9 +505,257 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             this.logistics = new Stage18LogisticsRuntime(
                     Stage18ResourceOntologyLoader.loadDefault(),
                     Objects.requireNonNull(products, "products"));
+            this.manufacturingQueue = new com.spacesim.economy.Stage18ManufacturingWorkQueue(
+                    Stage18ResourceOntologyLoader.loadDefault(),
+                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadManufacturing(), products,
+                    campaignAuthority.industrialState().processOrders(), campaignAuthority.industrialState().simulationTick());
+            manufacturingQueue.restoreReservations(id -> infrastructure.endpoint(id).storage());
+            this.constructionQueue = new com.spacesim.economy.Stage18FacilityConstructionWorkQueue(
+                    new com.spacesim.economy.Stage18FacilityConstructionRuntime(
+                            com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
+                            com.spacesim.content.Stage18FacilityCatalogLoader.loadDefault(),
+                            Stage18ResourceOntologyLoader.loadDefault()), Stage18ResourceOntologyLoader.loadDefault(),
+                    campaignAuthority.industrialState().constructionOrders(), campaignAuthority.industrialState().simulationTick());
+            constructionQueue.bindReservations(id -> infrastructure.endpoint(id).storage());
+            if (constructionQueue.capture().stream().anyMatch(com.spacesim.economy.Stage18FacilityConstructionWorkQueue::managed)
+                    && constructionQueue.lastProcessedTick() > world.getAuthoritativeWorldTick())
+                throw new IllegalArgumentException("Construction watermark exceeds world time");
+            if (manufacturingQueue.capture().stream().anyMatch(com.spacesim.economy.Stage18ManufacturingWorkQueue::managed)
+                    && manufacturingQueue.lastProcessedTick() > world.getAuthoritativeWorldTick())
+                throw new IllegalArgumentException("Manufacturing watermark exceeds world time");
             this.world.bindFleetPropellantLogisticsAuthority(
                     new Stage22GeneratedWorldPropellantLogisticsAuthority(
                             this.world, this.infrastructure, this.industry));
+        }
+
+        /** @return current immutable observer-local discovery registry */
+        public Stage20DiscoveryPersistentState discoveryState() { return discovery; }
+
+        /** @return native reserved-material production queue; commands require campaign ownership validation */
+        public com.spacesim.economy.Stage18ManufacturingWorkQueue manufacturingQueue() { return manufacturingQueue; }
+        /** @return existing physical facility-construction queue with shared industrial persistence */
+        public com.spacesim.economy.Stage18FacilityConstructionWorkQueue constructionQueue() { return constructionQueue; }
+
+        /**
+         * Installs only completed orders retained by the queue at an already completed world tick.
+         * This supplies no electrical power, workforce, maintenance capacity or stock.
+         * @param completed newly completed physical construction orders
+         */
+        public void adoptCompletedFacilityConstruction(
+                List<com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot> completed) {
+            completed = List.copyOf(completed);
+            if (completed.isEmpty()) return;
+            if (constructionQueue.lastProcessedTick() > world.getAuthoritativeWorldTick())
+                throw new IllegalStateException("Construction cannot finish ahead of the world clock");
+            var retained = constructionQueue.capture();
+            if (!retained.containsAll(completed))
+                throw new IllegalArgumentException("Installation must retain its paid construction evidence");
+            var construction = new com.spacesim.economy.Stage18FacilityConstructionRuntime(
+                    com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
+                    com.spacesim.content.Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault());
+            var updated = industry.industrial().adoptCompletedConstruction(completed, construction);
+            industry = new MaterializedGeneratedIndustrialRuntime(updated, industry.sourceOutposts());
+        }
+
+        /**
+         * Installs only exact retained yard completions at an already completed world tick.
+         * @param completed newly completed physical structures
+         * @param queue actual construction authority retaining material/work evidence
+         */
+        public void adoptCompletedYardConstruction(
+                List<com.spacesim.economy.Stage23YardConstructionWorkQueue.Order> completed,
+                com.spacesim.economy.Stage23YardConstructionWorkQueue queue) {
+            if (completed.isEmpty()) return;
+            if (queue.capture().lastProcessedTick() > world.getAuthoritativeWorldTick())
+                throw new IllegalStateException("Yard construction cannot finish ahead of world time");
+            industry = new MaterializedGeneratedIndustrialRuntime(
+                    industry.industrial().adoptCompletedYardConstruction(completed, queue), industry.sourceOutposts());
+        }
+
+        /**
+         * Redistributes already existing station resources without any bootstrap or inventory grant.
+         * @param stationId actual station; player command checks ownership and physical berth
+         * @param targetId actual installed facility
+         */
+        public void allocateFacilityResources(String stationId, String targetId) {
+            industry = new MaterializedGeneratedIndustrialRuntime(
+                    industry.industrial().allocateFacilityResources(stationId, targetId), industry.sourceOutposts());
+        }
+
+        /**
+         * Transfers existing yard resources within a station without issuing operating capacity.
+         * @param stationId actual station; player command checks ownership and berth
+         * @param targetId actual installed yard
+         */
+        public void allocateYardResources(String stationId, String targetId) {
+            industry = new MaterializedGeneratedIndustrialRuntime(
+                    industry.industrial().allocateYardResources(stationId, targetId), industry.sourceOutposts());
+        }
+
+        /**
+         * Shares an existing personal observation with an existing faction knowledge owner.
+         * The campaign validates the recipient and contract; no generated truth is consulted.
+         * @param recipient faction receiving the volunteered observation
+         * @param object exact personally observed static object
+         * @param reportId durable provenance identity
+         * @return recipient knowledge after the ordinary merge
+         */
+        public com.spacesim.world.Stage20DiscoveryKnowledgeState sharePersonalDiscovery(
+                String recipient, com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String reportId) {
+            if (world.findFactionEconomicState(recipient).isEmpty())
+                throw new IllegalArgumentException("Unknown discovery recipient");
+            var personal = discovery.knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+                    .knowledge(object).orElseThrow(() -> new IllegalStateException("No personal observation"));
+            var prior = discovery.knowledgeFor(recipient);
+            if (prior.knowledge(object).stream().flatMap(k -> k.evidence().stream())
+                    .anyMatch(e -> e.provenanceId().equals(reportId)))
+                throw new IllegalStateException("Discovery report already delivered");
+            var next = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object, personal.state(),
+                            personal.classificationId(), personal.knownLocation(), personal.resourceKnowledge(),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PURCHASED_OR_SHARED_MAP_DATA,
+                                    reportId, personal.lastUpdatedSeconds(), java.util.OptionalDouble.empty())));
+            var states = new ArrayList<>(discovery.knowledgeStates());
+            states.removeIf(state -> state.ownerId().equals(recipient)); states.add(next);
+            discovery = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                    discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
+            return next;
+        }
+
+        /**
+         * Records the human actor's actual physical visit to an existing local station.
+         * The caller has completed ordinary docking; this seam revalidates ownership and geometry.
+         * Previously known permanent station locations are not rewritten on repeated visits.
+         * @param player current durable docked player
+         * @param stationId physically visited generated endpoint
+         */
+        public void recordPersonalStationVisit(com.spacesim.player.PlayerState player, String stationId) {
+            Objects.requireNonNull(player, "player");
+            if (!player.docked() || player.activeFleetId() == null
+                    || !player.ownedFleetIds().contains(player.activeFleetId()))
+                throw new IllegalStateException("Personal station discovery requires owned docked fleet");
+            var fleet = world.findFleet(player.activeFleetId()).orElseThrow();
+            var endpoint = infrastructure.endpoint(stationId);
+            if (fleet.locationKind() != FleetLocationKind.IN_SYSTEM || world.findFleetJump(fleet.fleetId()).isPresent()
+                    || !fleet.systemId().equals(endpoint.systemId()) || !player.dockedAt().systemId().equals(fleet.systemId()))
+                throw new IllegalStateException("Personal station discovery requires local physical docking");
+            var physical = arrival.materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElseThrow();
+            if (physical.position().distanceTo(endpoint.position()) > 1000d
+                    || Math.hypot(physical.velocityXMps(), physical.velocityYMps()) > 1d)
+                throw new IllegalStateException("Station visit is outside ordinary berth geometry");
+            String owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
+            var prior = discovery.knowledgeFor(owner);
+            var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(endpoint.systemId(),
+                    com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE, stationId);
+            if (prior.entries().stream().filter(entry -> entry.object().equals(object))
+                    .flatMap(entry -> entry.evidence().stream()).anyMatch(evidence ->
+                        evidence.source() == com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY
+                        && evidence.provenanceId().equals("personal-station-visit:" + fleet.fleetId().value() + ":" + stationId))) return;
+            double seconds = world.getAuthoritativeWorldTick() * (double) world.findSession(fleet.systemId()).orElseThrow().getClock().getFixedStepSeconds();
+            var observed = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                            com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                            Optional.of(endpoint.stationArchetypeId()), Optional.of(endpoint.position()),
+                            com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY,
+                                    "personal-station-visit:" + fleet.fleetId().value() + ":" + stationId, seconds, java.util.OptionalDouble.empty())));
+            var states = new ArrayList<>(discovery.knowledgeStates());
+            states.removeIf(state -> state.ownerId().equals(owner)); states.add(observed);
+            discovery = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                    discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
+        }
+
+        /**
+         * Retains the physical location and resource indication from an actual recovered cargo
+         * sample. It provides no deposit grade, reserve estimate or foreign observer knowledge.
+         * @param player current personal actor
+         * @param sourceId contacted finite occurrence
+         */
+        public void recordPersonalExtractionSample(com.spacesim.player.PlayerState player, String sourceId) {
+            if (player == null || player.activeFleetId() == null || !player.ownedFleetIds().contains(player.activeFleetId()))
+                throw new IllegalStateException("Extraction observation requires its personal owner");
+            var fleet = world.findFleet(player.activeFleetId()).orElseThrow();
+            var source = industry.sourceOutposts().sources().source(sourceId);
+            if (fleet.locationKind() != FleetLocationKind.IN_SYSTEM || !fleet.systemId().equals(source.systemId()))
+                throw new IllegalStateException("Extraction sample requires the actual local occurrence");
+            var sample = freight.capture().cargoLots().stream()
+                    .filter(l -> l.fleetId().equals(player.activeFleetId()) && l.sourceEndpointId().equals(sourceId)
+                            && l.orderId().equals(Stage20FreightPersistentState.personalExtractionOrderId(player.activeFleetId())))
+                    .min(java.util.Comparator.comparingDouble(Stage20FreightPersistentState.CargoLotState::loadedAtSimulationSeconds))
+                    .orElseThrow(() -> new IllegalStateException("No recovered physical sample"));
+            String owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
+            var prior = discovery.knowledgeFor(owner);
+            var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
+                    com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, sourceId);
+            if (prior.knowledge(object).stream().anyMatch(k -> k.resourceKnowledge().level().ordinal()
+                    >= com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION.ordinal())) return;
+            String classification = prior.knowledge(object).flatMap(k -> k.classificationId()).orElse(sample.commodityId());
+            var observed = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                            com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                            Optional.of(classification), Optional.of(source.position()),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION,
+                                    Optional.empty(), Optional.empty()),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY,
+                                    "personal-extraction-sample:" + player.activeFleetId().value() + ':' + sourceId,
+                                    sample.loadedAtSimulationSeconds(), java.util.OptionalDouble.empty())));
+            var states = new ArrayList<>(discovery.knowledgeStates());
+            states.removeIf(state -> state.ownerId().equals(owner)); states.add(observed);
+            discovery = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                    discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
+        }
+
+        /**
+         * Receives permitted static station rows from the actual seller's existing archive.
+         * The campaign calls this only after its conserved new-game ship sale; no source position
+         * or missing archive record is synthesized from generated truth.
+         * @param player actual buyer owning the purchased local fleet
+         * @param purchasedFleet purchased existing fleet
+         * @param seller actual faction seller
+         * @param permitted seller-owned civilian station references disclosed by the sale policy
+         * @return exact received references, without stock, estimates or ownership grants
+         */
+        public List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> receiveSellerStationBriefing(
+                com.spacesim.player.PlayerState player, FleetId purchasedFleet, String seller,
+                List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> permitted) {
+            Objects.requireNonNull(player); Objects.requireNonNull(purchasedFleet); Objects.requireNonNull(seller);
+            if (!player.ownedFleetIds().contains(purchasedFleet) || !purchasedFleet.equals(player.activeFleetId())
+                    || world.findFactionEconomicState(seller).isEmpty()
+                    || !freight.findFreighter(purchasedFleet).orElseThrow().stableFactionId().equals(seller))
+                throw new IllegalArgumentException("Station briefing requires its actual purchased ship and faction seller");
+            var archive = discovery.knowledgeFor(seller);
+            String owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
+            var personal = discovery.knowledgeFor(owner);
+            var received = new ArrayList<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef>();
+            double seconds = world.getAuthoritativeWorldTick() * (double) world.findSession(world.getActiveSystemId()).orElseThrow().getClock().getFixedStepSeconds();
+            for (var ref : List.copyOf(permitted).stream().distinct().sorted().toList()) {
+                if (ref.kind() != com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE)
+                    throw new IllegalArgumentException("Sale briefing is limited to permitted stations");
+                var station = industry.industrial().stations().stream().filter(s -> s.stationId().equals(ref.objectId())
+                        && s.systemId().equals(ref.systemId()) && s.stableFactionId().equals(seller)).findFirst();
+                var known = archive.entries().stream().filter(e -> e.object().equals(ref) && e.knownLocation().isPresent()).findFirst();
+                if (station.isEmpty() || known.isEmpty()
+                        || !known.orElseThrow().classificationId().equals(java.util.Optional.of(station.orElseThrow().stationArchetypeId()))) continue;
+                personal = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(personal,
+                        new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(ref,
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                                known.orElseThrow().classificationId(), known.orElseThrow().knownLocation(),
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(),
+                                new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                        com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE,
+                                        "paid-ship-briefing:" + seller + ':' + purchasedFleet.value() + ':' + ref.objectId(), seconds, java.util.OptionalDouble.empty())));
+                received.add(ref);
+            }
+            if (!received.isEmpty()) {
+                var states = new ArrayList<>(discovery.knowledgeStates()); states.removeIf(state -> state.ownerId().equals(owner)); states.add(personal);
+                discovery = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                        discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
+            }
+            return List.copyOf(received);
         }
 
         /** @return ordinary multi-system simulation authority */
@@ -823,6 +1108,16 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     infrastructure.captureInto(campaignAuthority);
             Stage20GeneratedCampaignPersistentState campaign =
                     industry.captureCampaignState(withInfrastructure);
+            var previousIndustry = campaign.industrialState();
+            campaign = replaceIndustry(campaign, new Stage18IndustrialState(previousIndustry.schemaVersion(),
+                    previousIndustry.contentFingerprint(), Math.max(manufacturingQueue.lastProcessedTick(), constructionQueue.lastProcessedTick()), previousIndustry.sources(),
+                    previousIndustry.stationStorages(), previousIndustry.facilities(), previousIndustry.yards(),
+                    constructionQueue.capture(), manufacturingQueue.capture()));
+            campaign = new Stage20GeneratedCampaignPersistentState(campaign.schemaVersion(), campaign.generationIdentity(),
+                    campaign.materializedWorld(), campaign.materializationState(), campaign.industrialState(),
+                    new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                            discovery.worldGenerationVersion(), campaign.materializedWorld().worldFingerprint(), discovery.knowledgeStates()),
+                    campaign.openRuntimeBoundaries());
             List<LocalFleetPhysicalState> localPhysical = captureLocalFleetPhysicalStates();
             Stage20FreightPersistentState freightState = rebindFreightFingerprint(
                     freight.capture(), campaign.materializedWorld().worldFingerprint());
@@ -899,7 +1194,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                         fleetState.activeOrderId(),
                         fleetState.routeIndex(),
                         fleetState.cargoStorage(),
-                        fleetState.legalFactionId()));
+                        fleetState.legalFactionId(), fleetState.carriedEquipmentMassKg()));
                 changed = true;
             }
             if (!changed) {
@@ -916,7 +1211,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     source.nextCargoLotOrdinal(),
                     fleets,
                     source.cargoLots(),
-                    source.orders());
+                    source.orders(), source.personalMiningOrders(), source.productLots());
         }
 
         private void synchronizeCompletedHops() {
@@ -1218,7 +1513,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 state.nextCargoLotOrdinal(),
                 state.freighters(),
                 state.cargoLots(),
-                state.orders());
+                state.orders(), state.personalMiningOrders(), state.productLots());
     }
 
     private static Stage20GeneratedCampaignPersistentState replaceIndustry(

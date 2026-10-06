@@ -36,6 +36,19 @@ class Stage18ManufacturingRuntimeTest {
     }
 
     @Test
+    void electricalServicesCannotCreateEnergyOrSpendTheSameIntervalTwice() {
+        var budget = new ManufacturingCapability("shared", Set.of("physical-power"), 100d, 20d, 3d).openInterval(2d);
+        assertTrue(budget.reserveElectricalEnergyJ(75d)); assertEquals(125d, budget.remainingEnergyJ());
+        assertEquals(40d, budget.remainingWorkSeconds()); assertEquals(6d, budget.remainingMaintenanceWorkSeconds());
+        assertFalse(budget.reserveElectricalEnergyJ(126d)); assertEquals(125d, budget.remainingEnergyJ());
+        assertTrue(budget.reserveElectricalEnergyJ(125d)); assertEquals(0d, budget.remainingEnergyJ());
+        assertFalse(budget.reserveElectricalEnergyJ(1d));
+        for (double invalid : new double[]{0d, -1d, Double.NaN, Double.POSITIVE_INFINITY})
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> budget.reserveElectricalEnergyJ(invalid));
+        assertEquals(0d, budget.remainingEnergyJ()); assertEquals(40d, budget.remainingWorkSeconds());
+    }
+
+    @Test
     void heavyComponentsConsumeExactlyTheirPhysicalOutputMass() {
         ManufacturingInventory inventory = inventory(Map.of(
                 "commodity.material.structural_alloy", 1000d,

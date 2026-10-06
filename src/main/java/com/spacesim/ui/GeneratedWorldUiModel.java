@@ -73,6 +73,7 @@ public final class GeneratedWorldUiModel {
     private final LiveRuntime runtime;
     private final ContentCatalog content;
     private final CarrierUiSource carrierUiSource;
+    private final java.util.function.Supplier<com.spacesim.player.PlayerState> personalPlayer;
     private final Stage20GeneratedCampaignPersistentState campaign;
     private final Stage20StationPhysicalGeometryProfile stationGeometry;
 
@@ -104,10 +105,24 @@ public final class GeneratedWorldUiModel {
             LiveRuntime runtime,
             ContentCatalog content,
             CarrierUiSource carrierUiSource) {
+        this(worldSeed, runtime, content, carrierUiSource, null);
+    }
+
+    /**
+     * Creates the personal client's projection. Resource estimates come only from personal evidence.
+     * @param worldSeed exact seed
+     * @param runtime current runtime
+     * @param content authored content
+     * @param carrierUiSource read-only carrier projection
+     * @param personalPlayer current personal player; null supplier retains the diagnostic projection
+     */
+    public GeneratedWorldUiModel(long worldSeed, LiveRuntime runtime, ContentCatalog content,
+            CarrierUiSource carrierUiSource, java.util.function.Supplier<com.spacesim.player.PlayerState> personalPlayer) {
         this.worldSeed = worldSeed;
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.content = Objects.requireNonNull(content, "content");
         this.carrierUiSource = Objects.requireNonNull(carrierUiSource, "carrierUiSource");
+        this.personalPlayer = personalPlayer;
         this.campaign = runtime.captureState().campaign();
         this.stationGeometry = Stage20StationPhysicalGeometryProfile.deriveCurrent();
     }
@@ -196,16 +211,19 @@ public final class GeneratedWorldUiModel {
                     List.of(
                             identitySection(outpost.site().siteId(), ownerId, factionName(ownerId),
                                     active, outpost.source().position()),
-                            InfoSection.of("Добыча",
+                            personalPlayer == null ? InfoSection.of("Добыча",
                                     "Ресурс", outpost.source().sourceState().outputCommodityId(),
                                     "Метод", outpost.site().extractionMethodId(),
                                     "Остаток", mass(outpost.source().sourceState().remainingAccessibleMassKg()),
-                                    "Фракция извлечения", percent(outpost.source().sourceState().sourceRecoveryFraction())),
-                            storageSection(outpost.storage()),
-                            InfoSection.of("Оборудование",
+                                    "Фракция извлечения", percent(outpost.source().sourceState().sourceRecoveryFraction()))
+                                    : personalResourceSection(outpost.source()),
+                            personalPlayer == null || personallyOwnsStation(outpost.stationId()) ? storageSection(outpost.storage())
+                                    : InfoSection.of("Хранилище аванпоста", "Доступ", "Внутренние запасы чужого объекта закрыты"),
+                            personalPlayer == null || personallyOwnsStation(outpost.stationId()) ? InfoSection.of("Оборудование",
                                     "Объект", outpost.facilityState().definitionId(),
                                     "Состояние", outpost.facilityState().enabled() ? "Работает" : "Отключено",
-                                    "Целостность", percent(outpost.facilityState().conditionFraction()))))
+                                    "Целостность", percent(outpost.facilityState().conditionFraction()))
+                                    : InfoSection.of("Оборудование", "Доступ", "Состояние чужих внутренних систем неизвестно")))
                     .withScale(sprite));
         }
 
@@ -221,12 +239,12 @@ public final class GeneratedWorldUiModel {
                     sprite.binding(),
                     List.of(
                             identitySection(source.sourceId(), "", "Не принадлежит фракции", active, source.position()),
-                            InfoSection.of("Ресурс",
+                            personalPlayer == null ? InfoSection.of("Ресурс",
                                     "Тип", type,
                                     "Товар", source.sourceState().outputCommodityId(),
                                     "Начальная масса", mass(source.sourceState().initialAccessibleMassKg()),
                                     "Остаток", mass(source.sourceState().remainingAccessibleMassKg()),
-                                    "Содержание", percent(source.sourceState().gradeFraction()))))
+                                    "Содержание", percent(source.sourceState().gradeFraction())) : personalResourceSection(source)))
                     .withScale(sprite));
         }
 
@@ -236,6 +254,27 @@ public final class GeneratedWorldUiModel {
         addOrdinaryEntities(result, active);
         result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
+    }
+
+    private boolean personallyOwnsStation(String stationId) {
+        var player = personalPlayer == null ? null : personalPlayer.get();
+        if (player == null) return false;
+        return player.ownedStations().stream().anyMatch(ref -> runtime.world().findSession(ref.systemId()).map(session -> {
+            var entity = session.getEntityRegistry().require(ref.stationEntityId());
+            var identity = entity.getComponent(IdentityComponent.class);
+            return identity != null && (identity.name.equals("Generated market " + stationId)
+                    || identity.name.equals("Generated market v2 " + stationId));
+        }).orElse(false));
+    }
+
+    private InfoSection personalResourceSection(MaterializedSource source) {
+        var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, source.sourceId());
+        String actor = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
+        var knowledge = personalPlayer.get() == null ? new com.spacesim.world.Stage20DiscoveryKnowledgeState(actor, List.of())
+                : runtime.discoveryState().knowledgeFor(actor);
+        return PersonalResourceUiProjection.section(knowledge, object, runtime.world().findSession(runtime.world().getActiveSystemId())
+                .orElseThrow().getClock().getSimulationTimeSeconds());
     }
 
     private void addMilitaryObjects(List<LocalObjectView> result, StarSystemId active,

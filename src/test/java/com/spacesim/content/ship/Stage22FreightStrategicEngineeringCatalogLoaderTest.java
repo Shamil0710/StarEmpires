@@ -13,15 +13,46 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class Stage22FreightStrategicEngineeringCatalogLoaderTest {
+    @Test
+    void miningFreightReplacesOnlyCargoSectionAndRetainsPhysicalMobility() {
+        var catalog = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
+        var source = catalog.findDemonstratorFit(
+                Stage22FreightStrategicEngineeringCatalogLoader.UNION_FREIGHT_STRATEGIC_FIT);
+        var target = catalog.findDemonstratorFit(
+                Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT);
+        assertNotNull(target);
+        assertEquals(source.hullId(), target.hullId());
+        assertEquals(source.installedModules().size(), target.installedModules().size());
+        int changed = 0;
+        for (var original : source.installedModules()) {
+            var replacement = target.installedModules().stream()
+                    .filter(value -> value.mountId().equals(original.mountId())).findFirst().orElseThrow();
+            if (!original.equals(replacement)) {
+                changed++;
+                assertEquals("module.industrial_union_cargo_section_v1", original.moduleId());
+                assertEquals(Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID,
+                        replacement.moduleId());
+            }
+        }
+        assertEquals(1, changed);
+        var fit = InstalledFit.fromDemonstrator(target);
+        var runtime = new ShipEngineeringRuntime(catalog);
+        var state = runtime.initialize(fit, ConsumableState.empty(), DamageState.pristine());
+        assertTrue(new com.spacesim.ship.ShipMiningEngineeringAdapter()
+                .derive(runtime.derive(fit, state, DamageState.pristine())).isPresent());
+    }
+
     @Test
     void bothCoreFreightVariantsPayForFittedFtlAndCanPlanPhysicalJump() {
         ShipEngineeringCatalog catalog = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
 
         for (String fitId : List.of(
                 Stage22FreightStrategicEngineeringCatalogLoader.EMPIRE_FREIGHT_STRATEGIC_FIT,
-                Stage22FreightStrategicEngineeringCatalogLoader.UNION_FREIGHT_STRATEGIC_FIT)) {
+                Stage22FreightStrategicEngineeringCatalogLoader.UNION_FREIGHT_STRATEGIC_FIT,
+                Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)) {
             var definition = catalog.findDemonstratorFit(fitId);
             assertNotNull(definition);
             InstalledFit fit = InstalledFit.fromDemonstrator(definition);

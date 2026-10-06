@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,11 +52,14 @@ class ShipRefitApplicationServiceTest {
                 new WeaponMountRuntime.RuntimeState(Map.of("weapon_spinal", 3d)));
         EngineeringComponent component = new EngineeringComponent(source, hot, instance);
         EntityId id = new EntityId(712L);
+        Map<String, Double> targetAges = new TreeMap<>();
+        target.installedModules().forEach(module -> targetAges.put(module.mountId(), 0d));
+        targetAges.put("core_drive", 900d);
         Completion completion = new Completion(
                 id,
                 target,
                 damage,
-                new MaintenanceState(Map.of("core_drive", 900d)),
+                new MaintenanceState(targetAges),
                 List.of(new ShipyardRefitContinuity.RemovedModuleState(
                         new InstalledModuleDefinition("weapon_spinal", "module.railgun_large_v1"),
                         1d, 300d)));
@@ -74,6 +78,37 @@ class ShipRefitApplicationServiceTest {
                 component.instanceState.maintenance().secondsSinceServiceByMount().get("core_drive"), 0d);
         assertEquals(List.of(), component.instanceState.weaponLoadout().feeds());
         assertEquals(Map.of(), component.instanceState.weaponMountRuntime().cooldownSecondsByMount());
+        RuntimeState appliedRuntime = component.runtimeState;
+        ShipInstanceRuntimeState appliedInstance = component.instanceState;
+        assertThrows(IllegalArgumentException.class,
+                () -> new ShipRefitApplicationService(catalog).apply(id, component, completion));
+        assertSame(appliedRuntime, component.runtimeState);
+        assertSame(appliedInstance, component.instanceState);
+    }
+
+    @Test
+    void staleConditionAndDifferentHullAreRejectedBeforeAnyMutation() {
+        ShipEngineeringCatalog catalog = ShipEngineeringCatalogLoader.loadDefault();
+        InstalledFit fit = InstalledFit.fromDemonstrator(
+                catalog.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
+        EngineeringComponent component = new EngineeringComponent(
+                fit, new ShipEngineeringRuntime(catalog).initialize(fit, ConsumableState.empty()));
+        EntityId id = new EntityId(3L);
+        Map<String, Double> ages = new TreeMap<>();
+        fit.installedModules().forEach(module -> ages.put(module.mountId(), 0d));
+        Completion stale = new Completion(id, fit,
+                new ShipDamageRuntime.Snapshot(Map.of(), new DamageState(Map.of("core_drive", .5d))),
+                new MaintenanceState(ages), List.of());
+        RuntimeState beforeRuntime = component.runtimeState;
+        ShipInstanceRuntimeState beforeInstance = component.instanceState;
+        var service = new ShipRefitApplicationService(catalog);
+        assertThrows(IllegalArgumentException.class, () -> service.apply(id, component, stale));
+        Completion otherHull = new Completion(id, new InstalledFit("hull.other", fit.installedModules()),
+                component.instanceState.damage(), new MaintenanceState(ages), List.of());
+        assertThrows(IllegalArgumentException.class, () -> service.apply(id, component, otherHull));
+        assertSame(fit, component.fit);
+        assertSame(beforeRuntime, component.runtimeState);
+        assertSame(beforeInstance, component.instanceState);
     }
 
     @Test

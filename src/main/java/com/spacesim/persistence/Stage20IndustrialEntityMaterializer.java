@@ -372,7 +372,7 @@ public final class Stage20IndustrialEntityMaterializer {
         facilityCapabilities.sort(Comparator.comparing(FacilityCapabilitySnapshot::facilityInstanceId));
 
         Stage18ShipyardRuntime shipyardRuntime = new Stage18ShipyardRuntime(
-                Stage18ShipyardCatalogLoader.loadDefault(),
+                com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
                 Stage18ResourceOntologyLoader.loadDefault(),
                 productRegistry);
         ArrayList<YardCapabilitySnapshot> yardCapabilities = new ArrayList<>();
@@ -687,6 +687,130 @@ public final class Stage20IndustrialEntityMaterializer {
             return stations.stream().filter(value -> value.stationId().equals(id))
                     .findFirst().orElseThrow(() -> new IllegalArgumentException(
                             "unknown materialized industrial station: " + id));
+        }
+
+        /**
+         * Adopts fully paid physical construction without supplying power, labor or maintenance.
+         * New facilities remain disabled until actual station resources are allocated to them.
+         * Existing storage, installed conditions, resource allocations and yards are retained.
+         * @param completed completed orders admitted by the owning construction queue
+         * @param construction shared bill and completion validator
+         * @return immutable updated registry; repeated adoption preserves existing installed state
+         */
+        public MaterializedIndustrialRegistry adoptCompletedConstruction(
+                List<com.spacesim.economy.Stage18FacilityConstructionRuntime.ConstructionOrderSnapshot> completed,
+                com.spacesim.economy.Stage18FacilityConstructionRuntime construction) {
+            var updated = new TreeMap<String, MaterializedIndustrialStation>();
+            stations.forEach(station -> updated.put(station.stationId(), station));
+            var projector = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
+            for (var order : List.copyOf(completed)) {
+                var reference = construction.completedFacility(order);
+                var station = updated.get(order.stationId());
+                if (station == null) throw new IllegalArgumentException("Construction station is absent from the live registry");
+                var node = station.stationNode().withCompletedConstruction(order, construction);
+                var existing = station.facilities().stream()
+                        .filter(f -> f.facilityInstanceId().equals(reference.facilityInstanceId())).findFirst();
+                if (existing.isPresent()) {
+                    if (!existing.orElseThrow().definitionId().equals(reference.facilityDefinitionId())
+                            || !existing.orElseThrow().locationTag().equals(order.locationTag()))
+                        throw new IllegalArgumentException("Constructed facility conflicts with an installed identity");
+                    continue;
+                }
+                var installed = new InstalledFacilityState(reference.facilityInstanceId(), reference.facilityDefinitionId(),
+                        1d, 0d, 0d, 0d, 0d, order.locationTag(), false);
+                var facilities = new ArrayList<>(station.facilities()); facilities.add(installed);
+                var capabilities = new ArrayList<>(station.facilityCapabilities()); capabilities.add(projector.project(installed));
+                updated.put(station.stationId(), new MaterializedIndustrialStation(station.systemId(), station.stationId(),
+                        station.stableFactionId(), station.stationArchetypeId(), station.position(), node, station.storage(),
+                        facilities, capabilities, station.yards(), station.yardCapabilities()));
+            }
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint,
+                    List.copyOf(updated.values()));
+        }
+
+        /**
+         * Installs fully paid yard structures without supplying operating resources.
+         * Repeated admission retains subsequent condition and resource allocations.
+         * @param completed exact completed orders retained by the construction queue
+         * @param construction authoritative bill and work evidence
+         * @return immutable registry retaining all prior storage and installations
+         */
+        public MaterializedIndustrialRegistry adoptCompletedYardConstruction(
+                List<com.spacesim.economy.Stage23YardConstructionWorkQueue.Order> completed,
+                com.spacesim.economy.Stage23YardConstructionWorkQueue construction) {
+            Objects.requireNonNull(construction, "construction");
+            var updated = new TreeMap<String, MaterializedIndustrialStation>();
+            stations.forEach(station -> updated.put(station.stationId(), station));
+            var projector = new Stage18ShipyardRuntime(
+                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
+                    Stage18ResourceOntologyLoader.loadDefault(),
+                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+            for (var order : List.copyOf(completed)) {
+                var installed = construction.completedYard(order);
+                var original = updated.get(order.stationId());
+                if (original == null || !original.stationNode().locationTag().equals(order.locationTag()))
+                    throw new IllegalArgumentException("Constructed yard requires its actual compatible station");
+                for (var station : updated.values()) {
+                    var existing = station.yards().stream()
+                            .filter(y -> y.yardInstanceId().equals(installed.yardInstanceId())).findFirst();
+                    if (existing.isPresent() && (!station.stationId().equals(order.stationId())
+                            || !existing.orElseThrow().yardDefinitionId().equals(order.yardDefinitionId())))
+                        throw new IllegalArgumentException("Constructed yard conflicts with an installed identity");
+                }
+                if (original.yards().stream().anyMatch(y -> y.yardInstanceId().equals(installed.yardInstanceId()))) continue;
+                var yards = new ArrayList<>(original.yards()); yards.add(installed);
+                var capabilities = new ArrayList<>(original.yardCapabilities());
+                capabilities.add(projector.projectYard(installed, original.stationNode(), original.facilityCapabilities()));
+                updated.put(original.stationId(), new MaterializedIndustrialStation(original.systemId(), original.stationId(),
+                        original.stableFactionId(), original.stationArchetypeId(), original.position(), original.stationNode(),
+                        original.storage(), original.facilities(), original.facilityCapabilities(), yards, capabilities));
+            }
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint,
+                    List.copyOf(updated.values()));
+        }
+
+        /**
+         * Redistributes an existing station's allocations and reprojects its real facilities and yards.
+         * @param stationId canonical station identity
+         * @param targetId actual installed facility identity
+         * @return immutable registry conserving existing physical allocations
+         */
+        public MaterializedIndustrialRegistry allocateFacilityResources(String stationId, String targetId) {
+            var original = station(stationId);
+            var facilities = new com.spacesim.economy.Stage18FacilityResourceAllocator(Stage18FacilityCatalogLoader.loadDefault())
+                    .allocateRated(original.facilities(), targetId);
+            var projector = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
+            var capabilities = facilities.stream().map(projector::project).toList();
+            var shipyards = new Stage18ShipyardRuntime(com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
+                    Stage18ResourceOntologyLoader.loadDefault(), com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+            var yards = original.yards().stream().map(y -> shipyards.projectYard(y, original.stationNode(), capabilities)).toList();
+            var updated = new MaterializedIndustrialStation(original.systemId(), original.stationId(), original.stableFactionId(),
+                    original.stationArchetypeId(), original.position(), original.stationNode(), original.storage(),
+                    facilities, capabilities, original.yards(), yards);
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint,
+                    stations.stream().map(s -> s.stationId().equals(stationId) ? updated : s).toList());
+        }
+
+        /**
+         * Transfers existing yard allocations and validates the target's actual support facilities.
+         * @param stationId actual station identity
+         * @param targetId installed yard identity
+         * @return immutable registry with conserved resources and reprojected capabilities
+         */
+        public MaterializedIndustrialRegistry allocateYardResources(String stationId, String targetId) {
+            var original = station(stationId);
+            var catalog = com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards();
+            var states = new com.spacesim.economy.Stage18YardResourceAllocator(catalog).allocateRated(original.yards(), targetId);
+            var projector = new Stage18ShipyardRuntime(catalog, Stage18ResourceOntologyLoader.loadDefault(),
+                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+            var capabilities = states.stream().map(y -> projector.projectYard(y, original.stationNode(), original.facilityCapabilities())).toList();
+            if (!capabilities.stream().filter(y -> y.yardInstanceId().equals(targetId)).findFirst().orElseThrow().active())
+                throw new IllegalStateException("Allocated yard lacks its actual support facilities or operating capability");
+            var updated = new MaterializedIndustrialStation(original.systemId(), original.stationId(), original.stableFactionId(),
+                    original.stationArchetypeId(), original.position(), original.stationNode(), original.storage(),
+                    original.facilities(), original.facilityCapabilities(), states, capabilities);
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint,
+                    stations.stream().map(s -> s.stationId().equals(stationId) ? updated : s).toList());
         }
     }
 

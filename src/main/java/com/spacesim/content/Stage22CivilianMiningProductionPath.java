@@ -6,6 +6,7 @@ import com.spacesim.content.Stage18ManufacturingCatalog.ProductBindingDefinition
 import com.spacesim.content.Stage18ShipyardCatalog.ModuleServiceProfile;
 import com.spacesim.content.Stage22ContentGovernanceCatalog.ContentMaturity;
 import com.spacesim.content.ship.ShipEngineeringCatalog;
+import com.spacesim.content.ship.Stage22FreightStrategicProductionCatalogs;
 import com.spacesim.content.ship.Stage22CivilianMiningEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage22IndustrialUnionEngineeringCatalogLoader;
 import com.spacesim.economy.Stage18ExtractionRuntime;
@@ -46,6 +47,89 @@ public final class Stage22CivilianMiningProductionPath {
         throw new AssertionError("utility class");
     }
 
+    /** @return physical product vocabulary admitting the authored mining section; creates no inventory */
+    public static Stage18ManufacturingProductRegistry loadProducts() {
+        return ProductsHolder.VALUE;
+    }
+
+    /** @return ordinary manufacturing catalog with the closed material recipe for the mining section */
+    public static Stage18ManufacturingCatalog loadManufacturing() {
+        return ManufacturingHolder.VALUE;
+    }
+
+    private static final class ProductsHolder {
+        private static final Stage18ManufacturingProductRegistry VALUE = Stage18ManufacturingProductRegistry.loadDefault()
+                .withEngineeringCatalog(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault(),
+                        Stage18ManufacturingProductRegistry.Provenance.STAGE22_AUTHORED);
+    }
+
+    private static final class ManufacturingHolder {
+        private static final Stage18ManufacturingCatalog VALUE = Stage22FreightStrategicProductionCatalogs.manufacturing(Stage22AuthoredProductionBridge.withProductBindings(
+                Stage22IndustrialUnionManufacturingCatalogLoader.loadDefault(),
+                List.of(new ProductBindingDefinition(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID,
+                        Stage22CommonManufacturingProfiles.INDUSTRIAL_SUPPORT),
+                        new ProductBindingDefinition(Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID,
+                        Stage22CommonManufacturingProfiles.INDUSTRIAL_SUPPORT))));
+    }
+
+    /** @return physical refit/repair/service profiles for the mining section */
+    public static Stage18ShipyardCatalog loadShipyards() {
+        var base = Stage22IndustrialUnionShipyardCatalogLoader.loadDefault();
+        var workshop = Objects.requireNonNull(base.findModuleProfile(Stage22CivilianMiningEngineeringCatalogLoader.BASE_WORKSHOP_MODULE_ID));
+        return Stage22AuthoredProductionBridge.withShipyardProfiles(base, List.of(), List.of(),
+                List.of(new ModuleServiceProfile(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID,
+                        workshop.repairInputsAtFullLossKg(), workshop.maintenanceInputsKg()),
+                        new ModuleServiceProfile(Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID,
+                        workshop.repairInputsAtFullLossKg(), workshop.maintenanceInputsKg())));
+    }
+
+    /**
+     * Supplies authored service definitions for explicitly installed yards, without installing any.
+     * Existing common profiles remain canonical; faction-specific profiles extend them.
+     * @return common, Empire and Union physical service catalog
+     */
+    public static Stage18ShipyardCatalog loadRuntimeShipyards() { return RuntimeShipyardsHolder.VALUE; }
+
+    private static final class RuntimeShipyardsHolder {
+        private static final Stage18ShipyardCatalog VALUE = combine();
+        private static Stage18ShipyardCatalog combine() {
+            var result = Stage18ShipyardCatalogLoader.loadDefault();
+            for (var extension : List.of(Stage22EmpireShipyardCatalogLoader.loadDefault(), loadShipyards())) {
+                var existing = result;
+                result = Stage22AuthoredProductionBridge.withShipyardProfiles(existing,
+                        extension.getYards().stream().filter(y -> existing.findYard(y.id()) == null).toList(),
+                        extension.getHullProfiles().stream().filter(h -> existing.findHullProfile(h.hullId()) == null).toList(),
+                        extension.getModuleProfiles().stream().filter(m -> existing.findModuleProfile(m.moduleId()) == null).toList());
+            }
+            return Stage22FreightStrategicProductionCatalogs.shipyards(result);
+        }
+    }
+
+    /**
+     * Plans a same-hull Union freight conversion by exchanging only its mission section.
+     * This creates a fitting proposal, not a finished module or completed refit.
+     * @param source actual installed freight fitting
+     * @return target proposal retaining reactor, drive, FTL, sensors and thermal equipment
+     */
+    public static com.spacesim.ship.ShipEngineeringState.InstalledFit freightMiningProposal(
+            com.spacesim.ship.ShipEngineeringState.InstalledFit source) {
+        Objects.requireNonNull(source, "source");
+        if (!source.hullId().equals("hull.industrial_union_freight_v1"))
+            throw new IllegalArgumentException("Mining conversion requires the compatible Union freight hull");
+        var modules = new java.util.ArrayList<ShipEngineeringCatalog.InstalledModuleDefinition>();
+        int changed = 0;
+        for (var installed : source.installedModules()) {
+            if (installed.mountId().equals("mission_primary")) {
+                if (!installed.moduleId().equals("module.industrial_union_cargo_section_v1"))
+                    throw new IllegalArgumentException("Mining conversion requires the installed cargo mission section");
+                modules.add(new ShipEngineeringCatalog.InstalledModuleDefinition(installed.mountId(),
+                        Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID)); changed++;
+            } else modules.add(installed);
+        }
+        if (changed != 1) throw new IllegalArgumentException("Missing freight mission section");
+        return new com.spacesim.ship.ShipEngineeringState.InstalledFit(source.hullId(), modules);
+    }
+
     /**
      * Validates compatibility, physical production/service closure and real Stage-18 extraction behavior.
      *
@@ -73,23 +157,8 @@ public final class Stage22CivilianMiningProductionPath {
             throw new IllegalStateException("Civilian mining fit must install exactly one asteroid excavation section");
         }
 
-        Stage18ManufacturingCatalog manufacturing = Stage22AuthoredProductionBridge.withProductBindings(
-                Stage22IndustrialUnionManufacturingCatalogLoader.loadDefault(),
-                List.of(new ProductBindingDefinition(
-                        miningModule.id(), Stage22CommonManufacturingProfiles.INDUSTRIAL_SUPPORT)));
-
-        Stage18ShipyardCatalog baseShipyards = Stage22IndustrialUnionShipyardCatalogLoader.loadDefault();
-        ModuleServiceProfile workshopProfile = Objects.requireNonNull(
-                baseShipyards.findModuleProfile(Stage22CivilianMiningEngineeringCatalogLoader.BASE_WORKSHOP_MODULE_ID),
-                "reviewed workshop service profile");
-        Stage18ShipyardCatalog shipyards = Stage22AuthoredProductionBridge.withShipyardProfiles(
-                baseShipyards,
-                List.of(),
-                List.of(),
-                List.of(new ModuleServiceProfile(
-                        miningModule.id(),
-                        workshopProfile.repairInputsAtFullLossKg(),
-                        workshopProfile.maintenanceInputsKg())));
+        Stage18ManufacturingCatalog manufacturing = loadManufacturing();
+        Stage18ShipyardCatalog shipyards = loadShipyards();
 
         if (shipyards.findHullProfile(hull.id()) == null) {
             throw new IllegalStateException("Civilian mining hull lacks Stage-18 physical shipyard profile: " + hull.id());

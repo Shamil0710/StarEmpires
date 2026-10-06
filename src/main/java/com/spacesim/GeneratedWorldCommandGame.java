@@ -41,6 +41,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private Stage228CampaignAuthority.MissionCommandPreview pendingMissionPreview;
     private Stage228CampaignAuthority.PilotStartPreview pendingPilotStart;
     private Stage228CampaignAuthority.PlayerPhysicalPreview pendingPilotPhysical;
+    private Stage228CampaignAuthority.PilotRoutePreview pendingRoute;
+    private String pendingRouteSelection = "";
     private Stage228CampaignAuthority.PlayerFactionCommandPreview pendingGovernment;
     private String pendingGovernmentSelection = "";
     private Stage228CampaignAuthority.PlayerFactionFoundationPreview pendingFactionFoundation;
@@ -77,8 +79,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private void bindCampaign() {
         pendingGovernment = null;
+        pendingRoute = null;
         var coordinator = campaign.coordinator();
-        model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content());
+        model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
+                com.spacesim.ui.GeneratedWorldUiModel.CarrierUiSource.none(), () -> campaign.playerState().orElse(null));
         snapshot = model.capture();
         // A knowledge viewer is not player ownership. No ship, wallet or control is granted here.
         String viewer = coordinator.actors().capture().stream()
@@ -133,7 +137,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                         status = "Камера: обзор системы.";
                         yield true;
                     }
-                    case Input.Keys.C -> focusSelection();
+                    case Input.Keys.C -> controlHeld() ? focusPlayer() : focusSelection();
                     case Input.Keys.O -> switchTab(Tab.INTELLIGENCE);
                     case Input.Keys.SPACE -> togglePause();
                     case Input.Keys.NUM_1 -> setTimeScale(1d);
@@ -240,11 +244,33 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "save" -> save();
             case "load" -> load();
             case "focus" -> focusSelection();
+            case "focus-player" -> focusPlayer();
+            case "pilot.route-preview" -> {
+                var selected = workspace.view().selection();
+                if (workspace.tab() != Tab.GALAXY || selected.kind() != SelectionKind.SYSTEM) yield false;
+                campaign.coordinator().setPaused(true);
+                pendingRouteSelection = selected.stableId();
+                pendingRoute = campaign.previewPilotRoute(new StarSystemId(Long.parseLong(selected.stableId()))).orElse(null);
+                status = pendingRoute == null ? "Маршрут недоступен: нужны открытые системы, местный активный корабль и подходящий запас топлива."
+                        : pendingRoute.departure().allowed() ? "Маршрут рассчитан. Подтверждение отправит корабль только в первую систему пути."
+                        : "Путь рассчитан, но первый вылет недоступен. Проверьте стыковку, топливо и готовность FTL.";
+                yield true;
+            }
+            case "pilot.route-confirm" -> {
+                var preview = pendingRoute; pendingRoute = null;
+                if (preview == null || workspace.tab() != Tab.GALAXY
+                        || !workspace.view().selection().stableId().equals(pendingRouteSelection)) yield false;
+                try {
+                    campaign.submitPilotAction(preview.departure());
+                    status = "Первый вылет начат. Пробел — продолжить время; после прибытия проверьте следующий участок маршрута.";
+                } catch (IllegalStateException exception) { status = "Условия изменились. Рассчитайте маршрут заново."; }
+                snapshot = model.capture(); refreshProjection(); yield true;
+            }
             case "pilot.preview" -> {
                 if (!selectedPilotStart()) yield false;
                 campaign.coordinator().setPaused(true);
                 pendingPilotStart = campaign.previewIndependentPilotStart();
-                status = pendingPilotStart.allowed() ? "Условия проверены. Подтверждение переведёт оплату продавцу и оформит личное владение."
+                status = pendingPilotStart.allowed() ? "Условия проверены. Подтверждение оплатит корабль и оформит владение; продавец передаст имеющиеся у него координаты собственных гражданских станций."
                         : "Старт недоступен: резервный корабль или возможность оплаты отсутствуют.";
                 refreshProjection(); yield true;
             }
@@ -266,7 +292,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             }
             case "pilot.less", "pilot.more" -> {
                 pilotKilograms = Math.max(1, Math.min(10000, pilotKilograms + (id.equals("pilot.less") ? -1 : 1)));
-                pendingPilotPhysical = null; yield true;
+                pendingPilotPhysical = null; pendingMissionPreview = null; yield true;
             }
             case "pilot.faction-preview" -> {
                 if (workspace.tab() != Tab.SETTINGS || !workspace.view().selection().stableId().equals("pilot-faction-foundation")) yield false;
@@ -289,8 +315,33 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "pilot.faction-capitalize" -> previewPilotPhysical("CAPITALIZE");
             case "pilot.faction-withdraw" -> previewPilotPhysical("WITHDRAW");
             case "pilot.purchase" -> previewPilotPhysical("PURCHASE");
+            case "pilot.purchase-station" -> previewPilotPhysical("PURCHASE_STATION");
             case "pilot.switch" -> previewPilotPhysical("SWITCH");
             case "pilot.jump" -> previewPilotPhysical("JUMP");
+            case "pilot.load-consumable" -> previewPilotPhysical("LOAD_CONSUMABLE");
+            case "pilot.start-mining" -> previewPilotPhysical("START_MINING");
+            case "pilot.stop-mining" -> previewPilotPhysical("STOP_MINING");
+            case "pilot.start-manufacturing" -> previewPilotPhysical("START_MANUFACTURING");
+            case "pilot.start-construction" -> previewPilotPhysical("START_FACILITY_CONSTRUCTION");
+            case "pilot.start-yard-construction" -> previewPilotPhysical("START_YARD_CONSTRUCTION");
+            case "pilot.allocate-yard-resources" -> previewPilotPhysical("ALLOCATE_YARD_RESOURCES");
+            case "pilot.cancel-yard-construction" -> previewPilotPhysical("CANCEL_YARD_CONSTRUCTION");
+            case "pilot.cancel-construction" -> previewPilotPhysical("CANCEL_FACILITY_CONSTRUCTION");
+            case "pilot.allocate-facility-resources" -> previewPilotPhysical("ALLOCATE_FACILITY_RESOURCES");
+            case "pilot.start-repair" -> previewPilotPhysical("START_REPAIR");
+            case "pilot.start-refit" -> previewPilotPhysical("START_REFIT");
+            case "pilot.start-refit-used" -> previewPilotPhysical("START_REFIT_USED");
+            case "pilot.load-module" -> previewPilotPhysical("LOAD_MODULE");
+            case "pilot.unload-module" -> previewPilotPhysical("UNLOAD_MODULE");
+            case "pilot.cancel-module-transfer" -> previewPilotPhysical("CANCEL_MODULE_TRANSFER");
+            case "pilot.load-product" -> previewPilotPhysical("LOAD_PRODUCT");
+            case "pilot.unload-product" -> previewPilotPhysical("UNLOAD_PRODUCT");
+            case "pilot.cancel-product-transfer" -> previewPilotPhysical("CANCEL_PRODUCT_TRANSFER");
+            case "pilot.cancel-refit" -> previewPilotPhysical("CANCEL_REFIT");
+            case "pilot.cancel-repair" -> previewPilotPhysical("CANCEL_REPAIR");
+            case "pilot.acknowledge-journal" -> previewPilotPhysical("ACKNOWLEDGE_JOURNAL");
+            case "pilot.cancel-manufacturing" -> previewPilotPhysical("CANCEL_MANUFACTURING");
+            case "pilot.report-discovery" -> previewPilotPhysical("REPORT_DISCOVERY");
             case "pilot.dock" -> previewPilotPhysical("DOCK");
             case "pilot.undock" -> previewPilotPhysical("UNDOCK");
             case "pilot.buy" -> previewPilotPhysical("BUY");
@@ -342,20 +393,133 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private boolean previewPilotPhysical(String action) {
         String id = workspace.view().selection().stableId();
         String[] pieces = id.split("\\|", -1);
+        if ((action.equals("START_REFIT_USED") || action.equals("LOAD_MODULE")) && id.startsWith("stored-module|")) {
+            String custodyId = id.substring("stored-module|".length());
+            var row = campaign.moduleCustody().modules().stream().filter(m -> m.custodyId().equals(custodyId)).findFirst().orElse(null);
+            if (row == null) return false;
+            pieces = new String[]{"stored-module", row.stationId(), custodyId};
+        }
+        if (action.equals("UNLOAD_MODULE") && id.startsWith("carried-module|"))
+            pieces = new String[]{"carried-module", campaign.dockedModuleStationId().orElse(""), id.substring("carried-module|".length())};
         if (action.equals("SWITCH") && id.startsWith("personal-ship:")) pieces = new String[]{"personal-ship", id.substring("personal-ship:".length())};
         boolean finance = workspace.tab() == Tab.SETTINGS && id.equals("pilot-faction-finance")
                 && (action.equals("CAPITALIZE") || action.equals("WITHDRAW"));
         if (finance) pieces = new String[]{"pilot-faction-finance", "1000000"};
         boolean jump = action.equals("JUMP") && workspace.tab() == Tab.SHIPS && pieces[0].equals("pilot-jump");
+        boolean supply = action.equals("LOAD_CONSUMABLE") && workspace.tab() == Tab.SHIPS && pieces[0].equals("pilot-supply") && pieces.length == 3;
+        boolean report = action.equals("REPORT_DISCOVERY") && workspace.tab() == Tab.CONTACTS && pieces[0].equals("pilot-report") && pieces.length == 2;
+        boolean mining = workspace.tab() == Tab.INDUSTRY && pieces.length == 2
+                && (action.equals("START_MINING") && pieces[0].equals("pilot-mining")
+                || action.equals("STOP_MINING") && pieces[0].equals("pilot-mining-stop"));
+        boolean manufacturing = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("START_MANUFACTURING") && pieces[0].equals("pilot-manufacturing")
+                || action.equals("CANCEL_MANUFACTURING") && pieces[0].equals("pilot-manufacturing-cancel"));
+        boolean construction = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("START_FACILITY_CONSTRUCTION") && pieces[0].equals("pilot-construction")
+                || action.equals("CANCEL_FACILITY_CONSTRUCTION") && pieces[0].equals("pilot-construction-cancel")
+                || action.equals("ALLOCATE_FACILITY_RESOURCES") && pieces[0].equals("pilot-facility-resources")
+                || action.equals("ALLOCATE_YARD_RESOURCES") && pieces[0].equals("pilot-yard-resources")
+                || action.equals("START_YARD_CONSTRUCTION") && pieces[0].equals("pilot-yard-construction")
+                || action.equals("CANCEL_YARD_CONSTRUCTION") && pieces[0].equals("pilot-yard-construction-cancel"));
+        boolean journal = workspace.tab() == Tab.HISTORY && pieces.length == 2
+                && action.equals("ACKNOWLEDGE_JOURNAL") && pieces[0].equals("pilot-journal");
+        boolean repair = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("START_REPAIR") && pieces[0].equals("pilot-repair")
+                || action.equals("CANCEL_REPAIR") && pieces[0].equals("pilot-repair-cancel"));
+        boolean refit = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("START_REFIT") && pieces[0].equals("pilot-refit")
+                || action.equals("START_REFIT_USED") && pieces[0].equals("stored-module")
+                || action.equals("CANCEL_REFIT") && pieces[0].equals("pilot-refit-cancel"));
+        boolean moduleTransfer = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("LOAD_MODULE") && pieces[0].equals("stored-module")
+                || action.equals("UNLOAD_MODULE") && pieces[0].equals("carried-module")
+                || action.equals("CANCEL_MODULE_TRANSFER") && pieces[0].equals("module-transfer-cancel"));
+        boolean productTransfer = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
+                && (action.equals("LOAD_PRODUCT") && pieces[0].equals("pilot-product-load")
+                || action.equals("UNLOAD_PRODUCT") && pieces[0].equals("pilot-product-unload")
+                || action.equals("CANCEL_PRODUCT_TRANSFER") && pieces[0].equals("product-transfer-cancel"));
         boolean asset = workspace.tab() == Tab.SHIPS && (action.equals("PURCHASE") && pieces[0].equals("pilot-reserve")
                 || action.equals("SWITCH") && pieces[0].equals("personal-ship"));
+        asset = asset || workspace.tab() == Tab.INDUSTRY && action.equals("PURCHASE_STATION")
+                && pieces[0].equals("pilot-station-purchase") && pieces.length == 2;
         boolean market = workspace.tab() == Tab.LOGISTICS && (pieces[0].equals("pilot-station") || pieces[0].equals("pilot-market"));
-        if (pieces.length < 2 || !(jump || market || asset || finance)) return false;
+        if (pieces.length < 2 || !(jump || market || asset || finance || supply || report || mining || manufacturing || construction || journal || repair || refit || moduleTransfer || productTransfer)) return false;
         campaign.coordinator().setPaused(true);
         pendingPilotSelection = id;
-        pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", pilotKilograms);
+        pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", manufacturing ? 1 : pilotKilograms);
+        if (action.equals("PURCHASE_STATION")) {
+            status = pendingPilotPhysical.allowed() ? String.format(java.util.Locale.ROOT,
+                    "Покупка существующей станции проверена: %.3f кр. продавцу. Склад, установки и верфь сохранятся. Подтвердите.",
+                    -pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
+                    : "Покупка недоступна: проверьте предложение, деньги и физическую стыковку.";
+            refreshProjection(); return true;
+        }
+        if (productTransfer) {
+            status = pendingPilotPhysical.allowed() ? action.equals("CANCEL_PRODUCT_TRANSFER")
+                    ? "Подтвердите отмену: товар останется у источника; выполненная обработка не возвращается."
+                    : "Подтвердите обработку " + pilotKilograms + " шт. товара. Перенос завершится после работы на общих тактах."
+                    : "Перенос недоступен: проверьте стыковку, владение, доступный товар, обработку и место.";
+            refreshProjection(); return true;
+        }
+        if (moduleTransfer) {
+            status = pendingPilotPhysical.allowed() ? "Подтвердите обработку оборудования: дождитесь погрузки или выгрузки; состояние модуля сохранится."
+                    : "Операция недоступна: проверьте стыковку, владение, резерв, обработку и свободное место.";
+            refreshProjection(); return true;
+        }
+        if (refit) {
+            status = pendingPilotPhysical.allowed() ? action.startsWith("START_REFIT")
+                    ? "Подтвердите резерв оборудования и места. Компоновка изменится после работы верфи; груз сохранится."
+                    : "Подтвердите отмену: входящее оборудование вернётся на склад; выполненная работа не возвращается."
+                    : "Переоснащение недоступно: проверьте владение, стыковку, верфь, оборудование, свободное место и вместимость целевого трюма.";
+            refreshProjection(); return true;
+        }
+        if (repair) {
+            status = pendingPilotPhysical.allowed() ? action.equals("START_REPAIR")
+                    ? "Подтвердите резерв материалов для ремонта. На чужой верфи также резервируется показанная стоимость услуги; владелец получит её после завершения. На паузе повреждения сохраняются."
+                    : "Подтвердите отмену: материалы вернутся на склад, выполненная работа не возвращается."
+                    : "Ремонт недоступен: проверьте повреждения, свой корабль, стыковку, совместимую верфь, материалы и деньги для чужой услуги.";
+            refreshProjection(); return true;
+        }
+        if (journal) {
+            status = pendingPilotPhysical.allowed() ? "Отметка прочтения проверена. Подтвердите: история и игровые ресурсы сохранятся."
+                    : "Отметка прочтения недоступна: список событий изменился.";
+            refreshProjection(); return true;
+        }
+        if (construction) {
+            boolean allocation = action.equals("ALLOCATE_FACILITY_RESOURCES") || action.equals("ALLOCATE_YARD_RESOURCES");
+            boolean starting = action.startsWith("START_");
+            status = pendingPilotPhysical.allowed() ? allocation
+                    ? "Подтвердите перераспределение существующих ресурсов станции. Мощность прежних установок уменьшится."
+                    : action.equals("START_YARD_CONSTRUCTION") ? "Подтвердите заказ: доступные материалы будут доставляться со склада на стройплощадку. Работа начнётся после полной поставки; готовая структура будет отключена."
+                    : starting ? "Подтвердите резерв полного состава материалов. Для выполнения продолжите время; новая структура будет отключена."
+                    : "Подтвердите отмену до начала работы: зарезервированные материалы вернутся на склад."
+                    : "Строительство недоступно: проверьте владение, физическую стыковку, полный запас материалов, вместимость и действующую линию.";
+            refreshProjection(); return true;
+        }
+        if (manufacturing) {
+            status = pendingPilotPhysical.allowed() ? action.equals("START_MANUFACTURING")
+                    ? "Подтвердите резерв материалов для одной секции. Для выполнения продолжите время."
+                    : "Подтвердите отмену: резерв вернётся на склад, выполненная работа будет потеряна."
+                    : "Производство недоступно: проверьте владение станцией, стыковку, материалы, мощности и место на складе.";
+            refreshProjection(); return true;
+        }
+        if (mining) {
+            status = pendingPilotPhysical.allowed()
+                    ? action.equals("START_MINING") ? "Контакт и оборудование проверены. Подтвердите задание, затем продолжите время для добычи."
+                    : "Подтвердите остановку. Уже добытый груз останется в трюме."
+                    : "Добыча недоступна: проверьте оборудование, контакт, скорость и другие задания корабля.";
+            refreshProjection(); return true;
+        }
+        if (report) {
+            status = pendingPilotPhysical.allowed() ? String.format(java.util.Locale.ROOT,
+                    "Личное открытие проверено. Подтвердите передачу; контракт проверит результат и выплату %.2f cr из эскроу.",
+                    pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
+                    : "Отчёт недоступен: проверьте личное открытие, срок контракта и доступность получателя в системе вашего корабля.";
+            refreshProjection(); return true;
+        }
         status = pendingPilotPhysical.allowed() ? ((action.equals("BUY") || action.equals("SELL"))
                 ? String.format(java.util.Locale.ROOT, "Проверено: %d кг; кошелёк %+.3f кр. Подтвердите сделку.", pilotKilograms, pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
+                : supply ? "Проверено снабжение из собственного груза. Подтверждение уменьшит трюм и заполнит установленный интерфейс без изменения денег."
                 : finance ? String.format(java.util.Locale.ROOT, "Перевод проверен: личный кошелёк %+.3f кр. Подтвердите.", pendingPilotPhysical.walletChangeMilliCredits() / 1000d) : asset ? "Владение и условия проверены. Подтвердите действие." : jump ? "Вылет проверен: существующее топливо, движение к выходу и перелёт на общих тактах. Подтвердите вылет." : "Стыковка проверена. Подтвердите действие.")
                 : "Действие недоступно: проверьте расстояние, скорость, стыковку, запас, деньги и обработку за такт.";
         refreshProjection(); return true;
@@ -375,10 +539,17 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         pendingMissionPreview = null;
         if (id == null) return false;
         campaign.coordinator().setPaused(true);
-        pendingMissionPreview = campaign.previewMissionCommand(command, id);
+        var mission = campaign.coordinator().npcMissions().missions().stream().filter(m -> m.missionId().equals(id)).findFirst().orElseThrow();
+        int supplyPortion = command == com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.ACCEPT
+                && mission.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
+                ? Math.toIntExact(Math.min(pilotKilograms, mission.objective().threshold())) : 0;
+        pendingMissionPreview = campaign.previewMissionCommand(command, id, supplyPortion);
         status = pendingMissionPreview.allowed()
                 ? switch (command) {
-                    case ACCEPT -> "На паузе. Принять контракт? Награда выплачивается только после проверки результата и участия.";
+                    case ACCEPT -> supplyPortion > 0 ? "На паузе. Принять поставку " + supplyPortion
+                            + " кг? Премия " + String.format(java.util.Locale.ROOT, "%.3f кр.", pendingMissionPreview.proposedRewardMilliCredits() / 1000d)
+                            + "; остаток эскроу вернётся заказчику."
+                            : "На паузе. Принять контракт? Награда выплачивается только после проверки результата и участия.";
                     case REJECT -> "На паузе. Отклонить предложение? Эскроу вернётся выдавшей контракт фракции.";
                     case CANCEL -> "На паузе. Отменить контракт? Эскроу вернётся выдавшей контракт фракции.";
                 }
@@ -392,7 +563,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         pendingMissionPreview = null;
         if (preview == null || !preview.missionId().equals(selectedPersonalMissionId())) return false;
         try {
-            campaign.submitMissionCommand(preview);
+            var updated = campaign.submitMissionCommand(preview);
+            workspace.select(new UiSelection(SelectionKind.SURFACE_ROW, "player-mission:" + updated.missionId()));
             status = "Контракт обновлён. Кампания на паузе; Пробел — продолжить.";
         } catch (RuntimeException exception) {
             status = "Действие не выполнено: состояние изменилось или команда недоступна. Проверьте действие снова.";
@@ -457,6 +629,15 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         return selected.kind() == SelectionKind.LOCAL_OBJECT
                 && renderer.focusLocalObject(snapshot, selected.stableId());
+    }
+
+    private boolean focusPlayer() {
+        var player = campaign.playerState().orElse(null);
+        if (player == null || player.activeFleetId() == null) {
+            status = "Нет активного личного корабля. Выберите его во вкладке кораблей.";
+            return true;
+        }
+        return focusFleet(player.activeFleetId().value());
     }
 
     private boolean focusFleet(long fleetId) {
@@ -538,7 +719,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             var candidate = Stage228CampaignAuthority.restore(
                     Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(savePath));
             var coordinator = candidate.coordinator();
-            var nextModel = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content());
+            var nextModel = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
+                    com.spacesim.ui.GeneratedWorldUiModel.CarrierUiSource.none(), () -> candidate.playerState().orElse(null));
             var nextSnapshot = nextModel.capture();
             var nextProjector = new ProductionUiProjector(coordinator.actors().capture().stream()
                     .map(actor -> actor.factionContentId()).sorted().findFirst().orElseThrow());
@@ -578,9 +760,18 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         String missionId = selectedPersonalMissionId();
         if (pendingMissionPreview != null && !pendingMissionPreview.missionId().equals(missionId)) pendingMissionPreview = null;
         renderer.bindMissionActions(missionId != null, pendingMissionPreview != null && pendingMissionPreview.allowed());
+        var selectedMission = missionId == null ? null : campaign.coordinator().npcMissions().missions().stream()
+                .filter(m -> m.missionId().equals(missionId)).findFirst().orElse(null);
+        boolean supplyOffer = selectedMission != null && selectedMission.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
+                && selectedMission.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST;
+        renderer.bindSupplyMissionQuantity(supplyOffer, supplyOffer ? Math.toIntExact(Math.min(pilotKilograms, selectedMission.objective().threshold())) : 0);
         if (!selectedPilotStart()) pendingPilotStart = null;
         renderer.bindPilotStartActions(selectedPilotStart(), pendingPilotStart != null && pendingPilotStart.allowed());
         String selectedPilot = workspace.view().selection().stableId();
+        if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
+                || !campaign.coordinator().isPaused()) pendingRoute = null;
+        renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),
+                campaign.coordinator().session().fixedStepSeconds());
         if (!selectedPilot.equals(pendingPilotSelection)) pendingPilotPhysical = null;
         boolean selectedJump = workspace.tab() == Tab.SHIPS && selectedPilot.startsWith("pilot-jump|");
         String assetAction = workspace.tab() == Tab.SHIPS ? (selectedPilot.startsWith("pilot-reserve|") ? "PURCHASE"
@@ -588,9 +779,44 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         boolean foundation = workspace.tab() == Tab.SETTINGS && selectedPilot.equals("pilot-faction-foundation");
         boolean finance = workspace.tab() == Tab.SETTINGS && selectedPilot.equals("pilot-faction-finance");
         if (!foundation) pendingFactionFoundation = null;
+        if (workspace.tab() == Tab.INDUSTRY && selectedPilot.startsWith("pilot-station-purchase|")) assetAction = "PURCHASE_STATION";
         renderer.bindPilotAssetAction(foundation ? "FOUNDATION" : finance ? "FINANCE" : assetAction);
         renderer.bindPilotJumpAction(selectedJump);
-        renderer.bindPhysicalPilotActions(foundation || finance || selectedJump || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
+        boolean selectedSupply = workspace.tab() == Tab.SHIPS && selectedPilot.startsWith("pilot-supply|");
+        renderer.bindPilotSupplyAction(selectedSupply);
+        boolean selectedReport = workspace.tab() == Tab.CONTACTS && selectedPilot.startsWith("pilot-report|");
+        renderer.bindPilotReportAction(selectedReport);
+        String miningAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-mining|") ? "START_MINING"
+                : selectedPilot.startsWith("pilot-mining-stop|") ? "STOP_MINING" : "" : "";
+        renderer.bindPilotMiningAction(miningAction);
+        String manufacturingAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-manufacturing|") ? "START_MANUFACTURING"
+                : selectedPilot.startsWith("pilot-manufacturing-cancel|") ? "CANCEL_MANUFACTURING"
+                : selectedPilot.startsWith("pilot-construction|") ? "START_FACILITY_CONSTRUCTION"
+                : selectedPilot.startsWith("pilot-construction-cancel|") ? "CANCEL_FACILITY_CONSTRUCTION"
+                : selectedPilot.startsWith("pilot-yard-construction|") ? "START_YARD_CONSTRUCTION"
+                : selectedPilot.startsWith("pilot-yard-construction-cancel|") ? "CANCEL_YARD_CONSTRUCTION"
+                : selectedPilot.startsWith("pilot-yard-resources|") ? "ALLOCATE_YARD_RESOURCES"
+                : selectedPilot.startsWith("pilot-facility-resources|") ? "ALLOCATE_FACILITY_RESOURCES" : "" : "";
+        renderer.bindPilotManufacturingAction(manufacturingAction);
+        String repairAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-repair|") ? "START_REPAIR"
+                : selectedPilot.startsWith("pilot-repair-cancel|") ? "CANCEL_REPAIR" : "" : "";
+        renderer.bindPilotRepairAction(repairAction);
+        String refitAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-refit|") ? "START_REFIT"
+                : selectedPilot.startsWith("pilot-refit-cancel|") ? "CANCEL_REFIT"
+                : selectedPilot.startsWith("stored-module|") ? "START_REFIT_USED" : "" : "";
+        renderer.bindPilotRefitAction(refitAction);
+        String moduleTransferAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("stored-module|") ? "LOAD_MODULE"
+                : selectedPilot.startsWith("carried-module|") ? "UNLOAD_MODULE"
+                : selectedPilot.startsWith("module-transfer-cancel|") ? "CANCEL_MODULE_TRANSFER" : "" : "";
+        renderer.bindModuleTransferAction(moduleTransferAction);
+        String productTransferAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-product-load|") ? "LOAD_PRODUCT"
+                : selectedPilot.startsWith("pilot-product-unload|") ? "UNLOAD_PRODUCT"
+                : selectedPilot.startsWith("product-transfer-cancel|") ? "CANCEL_PRODUCT_TRANSFER" : "" : "";
+        renderer.bindProductTransferAction(productTransferAction);
+        boolean selectedJournal = workspace.tab() == Tab.HISTORY && selectedPilot.startsWith("pilot-journal|");
+        renderer.bindPilotJournalAction(selectedJournal);
+        renderer.bindPersonalNotificationCount(campaign.playerJournal().unreadCount());
+        renderer.bindPhysicalPilotActions(selectedJournal || foundation || finance || selectedJump || selectedSupply || selectedReport || !productTransferAction.isEmpty() || !moduleTransferAction.isEmpty() || !repairAction.isEmpty() || !refitAction.isEmpty() || !manufacturingAction.isEmpty() || !miningAction.isEmpty() || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
                 selectedPilot.startsWith("pilot-market|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
                         : pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
         if (!selectedPilot.equals(pendingGovernmentSelection)) pendingGovernment = null;

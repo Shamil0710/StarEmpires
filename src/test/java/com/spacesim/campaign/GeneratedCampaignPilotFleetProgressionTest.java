@@ -25,6 +25,9 @@ class GeneratedCampaignPilotFleetProgressionTest {
         assertEquals(active, c.playerState().orElseThrow().activeFleetId());
         assertEquals(2, c.playerState().orElseThrow().ownedFleetIds().size());
         assertEquals(target, r.freight().findFreighter(target.fleetId()).orElseThrow());
+        var receipt = c.playerJournal().entries().get(c.playerJournal().entries().size() - 1);
+        assertEquals("PURCHASE", receipt.action()); assertEquals(target.fleetId().value(), receipt.fleetId());
+        assertEquals(-25_000_000L, receipt.walletDeltaMilliCredits()); assertEquals(1, receipt.quantity());
         assertFalse(c.previewPilotAction("PURCHASE", Long.toString(target.fleetId().value()), "", 0).allowed());
         roundtrip(c);
     }
@@ -46,6 +49,9 @@ class GeneratedCampaignPilotFleetProgressionTest {
         assertTrue(preview.allowed()); assertEquals(baseline, c.captureState());
         c.submitPilotAction(preview);
         assertEquals(target.fleetId(), c.playerState().orElseThrow().activeFleetId());
+        var handover = c.playerJournal().entries().get(c.playerJournal().entries().size() - 1);
+        assertEquals("SWITCH", handover.action()); assertEquals(target.fleetId().value(), handover.fleetId());
+        assertEquals(0, handover.walletDeltaMilliCredits());
         assertEquals(50_000_000L, c.playerState().orElseThrow().walletMilliCredits());
         assertEquals(exact.position(), material.physicalState(current.localEntityId()).orElseThrow().position());
         assertTrue(c.setPilotThrust(0, 0, false));

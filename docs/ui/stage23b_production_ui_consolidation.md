@@ -5,6 +5,14 @@ completion record. Stage 23C implementation remains blocked. Required remaining 
 [#412](https://github.com/Shamil0710/StarEmpires/issues/412) and the existing human gate
 [#370](https://github.com/Shamil0710/StarEmpires/issues/370).
 
+User scheduling decision (2026-10-04): human acceptance is deferred until after Stage 23
+development. The [player checklist](../release/stage23_player_acceptance_checklist.md)
+records the required ordinary-play checks. Continue implementation and engineering validation;
+do not treat the deferred manual run as passed evidence or as a reason to pause development.
+
+The [current engineering remainder](stage23b_remaining_work.md) supersedes historical gap lists
+below; dated sections retain the evidence and limitations of each implementation slice.
+
 ## Implemented architecture
 
 The ordinary `GeneratedWorldCommandGame` now binds a `ProductionUiWorkspace` and
@@ -64,6 +72,10 @@ order labels have been removed: the inspector directs users to real command-grou
 - PgUp/PgDn scrolls a list; Ctrl+PgUp/PgDn scrolls inspector values.
 - +/- zooms maps; Left/Right pans maps; Home restores the local overview; C returns to the selected
   object's physical position when available. These are presentation operations.
+- Ctrl+C and the shared “Мой корабль” toolbar action return from any surface to the actual active
+  personally owned ship, open its current system and enable the existing physical camera follow.
+  Search editing captures this shortcut. An absent active ship or transit/loss reports a refusal
+  without changing the current surface or substituting another ship.
 - Double-click and the inspector's “open on map” action revalidate current ordinary FleetId
   placement. Transit/lost ships have no local position: the button shows that refusal before
   dispatch, and a stale accepted click is checked again by the application.
@@ -599,3 +611,1045 @@ is separately under CI #7837. This policy presentation batch stays unpublished w
 CI runs. Physical owned industry/construction/supply/mining/fitting, established territorial
 control, carrier operations, production NPC opportunities and genuine B18 remain mandatory.
 23B stays ACTIVE/PARTIAL; no merge or 23C.
+
+### Return to the active personal ship
+
+The shared toolbar and Ctrl+C now resolve the current PlayerState active FleetId at dispatch,
+then reuse ordinary local placement validation and camera follow. Choosing another row or viewer
+does not change the target; no saved camera/player state or simulation clock is introduced.
+Java-17 incremental compilation and the three existing production UI regression classes passed
+12 tests with zero failures/errors in 28 seconds, with coverage disabled for focused feedback.
+No full build or full suite was run for this presentation change. The existing software-EGL
+smoke now checks keyboard toolbar return from all eleven surfaces, Ctrl+C and unchanged paused
+campaign state. That extended graphics probe has not been run in this Windows environment;
+visual acceptance and the remaining 23B command integration remain open.
+
+### Personal route planning on the galaxy map
+
+The galaxy inspector now exposes explicit personal route preview and first-departure confirmation.
+The existing PlayerFleetRoutePlanner receives the immutable campaign PlayerState through a new
+read-only constructor; it installs no playable control systems and performs no player reconciliation.
+Only personally discovered origins, intermediate systems and destinations are admitted. No local
+active fleet, an existing jump, the current system or an unavailable route yields no travel token.
+Planning runs on explicit input, not on every graphics frame.
+
+The accepted path is highlighted on the ordinary galaxy topology. The scrollable inspector names
+every hop, shows the shared estimated transition time and explicit uncertainty, and explains their
+sources and limits. The estimate excludes refuelling and engine-readiness waiting; uncertainty is
+an exposure score, not a probability. This uses the existing Stage-15 route comparison model and
+does not introduce a new physical risk or travel-time authority.
+
+Confirmation delegates to previewPilotAction / submitPilotAction for the first direct edge only,
+with ordinary onboard fuel, docking and fitted FTL validation. The exact authority/checkpoint token
+rejects foreign, stale and repeated submission. The remaining path creates no delegated order,
+automatic refill, remote purchase or saved sidecar. After arrival the player must inspect the next
+hop again. Navigation, selection changes and resumed time discard the displayed preview; load
+rebuilds presentation without retaining the old token. A rejected departure does not start travel.
+
+Java-17 incremental compilation and six targeted regression classes passed **22 tests, zero
+failures/errors**, in **52.917 seconds**, with coverage disabled for local feedback. New tests cover
+unknown/current-system refusal, preview purity, deterministic path choice, foreign/stale/reused
+tokens, exact started-jump roundtrip and a multi-hop route committing only its first edge. The
+multi-hop fixture explicitly supplies discovered systems; it does not prove production discovery.
+Existing real-hop/cargo/arrival, docked/depleted-fuel, Stage-15 route-risk and production UI tests
+also passed. No clean package or full test suite was run.
+
+The software-EGL probe was extended with a return-home preview using two systems actually visited
+in its existing physical trade journey, a docked confirmation refusal and unchanged campaign state.
+It compiles against current production classes and existing packaged dependencies on Java 17;
+graphics execution/visual inspection has not been performed in this Windows environment. This
+slice does not close final galaxy overlays, physical mining/fitting/construction/supply, carrier
+commands, production NPC opportunities or human B18 acceptance. 23B remains ACTIVE/PARTIAL.
+
+### Physical personal consumable supply
+
+The Ships surface now exposes each authored consumable binding actually installed on the active
+owned IDLE freight. Quantity controls, pure preview and exact confirmation move previously bought
+Stage-18 commodity kilograms from that same freight hold into its fitted interface. The ordinary
+Stage18ShipConsumableService validates the module, interface, capacity and available material;
+Stage20FreightRuntime consumes the matching manual-cargo provenance lots and synchronizes real hold
+mass. Existing engineering cargo synchronization retains the fitted ship's total physical mass.
+No station stock, wallet, heat, bus energy, damage, cooldown or ownership is awarded or reset.
+Servicing requires an existing commissioned dock with current ordinary 1-km / 1-m/s geometry.
+This is the shared atomic interface-loading boundary, not a new timed pump or shipyard-work model.
+
+The same authority/checkpoint confirmation guards this action. Empty holds, unknown bindings,
+wrong mounts, invalid quantities, unavailable capacity, undocked ships and transit fail before
+conversion. Restore retains loaded consumables and reduced hold/lot state in existing owning formats.
+No schema, new-game resource profile or commodity/unit reinterpretation is introduced.
+
+The Java-17 focused group passed **9 tests, zero failures/errors**, in **51.886 seconds**: two new
+personal-supply methods, existing ship-consumable service, generated physical cargo and original UI
+projection. It covers a real paid water purchase, pure projection/preview, foreign/repeated tokens,
+conserved fitted total mass and personal money, preserved engineering heat/energy, depleted cargo
+lots and exact save/load. Berth geometry and previously spent tank mass are labelled fixtures.
+That result precedes only a presentation wording change. No full test suite or package was run;
+graphical execution for this new control remains pending. Physical mining, fitting/repair,
+construction/industry, carrier commands, production NPC opportunities and final B18 remain open.
+
+### Personal physical station discovery
+
+Successful ordinary docking now records the human actor's actual station visit in the existing
+Stage-20 discovery registry. Ownership, local system, absence of transit and berth geometry are
+validated before recording permanent location evidence. The observation contains no resource
+knowledge and does not copy a sovereign actor's intelligence. Repeated visits preserve the existing
+permanent observation. Campaign capture and restore retain this registry with the current world
+fingerprint in the existing format.
+
+The Intelligence surface shows these personal visited-station records independently of the selected
+sovereign knowledge viewer, with the original observation time and explicit limits on current stock
+or service knowledge. This establishes personal evidence; reporting discoveries to an issuer and
+production NPC opportunity creation remain separate unfinished work.
+
+The focused Java-17 group passed **20 tests, zero failures/errors**, in **1 minute 12 seconds**:
+personal discovery, personal supply, player mission integration and campaign UI integration.
+It verifies pure docking preview, unchanged sovereign registries, repeat-visit idempotence, exact
+save/load, personal intelligence visibility and refusal without physical docking. Test berth geometry
+is an explicit fixture. No full build or graphical acceptance was performed. 23B remains ACTIVE/PARTIAL.
+
+### Searchable reference and extended engineering UI scenario
+
+The Menu now includes two ordinary searchable/scrollable inspector rows explaining physical units,
+simulation time, route-estimate limits, personal authority, money/escrow, discovery provenance and
+common command refusals. The rows use the existing keyboard navigation and inspector; they do not
+change any authority or store new campaign data. This is a reference slice, not completed onboarding,
+localization or contextual tooltip coverage.
+
+The focused Java-17 regression passed **17 tests, zero failures/errors**, in **37.160 seconds**:
+personal discovery, campaign UI, workspace navigation, discovery persistence and generated industrial
+runtime bridge. The software-EGL scenario now additionally checks actual docking evidence after UI
+reload, a new normally paid water purchase, pure cargo-to-tank preview, exact interface amount increase,
+conserved fitted mass and wallet, consumed cargo, UI save/load and reference navigation. It uses fuel
+spent by its existing real journey, not a new depletion fixture. The earlier explicit berth geometry
+fixture remains labelled. The scenario compiles on Java 17; graphics execution remains outstanding.
+
+Manual player checks are scheduled after Stage 23 in the linked player checklist, as requested by
+the user. That schedule does not mark B18 or release acceptance passed. Mining, fitting/repair,
+construction/industry, carrier command composition, production NPC opportunities and remaining
+presentation integration are still open. No full build was needed for this reference/scenario slice.
+
+### Personal discovery report and ordinary contract settlement
+
+Accepted discovery contracts now expose a report row in Contacts. A pure exact-checkpoint preview
+and keyboard/mouse confirmation submit only the exact objective's existing personal observation.
+The active fleet must be personally owned and local to the available issuing NPC, and the contract
+must still be accepted within its inclusive deadline. The ordinary player-participation evaluator
+checks the required static knowledge quality before any transfer. The report shares that existing
+classification/location/resource knowledge through the Stage20G merge, retains shared-data evidence
+with the original observation freshness, and supplies an owner-local discovery fact to the issuing
+NPC. Other actors' intelligence is not consulted or copied.
+
+The ordinary Stage21H contract service then evaluates and settles this specific mission at the
+actual delivery tick. This preserves delivery on the inclusive final deadline tick; delaying the
+check until the next tick would incorrectly expire a timely report. Reward comes only from the
+existing funded escrow, with ordinary participation and reputation handling. The same wallet adapter
+is reused by periodic reconciliation. Preview includes the real resulting personal wallet delta;
+no independent reward or completion authority is introduced. Foreign, stale, repeated, absent,
+cancelled and insufficient-evidence reports fail before live submission.
+
+The Java-17 focused group passed **21 tests, zero failures/errors**, in **1 minute 6 seconds**:
+three discovery-report methods, personal discovery, player mission integration and campaign UI.
+It verifies actual docking-derived personal evidence, pure preview/projection, exact escrow payout
+once, shared provenance, unchanged unrelated knowledge owners, foreign/reused/stale tokens, exact
+save/load, inclusive-deadline completion and remote/unavailable recipient rejection. The NPC roster,
+causal posting, any necessary issuer treasury funding and berth geometry are explicitly test fixtures;
+this is not evidence of generated production NPC opportunities. No full build or graphical run was
+performed. Production roster/opportunities and the remaining physical command integrations remain open.
+
+### Physical personal extraction foundation (2026-10-04, partial)
+
+The existing Stage18 finite extraction authority can now settle natural-source commodity output into
+an idle generated freighter's actual SI hold. Source depletion, recovery losses, energy, engineering
+work, maintenance and compatible storage retain their ordinary physical accounting. Shared interval
+budgets also account for previously committed throughput across sources. Extracted lots use distinct
+`player-extraction:` provenance and may be sold alongside purchased lots through the ordinary finite
+station transfer. Selling cargo does not restore its source reserves.
+
+Freight schema 4 admits this provenance; historical schemas 1–3 adopt without creating cargo.
+Generated-world restore resolves every extraction source and rejects unknown sources, mismatched
+commodities or cargo exceeding the source's accounted depletion. Personal extracted cargo also
+requires checkpoint ownership. The composed save test uses a real generated finite source, while
+installed capability and interval allocation remain explicitly labelled test fixtures.
+
+The focused extraction, supply and persistence regression group passed 42 tests with zero failures
+or errors in 1 minute 32 seconds (`target/stage23b-extraction-cargo-tests.log`). This covers ordinary
+extraction/station adapters, shared budgets, physical cargo, historical freight adoption, personal
+ownership and composed checkpoint round trips.
+
+The common engineering catalog now admits the existing authored civilian mining module and fit.
+The read-only mining adapter derives capability only from that installed module and its actual
+damage-aware engineering state. A regular freight fit or repair workshop does not acquire mining
+capability. Destroyed equipment and unavailable continuous power/heat capacity block projection.
+Its interval allocator additionally bounds gross throughput by the installed equipment's damage;
+the ordinary extraction method's maximum alone is insufficient for damaged equipment.
+
+The final equipment/extraction group passed 27 tests with zero failures/errors in 27.995 seconds
+(`target/stage23b-mining-equipment-tests.log`), including refusal without spending source/cargo/energy
+when cumulative operations exceed a damaged unit's installed throughput. No full suite was run.
+
+This is infrastructure for the playable loop, not completion of mining: lawful equipment acquisition,
+physical approach/survey evidence, persisted mining intent and allocation of completed simulation
+intervals still need command integration. Reopening a fresh budget on each UI click is prohibited;
+selling all provenance lots cannot become a way to reset time allocation. No equipment, wallet,
+source reserve, intelligence or starting-asset grant was introduced. Stage23B remains ACTIVE/PARTIAL.
+
+### Personal physical mining commands (2026-10-04, partial)
+
+`START_MINING` now records a personal SI order at the current authoritative tick without awarding
+work or cargo. `STOP_MINING` cancels future work and leaves aboard cargo intact. Both reuse ordinary
+isolated command preview and exact owner/stale-state submission guards. Each completed campaign tick
+claims its interval once and rechecks active personal ownership, no conflicting fleet order,
+undocked/local/non-travelling placement, operating damage-aware mining hardware and actual SI contact.
+The explicitly authored excavation envelope is 5,000 m with drift at most 1 m/s. The process clips
+requested gross mass to installed per-interval throughput, then uses ordinary finite Stage18
+extraction, storage/provenance and engineering-cargo synchronization. Movement/control input, loss
+of contact/equipment, exhausted capability, full storage or depleted sources stops future work.
+
+Owning freight schema 5 appends orders and their last processed tick; old schemas 1–4 adopt with an
+empty list. Personal ownership and non-future time are checked at composed-checkpoint capture;
+source/method references are validated at runtime restore. A continuation regression exposed a copy
+that dropped the list during world-fingerprint rebinding. All relevant physical/fingerprint and
+initial-composition copies now preserve it. The test checks a nonempty restored order and equality
+after both uninterrupted and restored campaigns complete the next tick.
+
+The Industry inspector exposes start/stop controls through the normal preview/confirm flow. New
+personal contact rows enumerate only free-body sources within the installed section's current local
+working range. They disclose distance and equipment limits, not physical reserve or grade truth.
+Projection and preview leave the campaign unchanged. Ordinary unfitted freight gets no contact row
+or mining capability. The existing broader diagnostic industry projection is not replaced by this
+slice and still needs the planned final actor-bound UI consolidation.
+
+The final Java-17 focused group passed **45 tests, zero failures/errors**, in **1 minute 40 seconds**
+(`target/stage23b-mining-ui-tests.log`). Four personal mining methods cover real completed ticks,
+zero-delta refusal, pure preview/UI, exact composed save/load continuation, repeated/stale/foreign
+tokens, range/speed/absent equipment, direct-control/contact loss, future checkpoint time and explicit
+stop. Seven storage/persistence methods cover shared damaged-throughput and durable tick claims,
+destruction and historical v3/v4 layouts. The group also covers player physical/affiliation/save
+contracts, engineering adapters, campaign UI, workspace and game error handling. The software
+graphics smoke source compiles against current classes; no graphical execution or full build was run.
+
+Installed mining hardware and physical placement in these tests are explicit fixtures. Lawful
+production acquisition/build/refit, material research and market admission for natural feedstocks
+remain open, so this does not yet prove a complete fresh-player mining-to-sale loop. No production
+NPC or asset is granted, and Stage23B remains ACTIVE/PARTIAL.
+
+### Mining-equipment production and same-hull fitting path (2026-10-04, partial)
+
+The civilian mining production path now exposes reusable ordinary product, manufacturing and
+physical shipyard catalogs instead of building these bindings only inside its validator. The
+excavation section uses the already reviewed closed industrial-support material recipe. Its paid
+shipyard integration profile retains the authored workshop-envelope tooling, precision, power,
+labor, automation and work requirements. The validator reuses these same catalogs.
+
+A Union freight fitting proposal exchanges its existing cargo mission section for the mining
+section on the same hull and retains drive, reactor, FTL, sensors and thermal equipment. Foreign
+hulls, missing/other mission sections and already converted fits reject. The proposal does not
+instantiate equipment, complete work or change a live ship. Ordinary fitting and shipyard planning
+still determine feasibility; there is no hull-name-based mining capability grant.
+
+The integration test starts with explicitly labelled finite raw-material/line/yard fixtures and
+executes ordinary Stage18 manufacturing. Closed input mass becomes exactly one physical finished
+module. Ordinary Stage18 refit settlement consumes that module and finite yard work before the
+Stage17.5 continuity/application services change the same physical EntityId's fitting. Insufficient
+work leaves inventory and work budget unchanged. Repeating settlement with a fresh adequate work
+budget still rejects without the consumed product. Retained sensor damage/service age survives,
+and the removed cargo section's damage/service age is carried in the ordinary continuity handoff.
+It is not reintroduced as a pristine count-only module.
+
+Normal campaign creation/restoration now explicitly admits the common authored freight/mining
+product vocabulary. The persistence test proves zero opening mining-module stock, transfers one
+labelled supplied-module fixture through ordinary finite oversized-product logistics, and retains
+it through an exact native campaign save/load. Admission creates no inventory or player ownership.
+No save schema, file framing, generation identity or numerical opening profile changes here.
+
+The production/persistence/mining/minor-content group passed **11 tests, zero failures/errors** in
+**29.513 seconds** (`target/stage23b-mining-production-tests.log`). After strengthening the duplicate
+refit/input check, the final production and historical player-save/physical/supply/affiliation group
+passed **25 tests, zero failures/errors** in **1 minute 30 seconds**
+(`target/stage23b-mining-production-regression.log`). No full build or graphical run was performed.
+
+This closes the reusable catalog, physical settlement and finished-stock persistence seams. The
+player-facing persisted manufacturing/refit queue, allocation of completed ticks, lawful access and
+consideration at real stations, material supply, post-refit cargo-capacity policy and persistence of
+removed physical module condition remain open. The fixtures do not establish a fresh-player
+equipment acquisition loop, and Stage23B remains ACTIVE/PARTIAL.
+
+### Shared manufacturing interval (2026-10-04, partial)
+
+`Stage18StationProductionBridge.manufactureProductAtStorage` now accepts an already allocated
+manufacturing interval budget. Orders sharing one actual line can settle against canonical stock
+without reopening a full interval per order. The existing facility-based entry point delegates to
+this boundary. Rejection leaves canonical stock and remaining energy/work/maintenance unchanged.
+
+The finite mining-module test supplies materials for two modules but work for only one: the first
+order succeeds, the competing order cannot reuse that budget, and a later independently allocated
+interval can consume the remaining materials. The focused production/bridge group passed **8 tests,
+zero failures/errors**, in **21.143 seconds** (`target/stage23b-shared-manufacturing-tests.log`).
+No full build was run. This is the settlement boundary for the pending queue, not persisted queue
+or tick-allocation integration; the open work listed above remains required.
+
+### Persisted personal manufacturing and physical sample evidence (2026-10-04, partial)
+
+The campaign now executes personal manufacturing through `Stage18ManufacturingWorkQueue`. Its
+explicit `player-manufacturing:v1:` rows use the existing native Stage18 product-process contract:
+whole output units, actual station, proportional work progress and exact reserved input mass.
+Unrelated historical process rows are preserved and are not executed by this queue. No envelope,
+industrial schema, binary layout, opening resources or generation identity changes here.
+
+Starting work withdraws the full closed material recipe into physical order custody without
+creating a product. Custody continues occupying its real station storage classes; ordinary
+logistics, extraction and manufacturing cannot use that occupied capacity. Restore derives this
+occupancy from the persisted orders and rejects stock plus custody exceeding physical capacity.
+Cancellation returns material atomically and does not refund spent energy/work. Completion removes
+custody and creates only the authored whole-unit output. A full output store pauses work.
+
+Each consecutive completed campaign tick allocates a shared budget once per actual installed
+station line. Competing jobs cannot reuse it, replayed ticks do nothing and missing intervals cannot
+be manufactured retrospectively. Facility tags, storage interfaces, unit-handling envelope, power,
+work and maintenance come from real installed capability snapshots. Missing capabilities pause
+work; no yard/line is inferred from a station name.
+
+The Industry surface offers one mining-section order and cancellation for personally owned stations.
+Commands use the ordinary isolated preview/single-use confirmation and require personal station
+ownership, the owned docked ship and exact live berth geometry. Checkpoint validation rejects
+missing personal owners and future work timestamps. Read-only immutable product/recipe catalogs
+are cached; opening empty-player projections avoid loading manufacturing content repeatedly.
+
+Successful personal excavation now retains the contacted location and `RESOURCE_INDICATION`
+from an actual recovered physical cargo sample. Preview/start/zero frames create no observation.
+The personal Intelligence row explains that a sample provides no reserve or grade estimate.
+Evidence uses the actual cargo receipt time, persists independently of foreign knowledge and is
+not renewed by repeated mining at the same known location.
+
+The final reservation/manufacturing/ordinary logistics/mining/campaign-UI group passed **29 tests,
+zero failures/errors**, in **35.668 seconds** (`target/stage23b-manufacturing-reservation-final-tests.log`).
+The strengthened ordinary-campaign test then passed separately in **24.377 seconds**: it uses a
+really installed compatible production line and proves positive bounded partial progress, exact
+composed save/load and deterministic continuation. Ownership and supplied raw materials remain
+explicit fixtures; this is not evidence of an ordinary fresh-player acquisition loop. The prior
+discovery/report/queue/UI group passed **14 tests** in **1 minute**. Strict Javadoc passed.
+
+This closes manufacturing queue persistence, physical custody/capacity and completed-tick work
+allocation. Same-hull refit/repair/ammunition queues, removed-module condition custody, lawful
+ordinary acquisition and material supply, physical construction, remaining strategic/carrier
+commands, production NPC opportunities and final notification/overlay integration remain required.
+Human acceptance stays deferred until after Stage23 as instructed. Stage23B remains ACTIVE/PARTIAL.
+
+### Final Windows graphics and UI verification for this increment
+
+The hidden 1280x720 Windows GLFW/OpenGL smoke completed successfully on the NVIDIA GeForce
+RTX 4070 (`target/stage23b-manufacturing-windows-graphics.log`). It exercised all 11 screens,
+keyboard/mouse navigation, physical trade and personal fleet orders, faction actions, personal
+station evidence and purchased cargo-to-tank supply with save/load. The probe now advances an
+actual unpaused completed tick before its next purchase after loading; it preserves the runtime's
+once-per-tick trade guard. Linux EGL setup remains available in the same probe.
+
+The run uses current compiled classes before the previously packaged dependency jar; it is not
+a newly packaged release or exact-revision CI result. Positive manufacturing UI acquisition,
+quantitative surveys, carriers and production NPC opportunities are not covered by this smoke.
+The player-facing territorial overlay now resolves system names and displays controlled status
+in Russian; personal station evidence uses plain language. The final UI/discovery/queue group
+passed **9 tests**, zero failures/errors, in **40.200 seconds**. Whitespace verification passed.
+No full build or full test suite was run for this increment, and human acceptance is still pending.
+
+## Personal journal and evidence-bound resource inspection (2026-10-04, partial)
+
+The active player now has a durable personal journal independent of the presentation's faction
+viewer and the existing observer timeline. It records successful physical commands, personal
+faction/fleet confirmations, actual manufacturing completion, automatic excavation stops and actual
+contract lifecycle changes. Entries retain commit sequence, authoritative completed tick, actual
+wallet delta and physical station/source/product/contract/fleet references. Ship purchase/handover
+references identify the actual target hull; fleet orders retain their type and target. A report's
+contract payout appears in the contract outcome rather than a second monetary report receipt.
+
+Previews, rejected/stale/foreign/repeated confirmations, pause, zero frames and reload do not create
+events. Notification acknowledgement is itself an isolated preview plus single-use confirmation;
+it changes only a monotonic read watermark. The journal tab shows an unread badge, a read command
+and original event times. Its default is newest first, preserving commit order within a tick;
+the user can still choose another sort. The retained history is explicitly bounded to the last
+2048 events with never-reused identities. This is a personal event journal, not an unlimited audit
+ledger or a reconstructed account of actions before its introduction.
+
+Native composed campaign framing advances to **M22.8 v6**, appending a separately bounded schema-1
+journal after the existing optional player payload. Native v1–v5 and the supported Stage20/21
+migration chain adopt an empty non-granting journal. PlayerState, freight v5, industrial process
+and discovery formats are unchanged. Cross-envelope validation rejects nonempty uninitialized
+history and future commits; journal validation rejects invalid watermarks, missing/disordered
+retained suffixes and future acknowledgements. Faction world transitions preserve existing history.
+
+The actual game client's local resource inspector no longer prints exact physical reserve, grade
+or source recovery. It reads the personal actor's discovery record: absent or sample-only evidence
+has no quantitative estimate; existing bounded measurements retain their grade/mass intervals,
+confidence, original observation time and freshness. Expired estimates remain labelled as expired
+instead of being renewed on projection. Foreign internal extraction-outpost stock and equipment
+condition are closed unless that station is actually personally owned. Diagnostic model constructors
+retain their engineering projection; the client explicitly binds the personal projection both on
+initial binding and before adopting a loaded campaign.
+
+Fast projection tests use explicitly labelled measurement fixtures to verify existing intervals,
+expiry, missing evidence, unrelated objects and rejected foreign owners. They do not prove an
+ordinary quantitative-survey acquisition path. The mining integration checks its real viewed
+occurrence both before and after actual sample extraction, preserving absent reserve/grade estimates
+and pure projection. Exact positions, other maps and other internal indicators still need the
+remaining actor/knowledge work; this change is not a complete fog-of-war implementation.
+
+Stage23B remains **ACTIVE/PARTIAL**. The journal is implemented for the currently connected gameplay
+paths; refit/construction/carrier/NPC paths must add their own actual outcomes when implemented.
+Ordinary equipment/station acquisition, quantitative surveying, persistent player shipyard work,
+physical construction, remaining strategic/carrier loops and funded production NPC opportunities
+remain in the [current remainder](stage23b_remaining_work.md). Human acceptance stays scheduled
+after all Stage23 development.
+
+Validation for this increment:
+
+- Journal/resource/mining/report/faction/fleet/UI group: **28 tests, zero failures/errors**,
+  **1 minute 54 seconds** (`target/stage23b-journal-resource-tests.log`).
+- Final native player and v1–v6 campaign migration group: **15 tests, zero failures/errors**,
+  **1 minute 14 seconds** (`target/stage23b-journal-migration-final-tests.log`).
+- Final actual purchase/handover targets, fleet/faction commands and chronological UI group:
+  **27 tests, zero failures/errors**, **2 minutes 3 seconds**
+  (`target/stage23b-journal-command-final-tests.log`). Groups overlap; these are execution counts,
+  not a count of distinct tests or a full-suite result.
+- Fresh strict Javadoc generation passed in **23.383 seconds**, using a separate stale-data file;
+  generated output includes the new journal and resource APIs
+  (`target/stage23b-journal-javadoc.log`). Whitespace verification passed.
+- Final hidden Windows 1280x720 OpenGL probe passed all 11 screens and the ordinary physical trade,
+  fleet/government, supply and exact UI save/load journeys, including personal receipt history,
+  pure acknowledgement preview and durable read state
+  (`target/stage23b-journal-windows-graphics.log`). Journal screenshots were visually inspected;
+  unread count, retention limit and acknowledgement controls are readable. The policy scenario
+  requires unchanged physical/strategic/player/craft state plus exactly one accepted policy event.
+
+Graphics use current compiled classes before the previously packaged dependency jar, not a newly
+packaged release. No full build/suite, exact-revision CI or human acceptance is claimed. The same
+newly connected loops still require ordinary-play acceptance after Stage23.
+
+
+### 2026-10-04 — Проверка исходного состояния при применении refit
+
+Перед изменением живого инженерного компонента проверяется совпадение корпуса,
+состояния оставшихся и снятых модулей и возраста обслуживания с результатом работ.
+Устаревший результат и повторное применение результата со снятыми модулями отклоняются
+без изменения конфигурации, runtime и instance state. Это защита низкоуровневой границы;
+игроковая очередь верфи, физическое хранение снятых модулей и согласование новой
+вместимости с грузовым реестром остаются открытыми. Статус 23B: ACTIVE / PARTIAL.
+
+Проверка: ShipRefitApplicationServiceTest, ShipyardRefitContinuityTest,
+Stage22CivilianMiningProductionIntegrationTest — 7 тестов, 0 failures/errors,
+BUILD SUCCESS, 1:28; лог target/stage23b-refit-source-tests.log. Полная сборка
+и полный набор тестов не запускались. Ручная приёмка не проводилась.
+
+
+### 2026-10-04 — Индивидуальное хранение снятых модулей
+
+Снятый модуль хранится отдельно от счётчика новых изделий: стабильная индивидуальная
+ссылка, станция, исходный корабль и фактический такт снятия, назначение mount/module,
+целостность и возраст обслуживания. Повреждения не уменьшают занимаемую физическую массу.
+Хранилище ограничено 4096 реальными модулями: при исчерпании места записи не удаляются.
+Масса оборудования складывается с обычными товарами и резервом изготовления; повторное
+восстановление резерва не удваивает массу. Общая логистика учитывает занятую ёмкость.
+
+Новая граница физического refit проверяет место для снятого оборудования, реальные
+интерфейсы обработки и уникальность передачи до списания входящего изделия и работы.
+При успехе возвращаются согласованные physical settlement, condition completion и custody.
+Она не заменяет будущую игроковую сохраняемую очередь или транзакцию смены грузового реестра.
+
+Native campaign v7 добавляет отдельный bounded schema-1 payload после журнала.
+Исторические native v1–v6 получают пустое хранилище без выдачи оборудования; v6 сохраняет
+журнал и отметку прочтения. Восстановление проверяет существование станции, действительные
+определения модулей, время и суммарную вместимость, включая сохранённые process reservations.
+Композиция игроковых/world переходов и live capture сохраняют соседний owner.
+В промышленности показывается состояние оборудования только реально своей станции.
+
+Обычная очередь refit, её доступ/оплата, перевозка и повторная установка индивидуального
+оборудования, а также согласование трюма после смены секции остаются открытыми.
+Сценарий кампании с оборудованием и владением станцией использует явные fixtures;
+он проверяет сохранение и авторитетность, но не доказывает обычное получение этих активов.
+Статус 23B: ACTIVE / PARTIAL. Ручная приёмка остаётся после всего этапа 23.
+
+Проверки окончательного среза:
+
+- target/stage23b-module-custody-final-tests.log: 57 целевых тестов, 0 failures/errors,
+  BUILD SUCCESS, 2:45. Включены custody codec/storage, изготовление и refit, обе storage layers,
+  player/journal/native migrations, совместное продолжение оборудования с производством и UI.
+- target/stage23b-module-custody-javadoc.log: свежая строгая генерация doclint=all /
+  failOnWarnings=true, отдельный staleDataPath, BUILD SUCCESS, 29.444 s; HTML новых API проверен.
+- target/stage23b-module-custody-windows-graphics.log: exit 0, Graphical probe passed,
+  NVIDIA GeForce RTX 4070, скрытый GLFW 1280×720. Новая строка оборудования отрисована;
+  реальные F8/F9 точно сохраняют состояние, затем исходная игровая кампания восстановлена.
+  Скриншот stage23b-removed-module-custody.png проверен визуально: поля и текст читаемы.
+  Использованы текущие target/classes перед прежним dependency fat jar; новая упаковка не заявляется.
+- git diff --check с core.safecrlf=false: без ошибок.
+
+Первый прогон выявил неправильный тип исключения для отсутствующей станции; исправлен
+до указанного финального прогона. Полная сборка, весь набор тестов, exact-revision CI,
+публикация и ручная приёмка не выполнялись в этом срезе.
+
+### 2026-10-04: сохраняемая очередь ремонта собственной верфи
+
+Ремонт подключён к физическим командам START_REPAIR/CANCEL_REPAIR и вкладке промышленности.
+Доступ требует собственного владения, физической стыковки и действительной установленной
+верфи с активными опорными производствами и конечными выделениями мощности/работы.
+Материалы фактического повреждения резервируются из канонического склада и продолжают
+занимать место вместе с производством и снятыми модулями. Один бюджет верфи делится между
+заданиями; повторный такт и пауза не начисляют работу. Потеря контакта, изменение исходной
+компоновки/повреждения или доступности верфи останавливает работу. Отмена возвращает сырьё,
+но не выполненную работу. Завершение меняет повреждения и ограничения эмиттеров, сохраняя
+запасы, тепло, возраст обслуживания и боезапас; журнал получает одно фактическое завершение.
+
+Native M22.8 schema/file v8 сохраняет самостоятельный bounded schema-1 repair payload после
+индивидуального хранения модулей. v1–v7 читаются с пустой очередью без выдачи ресурсов или ремонта;
+v7 сохраняет существующие оборудование и журнал. Совместная вместимость проверяется при загрузке.
+
+Проверки: target/stage23b-repair-final-tests.log — 42 теста, 0 failures/errors, BUILD SUCCESS,
+1:31; target/stage23b-repair-javadoc.log — строгий свежий Javadoc, BUILD SUCCESS, 13.150 s.
+Кампанийный сценарий явно задаёт перенос того же корабля, строительство опорных производств,
+владение, мощность и конечное сырьё. Это не доказательство обычного получения верфи.
+После исправления подключения панели кнопок target/stage23b-repair-ui-tests.log:
+4 затронутых теста, 0 failures/errors, BUILD SUCCESS, 41.833 s.
+target/stage23b-repair-focused-graphics.log: exit 0, Repair graphical probe passed,
+NVIDIA GeForce RTX 4070, скрытый GLFW 1280×720. Клавиатурные preview/confirm/cancel,
+реальный резерв и точный F8/F9 проверены; исходное состояние восстановлено.
+Скриншот stage23b-repair-pending.png проверен визуально: прогресс, 75000 кг резерва,
+условия и кнопка отмены читаемы. Текущие target/classes идут перед прежним dependency
+fat jar; новая упаковка не заявляется. Доступен короткий запуск QA с
+`-Dstage23b.repairOnly=true`, без повторения остальных игровых сценариев.
+Найденные при проверке проблемы — незаданный pause в fixture и отсутствие repair в
+условии включения панели — исправлены. Последний успешный графический прогон адресный;
+предыдущие широкие графические попытки завершались ошибкой на ремонтном сценарии.
+Обычное получение верфи, коммерческая оплата, переоснащение и боезапас остаются открытыми.
+23B ACTIVE/PARTIAL; полная сборка, все тесты и ручная приёмка не выполнялись.
+
+### 2026-10-04: производство и ремонт дальнобойных грузовых двигателей
+
+У обеих стратегических грузовых компоновок уже были физически установленные дальнобойные
+двигатели с дополнительными 400000 кг сухого оборудования, но отсутствовали замкнутые
+производственные/сервисные профили. Добавлен Stage22FreightStrategicProductionCatalogs:
+модули изготавливаются через существующий профиль двигателя по полной фактической массе;
+сервисное сырьё и работа масштабируются относительно исходного двигателя по сухой массе.
+Состав материалов, инструментальные требования, точность и одновременные требования
+мощности/персонала наследуют исходный двигатель. Это явное правило авторинга добавленного
+оборудования, а не начисление запасов/работы. Базовые профили не заменяются.
+
+Общий каталог также допускает производственные привязки Империи наряду с Союзом.
+Повреждённый дальнобойный двигатель теперь проходит обычный план ремонта, физический
+резерв, завершённые такты, native save/load и завершение. Схема остаётся v8; начальные
+запасы, кошельки, установленное оборудование, генерационные ресурсы и владение не выдаются.
+Это не завершает игроковую очередь переоснащения, обычное получение верфи или её оплату.
+
+- target/stage23b-longhaul-final-tests.log: 18 тестов, 0 failures/errors, BUILD SUCCESS,
+  31.334 s. Обе фракции: недостаточный производственный бюджет, полная масса входов,
+  отсутствие повторной выдачи, фактический ремонт повреждённого двигателя, частичная
+  работа и продолжение после native save. Кампания: команда, реальный такт, сохранённый
+  возраст обслуживания, единственное завершение журнала. Смежные добыча/переоснащение,
+  промышленное сохранение и миграция хранения оборудования также проверены.
+- target/stage23b-longhaul-javadoc.log: свежий строгий Javadoc, BUILD SUCCESS, 13.644 s.
+- target/stage23b-longhaul-repair-graphics.log: exit 0, короткий сценарий ремонта в скрытом
+  GLFW с текущими classes; keyboard preview/confirm/cancel и точный F8/F9 прошли.
+  Этот графический сценарий использует прежнее явное повреждение датчика/владение/мощности;
+  новые повреждения двигателей проверены адресными физическими и кампанийными тестами.
+- git diff --check с core.safecrlf=false: без ошибок.
+
+23B ACTIVE/PARTIAL; полный Maven verify, упаковка, публикация и ручная приёмка не выполнялись.
+
+### 2026-10-04: физическая очередь переоснащения, до подключения кампании
+
+Добавлены ShipyardRefitQueueState, ShipyardRefitWorkQueue и bounded schema-1
+ShipyardRefitQueuePersistenceCodec. Очередь резервирует конечные входящие готовые модули
+и место для снятого оборудования по полной физической массе. Резервы ограничивают
+производство, сырьё и логистику общего склада наряду с ремонтом и индивидуальным хранением.
+Работа распределяется из предоставленного общего бюджета установленной верфи один раз
+на завершённый такт. Повторный/пропущенный такт не выдаёт работу. Отмена возвращает
+модули, сохраняя фактическое состояние корабля; уже выполненная работа не возвращается.
+
+Завершение предварительно готовит ту же сущность корабля и индивидуальное хранение
+снятых модулей. Снятые повреждения/возраст и фактический такт удаления сохраняются;
+оборудование не становится pristine stock. Сохранившиеся запасы/тепло/состояние продолжаются
+через ShipRefitApplicationService. Потеря контакта, изменение исходного повреждения,
+утрата handling, отрицательная чистая проверка целевой вместимости и исчерпание
+индивидуальных custody slots приостанавливают соответствующую работу без потери модулей.
+При нехватке места для снятого оборудования старт отклоняется до изъятия входящего модуля.
+
+Важная граница: это физический компонент и отдельный codec, **ещё не игроковая очередь
+кампании**. Общий native envelope остаётся v8 и не сохраняет pending refits. Доменный
+вызывающий код обязан сохранять queue/ship/store/custody совместно и предоставлять
+действительную проверку целевой вместимости. Текущие тесты дают явный пустой груз либо
+отрицательный guard; они не доказывают обновление грузового sidecar после замены секции.
+Следующее подключение требует пересмотра действующей bootstrap-only проверки грузовой
+вместимости, общей композиции, исключения параллельного ремонта одного корабля, общего
+бюджета верфи и реальных команд/UI/журнала. Повторная установка used modules и их перевозка
+также остаются открытыми: текущий вход очереди допускает готовые pristine modules.
+
+Проверки:
+
+- target/stage23b-refit-queue-final-tests.log: 32 теста, 0 failures/errors, BUILD SUCCESS,
+  59.608 s. Семь новых сценариев включают реальное частичное продолжение после native save,
+  возврат модулей, полный источник снятого оборудования, общие storage layers, конкуренцию,
+  исходные повреждения, утрату handling, вместимость и повреждённое framing. Смежные
+  ремонт, изготовление, физический refit application и сохранения кампании прошли.
+- target/stage23b-refit-queue-javadoc.log: свежий строгий Javadoc, BUILD SUCCESS, 17.720 s.
+- target/stage23b-refit-identity-tests.log: после дополнительной проверки границы
+  идентификатора удаления семь тестов очереди прошли, 0 failures/errors, 41.358 s.
+  Слишком длинное имя отклоняется до резервирования, а не при выдаче снятого модуля.
+- target/stage23b-refit-reservations-repair-graphics.log: exit 0, короткая графическая
+  регрессия существующего ремонта/preview/confirm/cancel/F8/F9 прошла на текущих classes.
+  Это не графическая проверка нового переоснащения: его UI пока не подключён.
+- git diff --check с core.safecrlf=false: без ошибок.
+
+Первый прогон исправил ожидаемый тип отказа существующего склада; финальный прогон указан
+выше. Полный набор Maven-тестов, clean verify, новая упаковка и ручная приёмка не выполнялись.
+23B ACTIVE/PARTIAL; этот срез не закрывает игроковое переоснащение.
+
+### 2026-10-04 — именованная шахтёрская компоновка стратегического грузового корабля
+
+В общий инженерный каталог добавлена `fit.industrial_union.freight.strategic_mining_v1`.
+Она использует тот же корпус и меняет ровно один установленный модуль: грузовую секцию
+на существующее физически изготовляемое добывающее оборудование. Дальнобойный двигатель,
+FTL и остальные назначения сохранены. Добавление определения не устанавливает оборудование
+в стартовые активы и не меняет исходную компоновку грузовых кораблей.
+
+Целевые проверки подтверждают неизменность остальных модулей, фактическую добывающую
+способность и разрешённый физический план прыжка с конечным запасом реакционной массы.
+Регрессия также охватывает производство двигателей и очередь переоснащения.
+`target/stage23b-mining-freight-fit-tests.log`: 13 tests, 0 failures/errors/skipped,
+BUILD SUCCESS, 28.710 s. Первый запуск выявил ошибочное обращение нового теста к RuntimeState;
+тест исправлен на существующий `runtime.derive(fit, state, damage)` и повторно проверен.
+
+Грузовая вместимость и совместное восстановление этой компоновки в кампании ещё не подключены.
+Вместимость интерфейса расходников не трактуется как дополнительный независимый рудный трюм.
+Native checkpoint остаётся v8; команды, UI и журнал переоснащения остаются открытыми.
+Полный набор тестов, clean verify, упаковка и ручная приёмка не выполнялись. 23B ACTIVE/PARTIAL.
+
+### 2026-10-04 — очередь переоснащения в кампании, native v9, трюм и UI
+
+Физическая очередь подключена к кампании и сохраняется совместно с кораблём, складом,
+ремонтом, снятым оборудованием и журналом. Native схема/файл v9 добавляет отдельный
+bounded schema-1 payload после ремонта. Исторические v1–v8 получают пустую очередь;
+нативный v8 с действительным заказом ремонта сохраняет все его материалы и работу.
+Композиция проверяет владение кораблём/станцией, исходную физическую сущность/компоновку,
+установленный экземпляр верфи, время и вместимость всех складских резервов.
+
+Команды START_REFIT/CANCEL_REFIT используют обычные чистый preview, однократное
+подтверждение и проверку актуального checkpoint. Действительные входящие изделия и место
+для снятых модулей резервируются без установки или мгновенной работы. Отмена возвращает
+оборудование; на паузе прогресса нет. Такты распределяют единый бюджет экземпляра верфи
+между ремонтом и переоснащением. Один корабль не может выполнять оба заказа одновременно;
+до завершения/отмены запрещены отстыковка, прыжок, передача управления и начало добычи.
+
+Компоновка `fit.industrial_union.freight.strategic_mining_v1` теперь использует отдельный
+`module.civilian.miners.freight_excavation_section_v1`: 8 млн кг для руды и 1 млн кг для
+расходников в девятимиллионном физическом объёме секции. Предыдущее шахтёрское оборудование
+сохранено с его прежними характеристиками. Новый вариант имеет собственный продукт и
+полные авторские производственные/сервисные профили той же массы; оба варианта доступны
+в меню изготовления. Рудный трюм не дублирует вместимость интерфейса расходников.
+
+Проверка грузовой системы отклоняет переполнение до резерва. Завершение сохраняет прежние
+груз и происхождение его партий, уменьшая фактический трюм до 8 млн кг. Исходные pool origin,
+ownership ordinal, исторический hull ID и legal affiliation сохраняются; новая fit-ID
+семантика допускается только для точной шахтёрской компоновки личного корабля Союза.
+Обычная грузовая компоновка возвращается к историческому compatibility fit-ID и 12 млн кг.
+Снятая секция сохраняет повреждения и текущий возраст и не становится новым товаром.
+Одно завершение создаёт одну запись REFIT_COMPLETED на настоящем такте; своей станции
+не начисляются фиктивные деньги. UI показывает целевую вместимость, резерв, прогресс,
+отмену и обычные клавиатурные подтверждения.
+
+Проверки:
+
+- `target/stage23b-refit-variant-final-tests.log`: 37 tests, 0 failures/errors/skipped,
+  BUILD SUCCESS, 1:42 min; переоснащение, старая добыча/снабжение, очередь изготовления,
+  оба производимых варианта, доменная очередь, инженерная компоновка и UI.
+- `target/stage23b-refit-campaign-initial-tests.log`: 24 tests, 0 failures/errors,
+  BUILD SUCCESS, 1:46 min; первоначальная интеграция v9, проверка player payload framing,
+  старые native миграции, использованные модули и регрессия ремонта.
+- `target/stage23b-refit-v9-javadoc.log`: свежий строгий Javadoc, BUILD SUCCESS, 18.566 s;
+  новая API-страница GeneratedCampaignRefitUi.html проверена по времени генерации.
+- `target/stage23b-refit-v9-graphics.log`: exit 0; скрытое окно GLFW 1280×720, NVIDIA RTX 4070;
+  клавиатурные preview/confirm, резерв без работы на паузе, F8/F9 с точной очередью,
+  отмена и возврат точного складского содержимого. Снимок pending-состояния просмотрен:
+  вместимость, прогресс и кнопки читаются и доступны.
+- `git diff --check` с core.safecrlf=false: без ошибок.
+
+Ограничения доказательств: реальные команды используют явно обозначенные fixtures
+станции, действительных мощностей и поставленного нового модуля; корабль приобретён
+из существующего резерва с сохранением оплаты. Финальный такт проверяется с явно заданным
+предыдущим выполненным work, чтобы не прогонять сотни тысяч тактов всей кампании. Полный
+расход конечной работы проверяет доменная очередь; финальный интеграционный тест проверяет
+публикацию всех владельцев, неизменный ненулевой груз и партии, native восстановление и
+однократное завершение. Это не доказательство полного обычного получения верфи/оборудования,
+полного ожидания в кампании или маршрута добыча–продажа. На раннем тесте поставка груза
+из нерегистрируемого внешнего endpoint была исправлена на поставку через настоящий склад.
+
+Полный Maven-набор, clean verify, новая упаковка и ручная приёмка не выполнялись.
+Использованный старый fat JAR служил только источником зависимостей; первым шёл текущий
+target/classes. Коммерческие верфи, перевозка/переустановка использованного оборудования,
+боезапас и другие пункты плана остаются открытыми. 23B ACTIVE/PARTIAL, не RC.
+
+### Повторная установка индивидуально хранимых секций, 2026-10-04
+
+Подключена команда START_REFIT_USED и кнопка установки в строке снятого оборудования.
+Предпросмотр и подтверждение используют точный ID модуля и общую физическую очередь.
+Входящий модуль остаётся на складе до завершения; отмена освобождает резерв.
+Повреждения и возраст сохраняются при установке, учёт вместимости не удваивает его массу.
+Native v9 содержит refit schema 2; schema 1 читается без выдачи использованных модулей.
+Совместная проверка сохранения отклоняет отсутствующие или изменённые входящие экземпляры.
+
+Выборочный прогон `target/stage23b-used-refit-player-tests.log`: 28 тестов, без ошибок,
+1:19. Проверены полный конечный расход работы в доменной очереди, старый payload,
+резерв/отмена/загрузка и завершение игроковой команды с сохранением груза и состояния.
+Финальный такт кампании использует явно заданную предшествующую работу; это не доказательство
+обычного получения верфи или полного ожидания длительного заказа игроком.
+Перевозка индивидуальных модулей между станциями и прочие типы оборудования остаются открытыми.
+
+Дополнительный один тест подготовки QA-сохранения прошёл за 43.510 с;
+строгая свежая Javadoc-проверка — за 23.819 с (`target/stage23b-used-refit-javadoc.log`).
+Графический прогон `target/stage23b-used-refit-graphics.log` завершился успешно на NVIDIA RTX 4070:
+кнопка установки снятой секции, клавиатурный предпросмотр/подтверждение, точный резерв,
+F8/F9 и отмена без изменения индивидуального модуля. Снимок
+`stage23b-used-refit-start.png` в пользовательском TEMP проверен при 1280×720.
+Первый QA-прогон загружал работающую кампанию и ошибочно сравнивал её с состоянием
+до продвижения тактов; QA-сценарий исправлен постановкой тестового сохранения на паузу
+до отрисовки. Полная сборка, общий прогон и ручная приёмка не выполнялись.
+
+### Физическая основа перевозки индивидуальных модулей, 2026-10-04
+
+Добавлена передача конкретного экземпляра между физическими складскими узлами без
+добавления взаимозаменяемого нового товара. Проверяются исходный владелец, точное состояние,
+совпадение складского учёта, резерв другого заказа, совместимый класс, предельная масса
+одного изделия, свободное место и конечная пропускная способность.
+Все проверки выполняются до смены владельца и расхода обработки.
+ID, исходный корабль, момент снятия, повреждения и возраст обслуживания сохраняются.
+
+`ShipyardModuleTransferWorkQueue` оставляет модуль у исходного владельца до завершения,
+копит только фактически выполненную обработку на последовательных тактах и использует
+общий бюджет endpoint. Дублированный такт не расходует работу, пропущенные интервалы
+не начисляются задним числом. Потеря контакта, несовместимая обработка и заполненный
+принимающий склад приостанавливают работу. Отмена освобождает ID без возврата потраченной
+обработки. Восстановление требует прежний точный экземпляр; подмена состояния отклоняется.
+Отдельный schema-1 codec ограничивает размер, число заданий и вложенные строки,
+отклоняет неизвестную версию, дубликаты, обрыв и лишние байты.
+
+Начальные выборочные проверки: `target/stage23b-module-transfer-tests.log`,
+18 тестов без ошибок, 43.399 с. Новый тест проверяет полный расход обработки,
+продолжение после отдельного checkpoint и цикл source → условный трюм → другой склад.
+Эти узлы — доменные fixtures, а не фактический транспорт игрока.
+
+Native v9 кампании не изменён: новая очередь пока не включена в envelope.
+Для игрового пути ещё нужны совместный владелец оборудования на борту, общая масса
+трюма и двигателей, уничтожение перевозимого оборудования при потере корабля,
+согласование резерва с переоснащением, фактическая стыковка и UI погрузки/выгрузки.
+Сторонние склады нельзя считать доступными без проверки прав; физическая служба
+сама не выдаёт разрешений на доступ и не выполняет путешествие.
+
+Финальный выборочный прогон `target/stage23b-module-transfer-final-tests.log`:
+14 тестов без ошибок, 41.844 с, включая существующую грузовую службу и custody codec.
+Строгая свежая Javadoc-проверка прошла за 25.253 с
+(`target/stage23b-module-transfer-javadoc.log`); `git diff --check` прошёл.
+Полный набор, clean verify, упаковка и графическая проверка не запускались:
+пользовательский интерфейс этого среза ещё не подключён. Статус 23B ACTIVE/PARTIAL.
+
+### Перевозка снятого оборудования в кампании, 2026-10-04
+
+Подключены LOAD_MODULE, UNLOAD_MODULE и CANCEL_MODULE_TRANSFER: физическая стыковка
+с собственной станцией, остановленный личный корабль, совместимая обработка и свободный
+трюм проверяются до резерва. Во время обработки блокируются конфликтующие грузовые
+операции, ремонт, переоснащение, добыча и выход из дока. UI показывает экземпляры на складе
+и на борту, прогресс обработки и отмену; все действия используют предпросмотр/подтверждение.
+Оборудование на борту сохраняет ID, повреждения, возраст и историю снятия; товарные
+счётчики остаются пустыми. Полная масса входит в суммарный груз, свободное место и
+физическую массу корабля. Потеря корабля удаляет перевозимые экземпляры без возврата на склад.
+
+Native v10 добавляет очередь обработки после refit sidecar. Freight v6 хранит точную
+зеркальную массу оборудования; совместная проверка сверяет её с экземплярами, владельцем,
+вместимостью и фактическим engineering cargo. Native v1–v9 получают пустую очередь;
+старые freight payloads читаются с нулевой массой оборудования. Контент не изменён.
+
+Выборочные проверки:
+
+- `target/stage23b-module-transport-player-tests.log`: 17 тестов, без ошибок, 1:10.
+- `target/stage23b-module-transport-final-tests.log`: 17 тестов, без ошибок, 2:47;
+  включены переполнение общей массы, native v9 migration, настоящий прыжок с сохранением
+  и уничтожение перевозимого оборудования, а также снабжение и player payload framing.
+- `target/stage23b-module-transport-regression-tests.log`: 6 тестов, без ошибок, 1:15;
+  сохранены обычные перевозки сырья, маршруты, лоты, уничтожение и материальные идентификаторы.
+- `target/stage23b-module-transport-final-javadoc.log`: строгая свежая проверка прошла,
+  32.830 с, после дополнения описаний параметров новых API.
+
+Первый проверочный прогон выявил использование старого ограниченного реестра продуктов
+в freight binding; заменён на общий авторский реестр снятого оборудования.
+Графический probe проверяет клавиатурные LOAD/UNLOAD, подтверждение, резерв,
+F8/F9 и отмену в скрытом окне на NVIDIA RTX 4070, 1280×720, с текущими target/classes.
+Старый fat JAR используется только для зависимостей. Полная сборка, упаковка и общий
+набор тестов не запускались. Получение станций/оборудования и предшествующая работа
+в тесте заданы fixtures; финальные интервалы реальны. Это не доказательство обычного
+полного получения двух станций, длительного ожидания и полного рейса доставки игроком.
+Ручная приёмка остаётся после всего этапа 23, статус 23B ACTIVE/PARTIAL.
+
+Итоговый `target/stage23b-module-transport-graphics.log` завершился с exit 0.
+Снимки `stage23b-module-load.png` и `stage23b-module-unload.png` в пользовательском TEMP
+просмотрены: действия и состояние читаются при 1280×720. Подписи трюма уточнены,
+после чего перекомпилирован только один UI-файл и повторён короткий графический probe.
+`git diff --check` прошёл; полный Maven-прогон и ручная приёмка не выполнялись.
+
+### Согласование личных ресурсных наблюдений, 2026-10-05
+
+Список «Личные открытия» использует общую `PersonalResourceUiProjection` с локальным
+инспектором. Все сохранённые личные наблюдения ресурсных объектов видны в списке, включая
+диапазоны содержания/извлекаемой массы, уверенность, время и актуальность уже существующей
+оценки. Полученный образец без измерений по-прежнему не раскрывает содержание или запас.
+Чужой реестр не принимается как личный; неизвестные объекты не добавляются по физическому миру.
+Обнаружение без точного положения не даёт переход на карту. Ключ строки включает систему,
+тип объекта и его идентификатор, поэтому одинаковые локальные ID не конфликтуют.
+Построение списка проходит по наблюдениям один раз, без повторного поиска каждой записи.
+
+`target/stage23b-resource-intelligence-final-validation.log`: JDK 17, 23 целевых теста,
+без failures/errors/skips, свежий строгий Javadoc, BUILD SUCCESS, 1:01.
+Проверены сохранение/устаревание существующей ограниченной оценки через discovery codec,
+разделение личного и чужого знания, отсутствие выдуманного положения, идентичность инспектора
+и списка, а также реальная добыча образца и полный checkpoint кампании после загрузки.
+Первый прогон обнаружил недопустимый fixture нового теста: ресурсное свидетельство требует
+известного статического положения. Для проверки простого обнаружения fixture исправлен на
+отсутствие ресурсной оценки; ограничения доменной модели сохранены.
+
+Это согласование отображения имеющихся наблюдений. Обычный путь получения новых измерений,
+фильтрация всех карт/наложений и доступ к другим закрытым сведениям остаются открытыми.
+Полный suite, графический прогон и ручная приёмка для этого среза не выполнялись.
+23B остаётся ACTIVE/PARTIAL; новый срез не закоммичен.
+
+### Строительство промышленных установок и ввод ресурсов, 2026-10-05
+
+`Stage18FacilityConstructionWorkQueue` подключён к existing construction authority,
+generated capture/restore, player preview/submit, world ticks, production UI и журналу.
+Точный bill атомарно изымается в заказ и продолжает занимать физическое складское место.
+Работа установки расходуется только на завершённом такте: изготовление и строительство
+на одной линии используют один конечный инженерный бюджет. Завершённый заказ сохраняет
+evidence и добавляет отключённую установку в live registry. Дублирующее принятие не меняет
+её позднейшее состояние. Checkpoint без installation либо с работой из будущего отклоняется.
+
+Команда распределения ресурсов сохраняет суммарные энергию, теплоотвод, труд и обслуживание
+станции, забирая нужные значения у других установок. При нехватке отвергается вся операция;
+возможности всех установок и верфей пересчитываются. Новые ресурсы не выдаются.
+
+Проверки: `target/stage23b-construction-final-validation.log` — 21 тест и строгий Javadoc;
+`target/stage23b-facility-allocation-validation.log` — 18 тестов и строгий Javadoc;
+окончательный `target/stage23b-construction-command-final-validation.log` — 13 тестов,
+строгий Javadoc, BUILD SUCCESS, 42.906 с. Последний прогон проверяет настоящее подтверждение
+и отмену игроковой команды после явного berth fixture, одноразовость token, невмешательство
+preview, точный возврат сырья и существующие player persistence сценарии.
+
+Эти проверки ещё используют явные ownership/supply/berth fixtures. Обычное строительство
+самой станции, поставка сырья, физическая постройка верфи и прочие пути принятого остатка
+не объявляются завершёнными. Полный suite и итоговая графическая проверка ещё впереди.
+23B остаётся ACTIVE/PARTIAL; изменения этого среза не закоммичены.
+
+### Готовые изделия в личном физическом трюме, 2026-10-05
+
+Freight schema 7 хранит отдельные countable-product lots: общий cargo ID, действующий FleetId,
+product ID, количество, настоящую станцию и время погрузки. Реальный stock переносится через
+общую Stage18 logistics; source evidence создаётся после успешного конечного переноса.
+Частичная выгрузка сохраняет исходное evidence. Полный вес складывается с raw commodity
+и повреждённым индивидуальным оборудованием. Потеря корабля удаляет оставшиеся изделия.
+Historical schemas 1–6 читают свой формат и не получают новый груз. Нативный внешний envelope
+остаётся v10; его вложенный freight payload имеет самостоятельную версию.
+
+Полный checkpoint требует фактического личного владельца и отвергает будущую погрузку.
+Все штатные копирования fingerprint/геометрии сохраняют новые лоты. Тест с явным supplied-product
+fixture сохраняет груз и fitted mass, затем выгружает на физический склад и сохраняет результат.
+Это доказательство persistence seam, а не обычного изготовления и игроковой доставки.
+
+Добавлен резерв finished-product counts для будущей обработки: реальный stock/масса остаются
+у источника, другие операции видят только не зарезервированный остаток. Пока production commands
+его не вызывают; он должен восстанавливаться из будущей очереди. Overflow целого счётчика
+товаров теперь отклоняется до изменения любого склада и бюджета.
+
+`target/stage23b-finished-product-cargo-final-validation.log`: 24 теста, строгий Javadoc,
+BUILD SUCCESS, 55.663 с. Проверены старые v3/v4/v6 layouts, source/hold conservation,
+partial unload, destruction, gross mass/capacity, source reserves, production/refit регрессии.
+`target/stage23b-finished-product-cargo-watermark-validation.log`: окончательные 6 тестов
+и строгий свежий Javadoc, BUILD SUCCESS, 44.973 с; future-loading guard проверен полным checkpoint.
+
+Сохраняемые многотактовые player handling commands, журнал и UI доставки ещё впереди.
+23B остаётся ACTIVE/PARTIAL. Полный suite, итоговый graphics и коммит этого среза не выполнены.
+
+### Native v11: конечная обработка готовых товаров (2026-10-05)
+
+Предыдущий freight-only статус superseded: многотактовая обработка теперь подключена к
+LOAD_PRODUCT / UNLOAD_PRODUCT / CANCEL_PRODUCT_TRANSFER, production UI и журналу. Native v11
+сохраняет источник, назначение, количество, начало и выполненные килограммы обработки;
+freight schema остаётся 7. Настоящий source reserve блокирует конкурентное потребление без
+дублирования товара/массы; общий endpoint budget не открывается повторно при завершении.
+Одноразовое разрешение публикует физический перенос и provenance; отмена освобождает товар,
+но не возвращает работу. Capture/restore и player/world transitions сохраняют очередь.
+Исторический v10 принимает genuine layout и получает пустую очередь без выдачи ресурсов.
+9 tests + strict Javadoc (52.451 s), затем native/initial-owner/UI regression 14 tests (45.948 s),
+оба BUILD SUCCESS. Начальные ownership/docking/stock fixtures отмечены; обычное изготовление
+и приобретение требуемых активов этими проверками не объявляются доказанными.
+
+### Приобретение существующей гражданской станции (2026-10-05)
+
+Authority, production UI и журнал поддерживают PURCHASE_STATION с точным confirmation token.
+Продавец — настоящий владелец промышленного объекта; физическая стыковка, собственное наблюдение,
+предложение, кошелёк и юридическая ссылка проверяются перед conserved payment. OwnedStationRef
+указывает на прежний объект, stock/facility/yard state сохраняются. Никакого ремонта, энергии,
+товаров, промышленной работы или новой инфраструктуры покупка не создаёт. Явная sale policy v1
+содержит цены и защищает military/mining designs; чужие внутренние запасы не раскрываются.
+Исправлена новая commissioning-привязка рынка: asset owner вместо territorial controller.
+Старые checkpoints сохраняют прежние faction components; mismatched seller не получает offer.
+9 targeted tests + strict Javadoc, BUILD SUCCESS (2:04); положительная геометрия прибытия
+остаётся explicit fixture, ownership/funding/stock/work — actual conserved owners.
+Initial distant purchase отклоняется. 23B остаётся ACTIVE/PARTIAL, полный suite и final graphics впереди.
+Окончательные 11 start/physical/payment/UI regression tests прошли (2:05): неверный продавец,
+нулевая цена, недостаток средств, foreign/stale tokens не меняют владельца или деньги.
+
+### Native v12: физическое строительство верфей (2026-10-05)
+
+Отдельный каталог задаёт настоящие килограммы трёх существующих проектов верфи и
+использует общие материальные/рабочие профили Stage-18H. START_YARD_CONSTRUCTION и
+CANCEL_YARD_CONSTRUCTION требуют собственной физической станции и стыковки. Очередь
+держит полный материальный резерв в пределах вместимости и выполняет конечную работу
+той же линии после изготовления и строительства установок, без второго бюджета.
+
+Native v12 сохраняет отдельный bounded schema-1 sidecar. Genuine v11 получает пустой
+заказ без структурных, материальных или рабочих grants. Составной checkpoint проверяет
+реального владельца, склад, место, watermark и соответствие законченной структуры.
+Player/world transitions сохраняют очередь. Завершение устанавливает отключённую верфь
+с нулевыми power/work/staff/automation и создаёт запись журнала; повторное принятие
+не сбрасывает её состояние. UI показывает физический состав, доступность, прогресс и отмену
+до начала работы.
+
+Обычная поставка полного bill, достаточное хранилище и ввод работающей верфи остаются
+открытыми. Completed-structure fixture подтверждает только совместное сохранение,
+а не получение активов игроком. Статус 23B ACTIVE/PARTIAL.
+
+`target/stage23b-yard-native12-final-validation.log`: 11 targeted tests + strict Javadoc,
+BUILD SUCCESS (1:55). `target/stage23b-yard-native12-ui-regression.log`: 4 production UI,
+finished-product transport and station acquisition tests, BUILD SUCCESS (1:05).
+Полный suite и final graphics остаются итоговыми проверками после закрытия игровых путей.
+
+### Поэтапная физическая поставка материалов верфи (2026-10-05)
+
+Новые заказы начинают с пустой стройплощадки. Доступные authored материалы перевозятся
+с собственного склада на реальных тактах в custody точного заказа, ограниченную его bill.
+Это не общий склад: произвольные товары и второй комплект материала туда не допускаются.
+Полная поставка через малый склад освобождает место для следующих партий; ни материал,
+ни мощность из времени не возникают. Engineering work начинается после всего состава.
+
+Доставка делит TransferBudget с обработкой новых изделий и снятых модулей. Повторный такт
+не повторяет перемещение, реальная поставка фиксируется журналом. Отмена до работы
+возвращает только доставленное и требует свободного места на исходном складе. UI объясняет
+автоматическую поставку и показывает доставленную массу отдельно от выполненной работы.
+
+Yard schema 2 при том же outer native v12 сохраняет mode и bounded commodity map;
+schema 1 остаётся прежним warehouse-only резервом без повторного material grant.
+Обычное экономическое приобретение полного запаса и ввод работающей верфи остаются открытыми.
+# 2026-10-06: начальные размещения диспетчеров
+
+Генерация supply offers подключена к обычным обзорам диспетчеров. Основание — существующий
+свой freight order с реальной задержкой/уничтоженным перевозчиком, собственный известный
+гражданский получатель и недостаток его товара относительно ёмкости назначенного судна.
+Партия ограничена 1000 кг и фактическими свободным местом/handling за такт; эскроу берётся
+из казны сверх reserve floor. Стабильный cause ID содержит order, число задержек и lost
+flag. Даже завершённый/отклонённый договор сохраняет ссылку, поэтому reload не выдаёт
+ту же заявку повторно. Чужие склады не читаются для генерации. Премия на кг: 1000 milli
+плюс 20% базовой открытой commodity quote; реальная продажа остаётся отдельной сделкой.
+
+Количество выбирается игроком при принятии. Меньшая партия закрывает старое предложение
+с полным возвратом и получает отдельный funded invoice с пропорциональной премией;
+ни один active contract не теряет точную treasury funding provenance. Preview изолирован,
+stale/repeated token отвергается. Production UI имеет +/- кг, показывает точную премию,
+при изменении количества сбрасывает подтверждение и после принятия выбирает новый invoice.
+Подключены котировки всех настоящих Stage18 commodities вместо прежних трёх строк,
+включавших несуществующий физический ore alias. Старые открытые цены воды/сплава сохранены;
+новые cargo identities не подменяются старым alias. Строки только у фактического dock и
+совместимых storage/handling; внутренние чужие количества не раскрываются.
+
+Проверки используют действительное уничтожение существующего NPC freighter, реальные
+начальные активы, банки и warehouse stocks, без внедрения shortage fact/stock/cash.
+Проверены финансирование, сохранение, отказ повторной выдачи после refund/restore,
+принятие меньшей партии и реальные BUY/SELL у получателя без контрактной выплаты.
+Прибытие по-прежнему задаётся явной геометрией. **Положительная обычная сырьевая цепочка
+не доказана:** исходный проводниковый stock seed 1 находится у получателя (`industry.2`),
+на внешней продаже его нет. Предыдущая попытка trader-only fulfillment была неверной
+для этого исходного состояния; её лог сохранён в
+`target/stage23b-npc-supply-external-stock-unavailable.log`. Для положительной цепочки
+нужны обычное получение добывающего оборудования и настоящий mining loop из пункта 1.
+Переносить stock или подставлять инструменты вместо этого запрещено текущей целью.
+
+`GeneratedCampaignNpcSupplyOffersTest,GeneratedCampaignPlayerMissionIntegrationTest,GeneratedCampaignPilotPhysicalTest`:
+20 тестов без ошибок, `target/stage23b-npc-supply-causality-validation.log`.
+Окончательный новый-API прогон `GeneratedCampaignNpcSupplyOffersTest,GeneratedCampaignPersonalSupplyContractTest`
+и Javadoc прошли: `target/stage23b-npc-supply-final-validation.log`, BUILD SUCCESS (1:24).
+Внешняя успешная выплата во втором тесте остаётся явно транзакционной с finite stock fixtures.
+23B остаётся ACTIVE/PARTIAL; полный UI общения/доступные предложения в личном журнале
+и ordinary mining/delivery journey ещё требуют реализации и проверки.
+
+Native v15 / физический supply predicate: appended `PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST`
+содержит точные станцию, систему, commodity и целые требуемые кг. Предложение требует
+архивированного фактического склада и реального legal market v2 владельца. Обычный
+world/player reconcile возвращает pending/not proven: складской stock или доставка NPC
+не заменяют личный receipt. Исполнитель принимает только ACCEPTED до deadline, реальный
+active owned fleet/current dock и receipt текущего такта строго позже принятия. Учитываются
+только доли с исходным endpoint, отличным от получателя; payout использует held escrow
+и одноразовый claim. COMPLETED, нулевой escrow и репутация сохраняются.
+SELL authority вызывает этот исполнитель, показывает новое условие в UI и разделяет
+деньги продажи/контрактной выплаты в журнале. Native v1–v14 не могут заявить новый
+predicate; прежняя layout читается writer v15 без выдачи новых обязательств.
+
+Проверены реальное финансирование из казны, отказ в награде за круговую перепродажу,
+выплата внешней поставке после восстановленного service, отсутствие второй выплаты,
+native v15 round-trip и отказ под fake v14 header. **Сценарий транзакционный**: shortage fact,
+геометрия и два конечных stocks заданы явно; не является ordinary journey или production
+offer generation. Первые regression 12 тестов прошли; окончательный целевой прогон
+`GeneratedCampaignPersonalSupplyContractTest,GeneratedCampaignPilotPhysicalTest,Stage228GeneratedCampaignPersistenceCodecTest`
+прошёл 10 тестов без ошибок: `target/stage23b-supply-contract-native15-validation.log`.
+
+Происхождение поставки: transient receipt дополнен точными списанными долями CargoLotState.
+Общий selector FIFO используется и физическим списанием, и построением свидетельства;
+ID, исходный endpoint/provenance и loaded time сохраняются. Невыгруженный остаток остаётся
+исходной партией, без переименования в новую покупку. Список долей immutable. Проверена
+смешанная поставка добытого груза и покупок на двух складах, включая частичную последнюю
+партию, точную сумму и save/load оставшегося hold. Эти данные пока не начисляют награду:
+условия допустимого происхождения и сам supply-contract executor остаются работой впереди.
+Проверки: `Stage20PersonalExtractionCargoTest,GeneratedCampaignPilotPhysicalTest`,
+`target/stage23b-delivery-provenance-validation.log`, BUILD SUCCESS.
+
+Физическое свидетельство поставки: `Stage20FreightRuntime.deliverPersonalCommodity`
+выполняет существующий finite cargo transfer и создаёт transient receipt только после
+успеха. Корабль, endpoint, товар, точная масса и время закреплены private constructor;
+claim принимается только создавшим runtime один раз. Чужой/восстановленный runtime не
+получает право на receipt. Обычная SELL-команда использует этот transfer внутри existing
+financial settlement и потребляет receipt после успешного расчёта. Новых денег, товаров
+и checkpoint grants нет. Дополнительная контрактная выплата ещё не подключена; понадобится
+проверка исходных cargo provenance и атомарное завершение соответствующего договора.
+Проверки: `Stage20PersonalExtractionCargoTest,GeneratedCampaignPilotPhysicalTest,GeneratedCampaignPersonalMiningTest`,
+16 тестов, 0 ошибок, `target/stage23b-personal-delivery-receipt-validation.log`, BUILD SUCCESS.
+
+Обновление знаний: существующие production-диспетчеры подключены к штатным actor reviews.
+Каждый факт принят только из текущего snapshot собственной фракции. Повторная доставка
+того же ID идемпотентна, изменение его свидетельства запрещено. Старые наблюдения того же
+грузового заказа удаляются только при отсутствии ссылки любого сохранённого контракта;
+таким образом прошлое обоснование эскроу не переписывается новым обзором. Ни restore,
+ни review не создают персонажей, договоры, деньги или груз.
+Проверки: `GeneratedCampaignNpcPlacementTest,Stage21HNpcMissionServiceTest`,
+`target/stage23b-npc-live-knowledge-validation.log`, BUILD SUCCESS. Физический такт обновляет
+сведения; 20 последовательных тестовых обзоров сохраняют исходный факт контракта и одну
+последнюю запись вместо накопления 20 неподтверждённых старых записей.
+
+Дополнение: конкретный posting сохраняется отдельным фактом NPC. Новые предложения
+диспетчера и передача ему открытия требуют доступности, личного корабля и фактической
+стыковки (не более 1 км и 1 м/с) у его станции. Контракты в личном UI используют ту же
+проверку. Уже принятый контракт не требует повторной стыковки для отмены.
+Проверены отказ при одном briefing, разрешение после настоящей команды DOCK с явно
+заданной тестовой геометрией и сохранение этого разрешения после restore.
+Также устранён null activeFleetId в проекции готовых изделий для игрока без корабля.
+`GeneratedCampaignNpcPlacementTest,GeneratedCampaignPlayerMissionIntegrationTest`:
+17 тестов, 0 ошибок, `target/stage23b-npc-contact-validation.log`, BUILD SUCCESS.
+
+Новая Stage228-кампания устанавливает по одному торгово-логистическому NPC на фракцию,
+имеющую существующую гражданскую станцию с собственным архивированным положением.
+Сведения NPC происходят из локального архива и фактического freight ledger владельца;
+физические запасы, корабли и финансы не изменяются. Восстановление checkpoint не вызывает
+размещение и сохраняет пустые исторические списки. Генерация оплачиваемых предложений
+и полная привязка общения к месту остаются незавершёнными.
+
+Целевая проверка: `GeneratedCampaignNpcPlacementTest,GeneratedCampaignPilotStartTest`,
+`target/stage23b-npc-placement-validation.log`, Maven завершился с кодом 0.

@@ -55,7 +55,7 @@ public final class PlayerFleetRoutePlanner {
     private static final double COST_EPSILON = 1e-9d;
     private static final double MAX_ESCORT_MITIGATION = 0.65d;
 
-    private final PlayerRuntime runtime;
+    private final java.util.function.Supplier<PlayerState> playerState;
     private final WorldSimulation world;
     private final ContentCatalog content;
 
@@ -65,9 +65,24 @@ public final class PlayerFleetRoutePlanner {
      * @param runtime current playable runtime
      */
     public PlayerFleetRoutePlanner(PlayerRuntime runtime) {
-        this.runtime = Objects.requireNonNull(runtime, "PlayerRuntime not set");
+        Objects.requireNonNull(runtime, "PlayerRuntime not set");
+        this.playerState = runtime::player;
         this.world = runtime.world();
         this.content = runtime.content();
+    }
+
+    /**
+     * Creates a read-only planner over an immutable campaign player checkpoint.
+     * No playable runtime, control systems or reference reconciliation is installed.
+     * @param world existing physical world
+     * @param content shared content catalog
+     * @param player existing immutable personal knowledge and orders
+     */
+    public PlayerFleetRoutePlanner(WorldSimulation world, ContentCatalog content, PlayerState player) {
+        this.world = Objects.requireNonNull(world, "world");
+        this.content = Objects.requireNonNull(content, "content");
+        PlayerState checked = Objects.requireNonNull(player, "player");
+        this.playerState = () -> checked;
     }
 
     /**
@@ -85,7 +100,7 @@ public final class PlayerFleetRoutePlanner {
         FleetId actor = Objects.requireNonNull(fleetId, "Route fleet not set");
         StarSystemId from = Objects.requireNonNull(origin, "Route origin not set");
         StarSystemId to = Objects.requireNonNull(destination, "Route destination not set");
-        PlayerState player = runtime.player();
+        PlayerState player = playerState.get();
         Set<StarSystemId> discovered = new HashSet<>(player.discoveredSystemIds());
         if (!discovered.contains(from) || !discovered.contains(to)) {
             return Optional.empty();
@@ -280,7 +295,7 @@ public final class PlayerFleetRoutePlanner {
 
     private double escortProtectionFactor(FleetId protectedFleet, FleetPlacementState protectedPlacement) {
         double combinedProtection = 0d;
-        PlayerState player = runtime.player();
+        PlayerState player = playerState.get();
         for (PlayerFleetOrderState order : player.fleetOrders()) {
             if (order.type() != FleetOrderType.ESCORT
                     || !protectedFleet.equals(order.targetFleetId())

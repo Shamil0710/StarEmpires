@@ -109,47 +109,96 @@ public final class ProductionUiProjector {
             var physical = runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElseThrow();
             var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
             var hold = runtime.freight().findFreighter(fleet.fleetId()).orElse(null);
+            var stationKnowledge = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
             for (var endpoint : runtime.infrastructure().endpoints()) {
                 if (!endpoint.systemId().equals(fleet.systemId()) || campaign.pilotMarketReference(endpoint.stationId()).isEmpty()) continue;
+                var knownStation = stationKnowledge.entries().stream().filter(entry -> entry.object().systemId().equals(endpoint.systemId())
+                        && entry.object().kind() == com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE
+                        && entry.object().objectId().equals(endpoint.stationId()) && entry.knownLocation().isPresent()).findFirst();
+                if (knownStation.isEmpty()) continue;
                 String name = GeneratedWorldUiModel.endpointDisplayName(endpoint);
                 var ref = campaign.pilotMarketReference(endpoint.stationId()).orElseThrow();
                 boolean docked = ref.equals(player.dockedAt());
                 long marketMoney = runtime.world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
                         .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
                 logistics.add(row("pilot-station|" + endpoint.stationId(), name, "Личные рынки", docked ? "Корабль пристыкован" : "Требуется стыковка",
-                        List.of(InfoSection.of("Доступ к рынку", "Расстояние", String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(endpoint.position())),
+                        List.of(InfoSection.of("Доступ к рынку", "Расстояние до известного положения", String.format(Locale.ROOT, "%.1f м", physical.position().distanceTo(knownStation.orElseThrow().knownLocation().orElseThrow())),
                                 "Скорость корабля", String.format(Locale.ROOT, "%.2f м/с", Math.hypot(physical.velocityXMps(), physical.velocityYMps())),
                                 "Условия стыковки", "Не далее 1 км; скорость не выше 1 м/с",
                                 "Управление тягой", "WASD в системе; X — торможение; без тяги — движение по инерции",
                                 "Кошелёк", credits(player.walletMilliCredits()))),
-                        "Фактическое положение и скорость личного корабля; состояние стыковки и кошелёк станции",
+                        "Собственное сохранённое положение станции, положение и скорость личного корабля; состояние стыковки",
                         endpoint.systemId(), 0, world.worldTick()));
-                if (hold == null) continue;
-                for (String commodity : List.of("commodity.material.purified_water", "commodity.material.structural_alloy", "commodity.ore.metallic")) {
-                    var definition = ontology.findCommodity(commodity);
-                    if (definition == null || !hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
-                            || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())) continue;
+                if (hold == null || !docked) continue;
+                boolean ownStation = campaign.ownsProductionStation(endpoint.stationId());
+                for (var definition : ontology.getCommodities()) {
+                    String commodity = definition.id();
+                    if (!hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
+                            || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())
+                            || !endpoint.storage().snapshot().capacityByStorageClassKg().containsKey(definition.storageClassId())) continue;
                     logistics.add(row("pilot-market|" + endpoint.stationId() + "|" + commodity, switch (commodity) {
                         case "commodity.material.purified_water" -> "Очищенная вода";
                         case "commodity.material.structural_alloy" -> "Конструкционный сплав";
-                        default -> "Металлическая руда";
+                        case "commodity.feedstock.metallic_ore" -> "Металлическая руда";
+                        default -> definition.displayName();
                     }, "Товары личного рынка", name,
-                            List.of(InfoSection.of("Физическая сделка", "Запас станции", endpoint.storage().commodityMassKg(commodity) + " кг",
+                            List.of(InfoSection.of("Физическая сделка", "Запас станции", ownStation ? endpoint.storage().commodityMassKg(commodity) + " кг" : "Доступность проверяется при сделке",
                                     "В трюме", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d) + " кг",
-                                    "Свободно на складе", endpoint.storage().remainingCapacityKg(definition.storageClassId()) + " кг",
-                                    "Кошелёк рынка", credits(marketMoney),
+                                    "Свободно на складе", ownStation ? endpoint.storage().remainingCapacityKg(definition.storageClassId()) + " кг" : "Проверяется при сделке",
+                                    "Кошелёк рынка", ownStation ? credits(marketMoney) : "Не раскрыт",
                                     "Покупка за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true)),
                                     "Продажа за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false)),
                                     "Кошелёк", credits(player.walletMilliCredits()), "Стыковка", docked ? "Да" : "Нет",
                                     "Обработка за такт", String.format(Locale.ROOT, "%.2f кг", endpoint.handlingCapability().massRateKgPerSecond() * campaign.coordinator().session().fixedStepSeconds()),
                                     "Лимит времени", "Одна физическая сделка корабля за завершённый такт; после сделки нужно продолжить время")),
-                            "Фактические запасы и ёмкость склада; раскрытые рыночные условия за килограмм, доступ и таможенные платежи",
+                            ownStation ? "Фактический собственный склад и раскрытые условия текущей сделки"
+                                    : "Раскрытые при стыковке котировки; чужие внутренние запасы, вместимость и кошелёк не раскрываются",
                             null, 0, world.worldTick()));
                 }
             }
         });
         rows.put(Tab.LOGISTICS, List.copyOf(logistics));
+        var personalIntel = new ArrayList<>(rows.get(Tab.INTELLIGENCE));
+        campaign.playerState().ifPresent(player -> {
+            var knowledge = campaign.coordinator().runtime().discoveryState()
+                    .knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+            personalIntel.addAll(PersonalResourceUiProjection.rows(knowledge,
+                    world.worldTick() * campaign.coordinator().session().fixedStepSeconds(), world.worldTick()));
+            for (var entry : knowledge.entries()) {
+                if (entry.object().kind() != com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE) continue;
+                if (entry.state() != com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION) continue;
+                boolean visited = entry.evidence().stream().anyMatch(e -> e.source() == com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY);
+                String provenance = visited ? "Физическое посещение" : entry.evidence().stream()
+                        .map(e -> switch (e.source()) {
+                            case PASSIVE_SENSOR -> "Пассивное наблюдение";
+                            case ACTIVE_SCAN -> "Активное сканирование";
+                            case PROBE_OR_RECON -> "Зонд или разведчик";
+                            case PURCHASED_OR_SHARED_MAP_DATA -> "Переданные картографические сведения";
+                            case FACTION_INTELLIGENCE -> "Архив фракции";
+                            case PHYSICAL_VISIT_OR_SURVEY -> "Физическое посещение";
+                            case PERSISTENT_INFRASTRUCTURE_BROADCAST -> "Передача станции";
+                        }).distinct().sorted().collect(java.util.stream.Collectors.joining(", "));
+                var endpoint = campaign.coordinator().runtime().infrastructure().endpoints().stream()
+                        .filter(e -> e.stationId().equals(entry.object().objectId()) && e.systemId().equals(entry.object().systemId()))
+                        .findFirst().orElse(null);
+                if (endpoint == null) continue;
+                personalIntel.add(row("station:" + endpoint.stationId(), GeneratedWorldUiModel.endpointDisplayName(endpoint),
+                        "Личные открытия", visited ? "Посещённая станция" : "Известная станция",
+                        List.of(InfoSection.of("Личная разведка", "Объект", "Станция с известным статическим положением",
+                                "Система", campaign.coordinator().runtime().world().getTopology().findSystem(endpoint.systemId()).orElseThrow().name(),
+                                "Способ", provenance,
+                                "Первое наблюдение", String.format(Locale.ROOT, "%.1f с кампании", entry.firstObservedSeconds()),
+                                "Состояние", "Постоянное знание статического положения; не обещает текущих запасов или услуг")),
+                        "Сохранённые свидетельства личного знания: " + provenance,
+                        endpoint.systemId(), 0, world.worldTick()));
+            }
+        });
+        rows.put(Tab.INTELLIGENCE, List.copyOf(personalIntel));
+        var personalHistory = new ArrayList<>(GeneratedCampaignJournalUi.rows(campaign));
+        personalHistory.addAll(rows.get(Tab.HISTORY));
+        rows.put(Tab.HISTORY, List.copyOf(personalHistory));
         var craftRows = new ArrayList<>(rows.get(Tab.SHIPS));
+        craftRows.addAll(GeneratedCampaignSupplyUi.rows(campaign));
         campaign.playerState().ifPresent(player -> {
             for (var id : player.ownedFleetIds()) {
                 var placement = campaign.coordinator().runtime().world().findFleet(id).orElseThrow();
@@ -252,6 +301,15 @@ public final class ProductionUiProjector {
         }
         rows.put(Tab.SHIPS, List.copyOf(craftRows));
         var industry = new ArrayList<>(rows.get(Tab.INDUSTRY));
+        industry.addAll(GeneratedCampaignStationAcquisitionUi.rows(campaign));
+        industry.addAll(GeneratedCampaignMiningUi.rows(campaign));
+        industry.addAll(GeneratedCampaignManufacturingUi.rows(campaign));
+        industry.addAll(GeneratedCampaignConstructionUi.rows(campaign));
+        industry.addAll(GeneratedCampaignYardConstructionUi.rows(campaign));
+        industry.addAll(GeneratedCampaignModuleCustodyUi.rows(campaign));
+        industry.addAll(GeneratedCampaignProductTransportUi.rows(campaign));
+        industry.addAll(GeneratedCampaignRepairUi.rows(campaign));
+        industry.addAll(GeneratedCampaignRefitUi.rows(campaign));
         for (var demand : campaign.coordinator().recovery().replacementDemands()) {
             if (!demand.factionContentId().equals(viewerFactionId)) continue;
             industry.add(row("replacement:" + demand.id(), "Замещение потерянного корабля",
@@ -279,7 +337,7 @@ public final class ProductionUiProjector {
                 var issuer = npcState.npcs().stream()
                         .filter(npc -> npc.npcId().equals(mission.issuerNpcId())).findFirst().orElseThrow();
                 if (mission.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
-                        && !player.discoveredSystemIds().contains(issuer.locationSystemId())) continue;
+                        && !campaign.canContactNpc(issuer.npcId())) continue;
                 contacts.add(row("player-mission:" + mission.missionId(), label(mission.template().name()),
                         "Личные контракты", label(mission.status().name()),
                         List.of(InfoSection.of("Контракт игрока", "Выдаёт", label(issuer.nameKey()),
@@ -294,6 +352,17 @@ public final class ProductionUiProjector {
                                         "Проверка действий", "Предпросмотр ставит кампанию на паузу; затем подтвердите действие")),
                         "Stage 21H: существующий funded contract и PlayerState; награда переводится из эскроу, срок — общий simulation tick",
                         null, 0, mission.statusUpdatedTick()));
+                if (mission.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.ACCEPTED
+                        && mission.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.DISCOVERY_AT_LEAST) {
+                    contacts.add(row("pilot-report|" + mission.missionId(), "Передать личное открытие",
+                            "Отчёты по контрактам", "Получатель: " + label(issuer.nameKey()),
+                            List.of(InfoSection.of("Передача сведений", "Цель", missionObjectiveDescription(mission.objective()),
+                                    "Условия", "Активный контракт, достаточное собственное открытие и доступный получатель в системе личного корабля",
+                                    "Содержимое", "Только собственная наблюдённая запись; сведения других фракций не копируются",
+                                    "Оплата", "При подтверждении обычный владелец контракта проверит результат и выплатит награду из существующего эскроу")),
+                            "Собственный реестр открытий; обычный обмен сведениями Stage20G и получение факта NPC Stage21H",
+                            null, 0, mission.statusUpdatedTick()));
+                }
             }
             for (var reputation : npcState.reputations()) {
                 if (!reputation.subjectActorId().equals(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)) continue;
@@ -409,7 +478,7 @@ public final class ProductionUiProjector {
         for (var overlay : bounded.overlays()) {
             result.get(Tab.INTELLIGENCE).add(row("overlay:" + overlay.kind() + ":" + overlay.subjectId()
                             + ":" + overlay.actorId() + ":" + overlay.state(),
-                    label(overlay.kind()) + " — " + label(overlay.subjectId()), label(overlay.kind()),
+                    label(overlay.kind()) + " — " + overlaySubjectName(world, overlay.subjectId()), label(overlay.kind()),
                     label(overlay.state()), List.of(InfoSection.of("Наблюдение", "Состояние", label(overlay.state()),
                             "Доступность", label(overlay.visibility()), "Подробности", join(overlay.details()))),
                     overlay.authorityRef() + "; факты отфильтрованы существующей Stage 21 проекцией наблюдателя",
@@ -426,16 +495,45 @@ public final class ProductionUiProjector {
         }
         result.get(Tab.SETTINGS).add(row("session", "Кампания", "Сессия", "Пауза, скорость, сохранение и загрузка",
                 List.of(InfoSection.of("Управление", "Навигация", "F1–F7, Tab и Enter; Esc — назад; Ctrl+F — поиск",
-                        "Карты", "Колесо — масштаб; СКМ — панорама; Home — обзор; C — вернуться к объекту",
+                        "Карты", "Колесо — масштаб; СКМ — панорама; Home — обзор; C — выбранный объект; Ctrl+C / Мой корабль — активный личный корабль",
                         "Списки", "Стрелки — выбор; PgUp/PgDn — прокрутка; сортировка и фильтр — кнопки сверху",
                         "Сессия", "Пробел — пауза; 1/2/3/4 — скорость; F8/F9 — сохранение/загрузка")),
                 "Клавиши текущего production-клиента; переназначение и локализация принадлежат 23C", null, 0, world.worldTick()));
         result.get(Tab.SETTINGS).add(row("diagnostics", "Сведения о кампании", "Диагностика", "Версия и воспроизводимость",
                 List.of(InfoSection.of("Кампания", "Seed", Long.toString(world.worldSeed()),
                         "Такт", Long.toString(world.worldTick()), "Текущая система", world.activeSystemName(),
-                        "Формат", "M22.8 campaign v5")),
+                        "Формат", "M22.8 campaign v" + com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION)),
                 "Текущая сохранённая authority; содержимое сохранений и пользовательские пути здесь не показываются",
                 null, 0, world.worldTick()));
+        result.get(Tab.SETTINGS).add(row("glossary-physical", "Единицы и физические ограничения", "Справочник",
+                "Масса, скорость, энергия, мощность и время",
+                List.of(InfoSection.of("Физические величины", "кг", "Масса груза или расходника; свободный трюм и бак ограничивают загрузку",
+                        "м / км", "Расстояние; 1 км = 1000 м",
+                        "м/с", "Скорость; обычная стыковка требует не более 1 м/с и расстояния не более 1 км",
+                        "Н", "Сила тяги; ускорение зависит также от полной массы корабля",
+                        "Дж", "Запас энергии или накопленное тепло; это количество, а не скорость расхода",
+                        "Вт", "Мощность; 1 Вт = 1 Дж/с",
+                        "кг/с", "Скорость обработки массы; за такт доступна скорость, умноженная на длительность такта"),
+                        InfoSection.of("Время и маршрут", "Такт", "Один завершённый шаг симуляции; срок задания задаётся общим номером такта",
+                                "Секунды кампании", "Время симуляции; пауза его останавливает, скорость игры меняет темп относительно реального времени",
+                                "Время маршрута", "Расчёт перелёта; заправка, ожидание и обслуживание могут занять дополнительное время",
+                                "Неизвестная угроза", "Оценка неопределённости маршрута по доступной разведке; это не вероятность потери корабля")),
+                "Объяснение используемых единиц и обычных физических ограничений; текущие значения показаны в инспекторах объектов",
+                null, 0, 0));
+        result.get(Tab.SETTINGS).add(row("glossary-authority", "Деньги, сведения и подтверждение", "Справочник",
+                "Личное владение, наблюдение и причины отказов",
+                List.of(InfoSection.of("Деньги и сведения", "cr", "Кредиты; внутренние денежные суммы хранятся в тысячных долях кредита",
+                        "Эскроу", "Уже зарезервированная выдающим заданием сумма; выплата требует выполнения условий и подтверждённого участия",
+                        "Наблюдаемая фракция", "Выбирает доступные сведения; командные права определяются личным владением и принадлежностью",
+                        "Личное открытие", "Сохранённое свидетельство собственного наблюдения; известное положение не гарантирует текущие запасы",
+                        "Источник", "Объяснение происхождения показателя и границ доступных сведений в инспекторе"),
+                        InfoSection.of("Действия", "Предпросмотр", "Проверяет действие и ставит кампанию на паузу; результат применяется при подтверждении",
+                                "Устаревшее подтверждение", "Если состояние изменилось, заново запросите предпросмотр",
+                                "Нет ресурсов", "Проверьте деньги, фактический груз, совместимость модуля, ёмкость и доступ к станции",
+                                "Нет полномочий", "Проверьте личное владение активом и собственную фракционную принадлежность",
+                                "Нет сведений", "Отсутствие наблюдения не означает нулевое значение")),
+                "Объяснение существующих правил владения, сохранённого знания и проверяемых команд; прав или ресурсов не выдаёт",
+                null, 0, 0));
         return result;
     }
 
@@ -456,6 +554,19 @@ public final class ProductionUiProjector {
                 .map(GalaxyStrategicMapSnapshot.FactionView::displayName).findFirst().orElse(label(id));
     }
 
+    private static String overlaySubjectName(GeneratedWorldUiSnapshot world, String id) {
+        String prefix = "StarSystemId[value=";
+        if (id.startsWith(prefix) && id.endsWith("]")) {
+            try {
+                long value = Long.parseLong(id.substring(prefix.length(), id.length() - 1));
+                return world.galaxy().systems().stream().filter(system -> system.id().value() == value)
+                        .map(system -> system.name()).findFirst().orElse("Неизвестная система");
+            } catch (NumberFormatException invalid) { return "Неизвестная система"; }
+        }
+        if (id.startsWith("faction.")) return factionName(world, id);
+        return label(id);
+    }
+
     private static String join(List<String> values) {
         return values.isEmpty() ? "Нет сведений" : String.join("; ", values.stream().map(ProductionUiProjector::label).toList());
     }
@@ -463,6 +574,12 @@ public final class ProductionUiProjector {
     private static String missionObjectiveDescription(com.spacesim.world.Stage21HNpcMissionState.MissionObjective objective) {
         String target = label(objective.kind().name());
         return switch (objective.kind()) {
+            case PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> {
+                var commodity = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault().findCommodity(objective.requiredState());
+                yield "Продать получателю одной поставкой не менее " + objective.threshold() + " кг: "
+                        + (commodity == null ? "назначенный товар" : commodity.displayName())
+                        + ". Груз должен происходить из другого источника. После принятия должен пройти хотя бы один такт; покупка у получателя не учитывается";
+            }
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST -> "Доставить по назначенному транспортному контракту не менее " + objective.threshold() + " кг";
             case FLEET_REACTION_MASS_KG_AT_LEAST -> "Пополнить реакционную массу назначенного корабля до " + objective.threshold() + " кг";
             case DERELICT_DISCOVERED_AND_SALVAGED_KG_AT_LEAST -> "Обнаружить назначенные обломки и извлечь не менее " + objective.threshold() + " кг";
@@ -508,6 +625,7 @@ public final class ProductionUiProjector {
             case "MARKET_ACCESS" -> "Доступ к рынку";
             case "TERRITORIAL_CLAIM" -> "Территориальная претензия";
             case "TERRITORIAL_CONTROL" -> "Контроль территории";
+            case "CONTROLLED" -> "Под контролем";
             case "DISCOVERY" -> "Открытие";
             case "NONE" -> "Нет";
             default -> value.replace('_', ' ').replace(':', ' ').replace('.', ' ').strip();

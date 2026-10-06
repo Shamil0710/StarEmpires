@@ -81,6 +81,7 @@ public final class Stage21HPlayerMissionAuthority {
         PlayerState checkedPlayer = Objects.requireNonNull(player, "Player contractor state not set");
         MissionObjective checkedObjective = Objects.requireNonNull(objective, "Mission objective not set");
         return switch (checkedObjective.kind()) {
+            case PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST -> new Observation(Result.NOT_PROVEN, "personal-supply.requires-one-use-physical-receipt");
             case FREIGHT_ORDER_DELIVERED_KG_AT_LEAST ->
                     freightParticipation(freight, checkedPlayer, checkedObjective);
             case FLEET_PRESENT_IN_SYSTEM ->

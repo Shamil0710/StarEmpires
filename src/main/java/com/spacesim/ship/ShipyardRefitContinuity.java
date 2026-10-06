@@ -131,6 +131,81 @@ public final class ShipyardRefitContinuity {
                 reconciled.installedMaintenance(), reconciled.removedModules());
     }
 
+    /**
+     * Checks that a completion still describes the actual ship before any live mutation.
+     *
+     * @param completion settled continuity handoff
+     * @param sourceFit current installed fit
+     * @param sourceDamage current physical damage
+     * @param sourceMaintenance current module service ages
+     * @throws IllegalArgumentException if the hull or module condition has changed
+     */
+    public static void validateSource(
+            Completion completion,
+            InstalledFit sourceFit,
+            Snapshot sourceDamage,
+            MaintenanceState sourceMaintenance) {
+        validateSource(completion, sourceFit, sourceDamage, sourceMaintenance, Map.of());
+    }
+
+    /**
+     * Reconciles an already settled handoff with exact used incoming equipment.
+     * @param completion settled original handoff
+     * @param sourceFit actual source fitting
+     * @param incoming exact incoming conditions by changed target mount
+     * @return handoff retaining incoming damage and age, without altering removed hardware
+     */
+    public static Completion withIncomingConditions(Completion completion, InstalledFit sourceFit,
+            Map<String, RemovedModuleState> incoming) {
+        var adjusted = installIncoming(new ReconciledState(completion.installedDamage(), completion.installedMaintenance(),
+                completion.removedModules()), sourceFit, completion.fit(), incoming);
+        return new Completion(completion.assetId(), completion.fit(), adjusted.installedDamage(),
+                adjusted.installedMaintenance(), adjusted.removedModules());
+    }
+
+    /**
+     * Validates source continuity including exact individually supplied incoming conditions.
+     * @param completion settled handoff
+     * @param sourceFit actual source fit
+     * @param sourceDamage current source damage
+     * @param sourceMaintenance current source service ages
+     * @param incoming paid used equipment by changed target mount
+     */
+    public static void validateSource(Completion completion, InstalledFit sourceFit, Snapshot sourceDamage,
+            MaintenanceState sourceMaintenance, Map<String, RemovedModuleState> incoming) {
+        Objects.requireNonNull(completion, "completion");
+        Objects.requireNonNull(sourceFit, "sourceFit");
+        Objects.requireNonNull(sourceDamage, "sourceDamage");
+        Objects.requireNonNull(sourceMaintenance, "sourceMaintenance");
+        if (!sourceFit.hullId().equals(completion.fit().hullId())) {
+            throw new IllegalArgumentException("refit cannot replace the physical hull");
+        }
+        ReconciledState current = installIncoming(reconcile(sourceFit, completion.fit(), sourceDamage, sourceMaintenance),
+                sourceFit, completion.fit(), incoming);
+        if (!current.installedDamage().equals(completion.installedDamage())
+                || !current.installedMaintenance().equals(completion.installedMaintenance())
+                || !current.removedModules().equals(completion.removedModules())) {
+            throw new IllegalArgumentException("refit completion no longer matches physical module condition");
+        }
+    }
+
+    private static ReconciledState installIncoming(ReconciledState base, InstalledFit source, InstalledFit target,
+            Map<String, RemovedModuleState> incoming) {
+        Objects.requireNonNull(incoming); var before = byMount(source); var after = byMount(target);
+        var damage = new TreeMap<>(base.installedDamage().moduleDamage().moduleIntegrityByMount());
+        var ages = new TreeMap<>(base.installedMaintenance().secondsSinceServiceByMount());
+        incoming.forEach((mount, condition) -> {
+            Objects.requireNonNull(condition); var assignment = after.get(mount); var old = before.get(mount);
+            if (assignment == null || !assignment.moduleId().equals(condition.assignment().moduleId())
+                    || old != null && old.moduleId().equals(assignment.moduleId()))
+                throw new IllegalArgumentException("Incoming used condition requires a changed matching target module");
+            if (condition.integrity() < 1) damage.put(mount, condition.integrity()); else damage.remove(mount);
+            ages.put(mount, condition.secondsSinceService());
+        });
+        return new ReconciledState(new Snapshot(base.installedDamage().compartmentIntegrityById(), new DamageState(damage)),
+                new MaintenanceState(ages), base.removedModules());
+    }
+
     private static ReconciledState reconcile(
             InstalledFit sourceFit,
             InstalledFit targetFit,
