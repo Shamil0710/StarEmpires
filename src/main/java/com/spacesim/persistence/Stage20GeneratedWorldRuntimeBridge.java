@@ -125,7 +125,15 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
     }
 
-    /** Materializes explicit initial NPC loadouts; restoration never invokes this policy. */
+    /**
+     * Materializes explicit initial NPC loadouts; restoration never invokes this policy.
+     * @param campaign exact accepted Stage-20K campaign
+     * @param specialization exact accepted Stage-20F operating authority
+     * @param world ordinary live world with the exact generated topology
+     * @param products explicit ordinary Stage-18 manufactured-product vocabulary
+     * @param reservePolicy authored initial NPC reserve loadouts
+     * @return composed live generated-world runtime with the selected initial manifest
+     */
     public static LiveRuntime materializeBootstrap(
             Stage20GeneratedCampaignPersistentState campaign, OperationalSpecializationReport specialization,
             WorldSimulation world, Stage18ManufacturingProductRegistry products,

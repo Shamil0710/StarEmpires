@@ -67,7 +67,12 @@ public final class GeneratedCampaignSession {
         return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
     }
 
-    /** Starts explicit new-game capital loadouts without reconfiguring resumed assets. */
+    /**
+     * Starts explicit new-game capital loadouts without reconfiguring resumed assets.
+     * @param rootSeed deterministic new-campaign seed
+     * @param reservePolicy authored initial NPC reserve loadouts
+     * @return ordinary campaign session with the selected initial manifest
+     */
     public static GeneratedCampaignSession create(long rootSeed,
             com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
         var generated = Stage20PlayableGeneratedWorldFactory.create(rootSeed, reservePolicy);

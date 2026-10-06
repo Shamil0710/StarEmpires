@@ -90,7 +90,12 @@ public final class GeneratedCampaignCoordinator {
         return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
     }
 
-    /** Creates explicit new-game asset manifests; restore retains its accepted exact checkpoint. */
+    /**
+     * Creates explicit new-game asset manifests; restore retains its accepted exact checkpoint.
+     * @param rootSeed deterministic new-campaign seed
+     * @param reservePolicy authored initial NPC reserve loadouts
+     * @return ordinary coordinator with the selected initial manifest
+     */
     public static GeneratedCampaignCoordinator create(long rootSeed,
             com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
         GeneratedCampaignSession initial = GeneratedCampaignSession.create(rootSeed, reservePolicy);

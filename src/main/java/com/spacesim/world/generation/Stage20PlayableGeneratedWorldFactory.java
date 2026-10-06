@@ -102,7 +102,12 @@ public final class Stage20PlayableGeneratedWorldFactory {
         return create(rootSeed, com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE);
     }
 
-    /** Creates explicit initial NPC loadouts; supported saves retain their exact stored fleet. */
+    /**
+     * Creates explicit initial NPC loadouts; supported saves retain their exact stored fleet.
+     * @param rootSeed deterministic new-campaign seed
+     * @param reservePolicy authored initial NPC reserve loadouts
+     * @return live generated-world runtime plus immutable bootstrap authority
+     */
     public static GeneratedWorld create(long rootSeed,
             com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
         BootstrapFixture fixture = operationalFixture(rootSeed);
