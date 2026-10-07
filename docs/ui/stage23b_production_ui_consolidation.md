@@ -15,6 +15,35 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — paid station navigation charts
+
+`BUY_STATION_MAP` copies a contacted dispatcher's existing civilian station record for 100 credits,
+paid from the personal wallet into the existing operator treasury. Admission validates the archived
+identity and classification against the common infrastructure endpoint registry, including logistics
+hubs rather than only commissioned industrial stations. It never supplies a missing archive row
+from truth coordinates. The transfer preserves the original observation time and freshness; it adds
+only the station's system and grants no assets, stock visibility or remote trading rights.
+
+Contacts now exposes station-chart offers and their count in the dispatcher service overview.
+Unpaid rows have no map focus or coordinates. Keyboard purchase uses the same immutable preview,
+explicit confirmation and stale/foreign-runtime rejection as resource maps. The journal records the
+actual conserved charge; existing native v16 fields persist the copied static knowledge without a
+layout change or load-time grant. Purchasing an already known coordinate is refused.
+
+`GeneratedCampaignStationMapPurchaseTest,GeneratedCampaignResourceMapPurchaseTest,GeneratedCampaignNpcPlacementTest,ProductionUiCampaignIntegrationTest`
+passed 8 tests without failures/errors (`target/stage23b-station-map-validation.log`). The finalized
+station test uses untouched initial seed-1 archives and asserts that the offered coordinate is absent
+from personal knowledge. The only fixture is the physical berth; station reports, funding and assets
+are not supplied. It checks conserved payment, unchanged operator evidence, ownership, refusal of
+remote trading, journal charge, duplicate/stale/foreign confirmation and exact native restoration.
+
+The RTX 4070 station-map mode of `Stage23BSoftwareGraphicsSmoke` loads the existing contact fixture
+without editing its archives, purchases the chart with keyboard controls, saves/loads it exactly and
+focuses the actual known station marker. Offer/marker screenshots were visually inspected; the
+marker shows the archived time and withholds private inventory/equipment. Strict Javadoc passed.
+This is transactional and graphical evidence, not proof of ordinary travel to the seller. The separate
+long physical resource-map journey remains active and unproven until its endpoint check succeeds.
+
 ### 2026-10-07 — local dispatcher service overview and ordinary map probe
 
 The Contacts surface now lists a dispatcher conversation only while the personal ship is

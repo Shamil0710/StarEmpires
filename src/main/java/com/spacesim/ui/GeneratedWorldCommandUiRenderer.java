@@ -658,6 +658,12 @@ public final class GeneratedWorldCommandUiRenderer {
     /** @param map whether the selected contact offers a paid archived resource map */
     public void bindPilotResourceMapAction(boolean map) { physicalPilotResourceMap = map; }
     private boolean physicalPilotResourceMap;
+    /**
+     * Binds the station-map purchase button for the current contact selection.
+     * @param map whether an actual station-map offer is selected
+     */
+    public void bindPilotStationMapAction(boolean map) { physicalPilotStationMap = map; }
+    private boolean physicalPilotStationMap;
     /** @param supply whether the selected row supplies an existing installed interface */
     public void bindPilotSupplyAction(boolean supply) { physicalPilotSupply = supply; }
     private String physicalPilotAssetAction = "";
@@ -719,6 +725,10 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         if (physicalPilotResourceMap) {
             ids = new String[]{"pilot.buy-resource-map"}; labels = new String[]{"КУПИТЬ КАРТУ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (physicalPilotStationMap) {
+            ids = new String[]{"pilot.buy-station-map"}; labels = new String[]{"КУПИТЬ КАРТУ"};
             width = inspectorRect.width() - 32f * scale;
         }
         if (!physicalPilotMining.isEmpty()) {

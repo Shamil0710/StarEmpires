@@ -340,6 +340,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "pilot.cancel-manufacturing" -> previewPilotPhysical("CANCEL_MANUFACTURING");
             case "pilot.report-discovery" -> previewPilotPhysical("REPORT_DISCOVERY");
             case "pilot.buy-resource-map" -> previewPilotPhysical("BUY_RESOURCE_MAP");
+            case "pilot.buy-station-map" -> previewPilotPhysical("BUY_STATION_MAP");
             case "pilot.dock" -> previewPilotPhysical("DOCK");
             case "pilot.undock" -> previewPilotPhysical("UNDOCK");
             case "pilot.buy" -> previewPilotPhysical("BUY");
@@ -442,13 +443,17 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 && pieces[0].equals("pilot-station-purchase") && pieces.length == 2;
         boolean resourceMap = workspace.tab() == Tab.CONTACTS && pieces.length == 3
                 && pieces[0].equals("pilot-resource-map") && action.equals("BUY_RESOURCE_MAP");
+        boolean stationMap = workspace.tab() == Tab.CONTACTS && pieces.length == 3
+                && pieces[0].equals("pilot-station-map") && action.equals("BUY_STATION_MAP");
         boolean market = workspace.tab() == Tab.LOGISTICS && (pieces[0].equals("pilot-station") || pieces[0].equals("pilot-market"));
-        if (pieces.length < 2 || !(jump || market || asset || finance || supply || report || resourceMap || mining || manufacturing || construction || journal || repair || refit || moduleTransfer || productTransfer)) return false;
+        if (pieces.length < 2 || !(jump || market || asset || finance || supply || report || resourceMap || stationMap || mining || manufacturing || construction || journal || repair || refit || moduleTransfer || productTransfer)) return false;
         campaign.coordinator().setPaused(true);
         pendingPilotSelection = id;
         pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", manufacturing ? 1 : pilotKilograms);
-        if (resourceMap) {
-            status = pendingPilotPhysical.allowed() ? "Подтвердите оплату 100 кредитов: оператор передаст существующую карту участка. Новых измерений нет."
+        if (resourceMap || stationMap) {
+            status = pendingPilotPhysical.allowed() ? stationMap
+                    ? "Подтвердите оплату 100 кредитов: оператор передаст архивную карту станции. Владение и доступ к услугам сохраняются."
+                    : "Подтвердите оплату 100 кредитов: оператор передаст существующую карту участка. Новых измерений нет."
                     : "Передача недоступна: проверьте контакт, архив оператора и личные средства.";
             refreshProjection(); return true;
         }
@@ -793,6 +798,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindPilotReportAction(selectedReport);
         boolean selectedResourceMap = workspace.tab() == Tab.CONTACTS && selectedPilot.startsWith("pilot-resource-map|");
         renderer.bindPilotResourceMapAction(selectedResourceMap);
+        boolean selectedStationMap = workspace.tab() == Tab.CONTACTS && selectedPilot.startsWith("pilot-station-map|");
+        renderer.bindPilotStationMapAction(selectedStationMap);
         String miningAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-mining|") ? "START_MINING"
                 : selectedPilot.startsWith("pilot-mining-stop|") ? "STOP_MINING" : "" : "";
         renderer.bindPilotMiningAction(miningAction);
@@ -823,7 +830,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         boolean selectedJournal = workspace.tab() == Tab.HISTORY && selectedPilot.startsWith("pilot-journal|");
         renderer.bindPilotJournalAction(selectedJournal);
         renderer.bindPersonalNotificationCount(campaign.playerJournal().unreadCount());
-        renderer.bindPhysicalPilotActions(selectedJournal || foundation || finance || selectedJump || selectedSupply || selectedReport || selectedResourceMap || !productTransferAction.isEmpty() || !moduleTransferAction.isEmpty() || !repairAction.isEmpty() || !refitAction.isEmpty() || !manufacturingAction.isEmpty() || !miningAction.isEmpty() || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
+        renderer.bindPhysicalPilotActions(selectedJournal || foundation || finance || selectedJump || selectedSupply || selectedReport || selectedResourceMap || selectedStationMap || !productTransferAction.isEmpty() || !moduleTransferAction.isEmpty() || !repairAction.isEmpty() || !refitAction.isEmpty() || !manufacturingAction.isEmpty() || !miningAction.isEmpty() || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-station|")),
                 selectedPilot.startsWith("pilot-market|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
                         : pendingPilotPhysical != null && pendingPilotPhysical.allowed(), pilotKilograms);
         if (!selectedPilot.equals(pendingGovernmentSelection)) pendingGovernment = null;

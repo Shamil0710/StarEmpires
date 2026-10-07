@@ -316,6 +316,7 @@ public class Stage23BSoftwareGraphicsSmoke {
   System.out.println("Actual ordinary mining checkpoint graphical load/known resource focus passed; no geometry or equipment fixture");
  }
  static void resourceMap(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
+  boolean stationMap=Boolean.getBoolean("stage23b.stationMapOnly");
   var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-resource-map-fixture.s25"));
   com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
   processor.keyDown(Input.Keys.F9);game.render();
@@ -332,14 +333,14 @@ public class Stage23BSoftwareGraphicsSmoke {
   selectRow(workspace,game,conversation.selection().stableId());
   screenshot("stage23b-dispatcher-conversation");
   if(!conversationBefore.equals(campaign(game).captureState()))throw new AssertionError("Dispatcher conversation changed authority");
-  var offer=com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game)).get(0);
+  var offer=(stationMap?com.spacesim.ui.GeneratedCampaignStationMapUi.rows(campaign(game)):com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game))).get(0);
   selectRow(workspace,game,offer.selection().stableId());
   String[] parts=offer.selection().stableId().split("\\|",-1);
   var npc=campaign(game).coordinator().npcMissions().npcs().stream().filter(n->n.npcId().equals(parts[1])).findFirst().orElseThrow();
   var archived=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(npc.factionContentId()).entries().stream().filter(k->k.object().objectId().equals(parts[2])).findFirst().orElseThrow();
   var before=campaign(game).captureState();long wallet=campaign(game).playerState().orElseThrow().walletMilliCredits();
   long treasury=campaign(game).coordinator().runtime().world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits();
-  screenshot("stage23b-resource-map-offer");keyboardAction(renderer,game,"pilot.buy-resource-map");
+  screenshot(stationMap?"stage23b-station-map-offer":"stage23b-resource-map-offer");keyboardAction(renderer,game,stationMap?"pilot.buy-station-map":"pilot.buy-resource-map");
   if(!before.equals(campaign(game).captureState()))throw new AssertionError("Map preview changed live state");
   keyboardAction(renderer,game,"pilot.physical-confirm");
   var received=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).knowledge(archived.object()).orElseThrow();
@@ -351,13 +352,13 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(!purchased.equals(campaign(game).captureState()))throw new AssertionError("Paid map lost on actual UI save/load");
   hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INTELLIGENCE).findFirst().orElseThrow());game.render();
-  String intel="personal-resource:"+archived.object().systemId().value()+":"+archived.object().kind()+":"+archived.object().objectId();
+  String intel=stationMap?"station:"+archived.object().objectId():"personal-resource:"+archived.object().systemId().value()+":"+archived.object().kind()+":"+archived.object().objectId();
   selectRow(workspace,game,intel);keyboardAction(renderer,game,"focus");
   if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
-    ||!workspace.view().selection().stableId().equals("resource:"+archived.object().objectId()))throw new AssertionError("Paid resource coordinate did not focus the actual local marker");
-  screenshot("stage23b-resource-map-known-marker");
-  if(campaign(game).canPurchaseResourceMap(parts[1],parts[2])||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
-  System.out.println("Resource map keyboard preview/payment/native save/load/known resource focus passed; only contact geometry is a fixture");
+    ||!workspace.view().selection().stableId().equals((stationMap?"station:":"resource:")+archived.object().objectId()))throw new AssertionError("Paid map coordinate did not focus the actual local marker");
+  screenshot(stationMap?"stage23b-station-map-known-marker":"stage23b-resource-map-known-marker");
+  if((stationMap?campaign(game).canPurchaseStationMap(parts[1],parts[2]):campaign(game).canPurchaseResourceMap(parts[1],parts[2]))||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
+  System.out.println((stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; only contact geometry is a fixture");
  }
  static void run(String[] args) throws Exception {
   GL.createCapabilities(); System.out.println("Renderer: "+GL11.glGetString(GL11.GL_RENDERER));
@@ -374,8 +375,8 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(System.getProperty("stage23b.ordinaryMiningCheckpoint")!=null){
    ordinaryMiningLoad(game,pendingSave);game.dispose();System.out.println("Ordinary mining checkpoint graphical probe passed");return;
   }
-  if(Boolean.getBoolean("stage23b.resourceMapOnly")){
-   resourceMap(game,pendingSave);game.dispose();System.out.println("Resource map graphical probe passed");return;
+  if(Boolean.getBoolean("stage23b.resourceMapOnly")||Boolean.getBoolean("stage23b.stationMapOnly")){
+   resourceMap(game,pendingSave);game.dispose();System.out.println("Archived map graphical probe passed");return;
   }
   if(Boolean.getBoolean("stage23b.repairOnly")){
    var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);

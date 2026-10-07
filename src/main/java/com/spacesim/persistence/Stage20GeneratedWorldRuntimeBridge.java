@@ -871,6 +871,25 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         public ResourceMapTransfer previewResourceMap(String seller,
                 com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String receiptId) {
             if (!object.resourceObject()) throw new IllegalArgumentException("Not a resource map");
+            return previewArchivedMap(seller, object, receiptId);
+        }
+
+        /**
+         * Prevalidates a copy of an existing static station record without refreshing its evidence.
+         * @param seller existing archive owner
+         * @param object exact infrastructure reference
+         * @param receiptId durable paid-map provenance
+         * @return exact current archive transfer, without mutation
+         */
+        public ResourceMapTransfer previewStationMap(String seller,
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String receiptId) {
+            if (object.kind() != com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE)
+                throw new IllegalArgumentException("Not a station map");
+            return previewArchivedMap(seller, object, receiptId);
+        }
+
+        private ResourceMapTransfer previewArchivedMap(String seller,
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String receiptId) {
             var source = discovery.knowledgeFor(seller).knowledge(object).orElseThrow();
             if (source.knownLocation().isEmpty()) throw new IllegalStateException("Seller has no resource coordinate");
             var evidence = source.evidence().stream().max(java.util.Comparator.comparingDouble(
@@ -889,7 +908,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             return new ResourceMapTransfer(this, discovery, candidate);
         }
 
-        /** Exact-archive single-use resource transfer; it contains no new physical measurements. */
+        /** Exact-archive single-use map transfer; it contains no new physical measurements. */
         public static final class ResourceMapTransfer {
             private final LiveRuntime owner;
             private final Stage20DiscoveryPersistentState baseline, candidate;

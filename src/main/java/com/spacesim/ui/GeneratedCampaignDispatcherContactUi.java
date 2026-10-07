@@ -24,6 +24,8 @@ public final class GeneratedCampaignDispatcherContactUi {
             if (!npc.npcId().startsWith("npc.stage23b.dispatcher:") || !campaign.canContactNpc(npc.npcId())) continue;
             long maps = runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
                     .filter(e -> campaign.canPurchaseResourceMap(npc.npcId(), e.object().objectId())).count();
+            long stations = runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
+                    .filter(e -> campaign.canPurchaseStationMap(npc.npcId(), e.object().objectId())).count();
             long offers = state.missions().stream().filter(m -> m.issuerNpcId().equals(npc.npcId())
                     && m.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED).count();
             result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
@@ -31,7 +33,9 @@ public final class GeneratedCampaignDispatcherContactUi {
                     List.of(InfoSection.of("Услуги диспетчера", "Ресурсные карты", maps == 0
                                     ? "Новых карт для вас нет" : maps + " — выберите карту в списке контактов",
                             "Цена карты", "100 кредитов из личного кошелька",
-                            "Сведения карты", "Архивное положение участка и подтверждённый образец; время наблюдения сохраняется",
+                            "Карты станций", stations == 0 ? "Новых карт станций для вас нет"
+                                    : stations + " — выберите навигационную карту в списке контактов",
+                            "Сведения ресурсной карты", "Архивное положение участка и подтверждённый образец; время наблюдения сохраняется",
                             "Предложения работы", offers == 0 ? "Доступных предложений нет"
                                     : offers + " — выберите контракт в списке контактов",
                             "Получение сведений", "Откройте предложение, проверьте условия и подтвердите действие")),
