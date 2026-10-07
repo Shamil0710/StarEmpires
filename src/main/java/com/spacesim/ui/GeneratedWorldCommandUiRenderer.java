@@ -655,6 +655,9 @@ public final class GeneratedWorldCommandUiRenderer {
     public void bindPilotMiningAction(String action) { physicalPilotMining = action; }
     /** @param report whether the selected row submits a personal discovery report */
     public void bindPilotReportAction(boolean report) { physicalPilotReport = report; }
+    /** @param map whether the selected contact offers a paid archived resource map */
+    public void bindPilotResourceMapAction(boolean map) { physicalPilotResourceMap = map; }
+    private boolean physicalPilotResourceMap;
     /** @param supply whether the selected row supplies an existing installed interface */
     public void bindPilotSupplyAction(boolean supply) { physicalPilotSupply = supply; }
     private String physicalPilotAssetAction = "";
@@ -712,6 +715,10 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         if (physicalPilotReport) {
             ids = new String[]{"pilot.report-discovery"}; labels = new String[]{"ПЕРЕДАТЬ ОТЧЁТ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (physicalPilotResourceMap) {
+            ids = new String[]{"pilot.buy-resource-map"}; labels = new String[]{"КУПИТЬ КАРТУ"};
             width = inspectorRect.width() - 32f * scale;
         }
         if (!physicalPilotMining.isEmpty()) {

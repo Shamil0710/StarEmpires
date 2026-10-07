@@ -87,8 +87,8 @@ public final class GeneratedWorldFreightAutopilot {
                                         remainingCapacityKg,
                                         elapsedSimulationSeconds);
                                 if (extractionRequestKg > MASS_EPSILON_KG) {
-                                    var extraction = runtime.extract(
-                                            outpost.site().siteId(), extractionRequestKg,
+                                    var extraction = runtime.extractForFreighter(
+                                            fleet.fleetId(), outpost.site().siteId(), extractionRequestKg,
                                             elapsedSimulationSeconds);
                                     if (extraction.committed() && extraction.outputMassStoredKg() > 0d) {
                                         var staged = runtime.transferOutpostToOrderSource(

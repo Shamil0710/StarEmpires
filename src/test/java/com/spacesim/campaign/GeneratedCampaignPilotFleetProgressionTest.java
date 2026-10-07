@@ -13,6 +13,7 @@ class GeneratedCampaignPilotFleetProgressionTest {
         var c = started(); var r = c.coordinator().runtime(); var world = r.world();
         var target = reserve(c); dock(c);
         var baseline = c.captureState(); long fleetCount = world.getFleetPlacements().size();
+        var discoveryBefore = r.discoveryState();
         long treasury = world.findFactionEconomicState(target.stableFactionId()).orElseThrow().treasuryMilliCredits();
         var preview = c.previewPilotAction("PURCHASE", Long.toString(target.fleetId().value()), "", 0);
         assertTrue(preview.allowed()); assertEquals(-25_000_000L, preview.walletChangeMilliCredits());
@@ -25,6 +26,7 @@ class GeneratedCampaignPilotFleetProgressionTest {
         assertEquals(active, c.playerState().orElseThrow().activeFleetId());
         assertEquals(2, c.playerState().orElseThrow().ownedFleetIds().size());
         assertEquals(target, r.freight().findFreighter(target.fleetId()).orElseThrow());
+        assertEquals(discoveryBefore, r.discoveryState(), "Buying another local hull must not refresh known station reports");
         var receipt = c.playerJournal().entries().get(c.playerJournal().entries().size() - 1);
         assertEquals("PURCHASE", receipt.action()); assertEquals(target.fleetId().value(), receipt.fleetId());
         assertEquals(-25_000_000L, receipt.walletDeltaMilliCredits()); assertEquals(1, receipt.quantity());

@@ -18,6 +18,18 @@ public final class PersonalResourceUiProjection {
     private PersonalResourceUiProjection() { throw new AssertionError("No instances"); }
 
     /**
+     * Resolves an observed occurrence row to its existing local resource marker.
+     * Coordinate access remains controlled by the row's saved observation, not by this identifier.
+     * @param stableId selected intelligence row identity
+     * @return local marker identity for occurrences, otherwise the original selection
+     */
+    public static String localObjectId(String stableId) {
+        String[] parts = Objects.requireNonNull(stableId).split(":", 4);
+        return parts.length == 4 && parts[0].equals("personal-resource") && parts[2].equals("RESOURCE_OCCURRENCE")
+                ? "resource:" + parts[3] : stableId;
+    }
+
+    /**
      * Lists only resource observations actually retained by the player, using the same values
      * as the local inspector. No physical world state is consulted to fill missing knowledge.
      * @param knowledge actual personal knowledge owner

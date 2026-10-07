@@ -719,7 +719,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
         /**
          * Receives permitted static station rows from the actual seller's existing archive.
-         * The campaign calls this only after its conserved new-game ship sale; no source position
+         * The campaign calls this only after its conserved local ship sale; no source position
          * or missing archive record is synthesized from generated truth.
          * @param player actual buyer owning the purchased local fleet
          * @param purchasedFleet purchased existing fleet
@@ -731,7 +731,12 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 com.spacesim.player.PlayerState player, FleetId purchasedFleet, String seller,
                 List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> permitted) {
             Objects.requireNonNull(player); Objects.requireNonNull(purchasedFleet); Objects.requireNonNull(seller);
-            if (!player.ownedFleetIds().contains(purchasedFleet) || !purchasedFleet.equals(player.activeFleetId())
+            var activePlacement = world.findFleet(player.activeFleetId());
+            var purchasedPlacement = world.findFleet(purchasedFleet);
+            if (!player.ownedFleetIds().contains(purchasedFleet)
+                    || !player.ownedFleetIds().contains(player.activeFleetId())
+                    || activePlacement.isEmpty() || purchasedPlacement.isEmpty()
+                    || !activePlacement.orElseThrow().systemId().equals(purchasedPlacement.orElseThrow().systemId())
                     || world.findFactionEconomicState(seller).isEmpty()
                     || !freight.findFreighter(purchasedFleet).orElseThrow().stableFactionId().equals(seller))
                 throw new IllegalArgumentException("Station briefing requires its actual purchased ship and faction seller");
@@ -748,6 +753,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 var known = archive.entries().stream().filter(e -> e.object().equals(ref) && e.knownLocation().isPresent()).findFirst();
                 if (station.isEmpty() || known.isEmpty()
                         || !known.orElseThrow().classificationId().equals(java.util.Optional.of(station.orElseThrow().stationArchetypeId()))) continue;
+                if (personal.knowledge(ref).filter(k -> k.knownLocation().isPresent()).isPresent()) continue;
                 personal = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(personal,
                         new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(ref,
                                 com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
@@ -805,6 +811,112 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 double durationSeconds) {
             return industry.sourceOutposts().extract(
                     siteId, requestedSourceMassKg, durationSeconds);
+        }
+
+        /**
+         * Extracts for an existing local freight order and delivers its source operator's report.
+         * Only a recovered physical sample publishes a position; reserve and grade remain unknown.
+         * @param fleetId actual order-owning local freighter
+         * @param siteId commissioned extraction site supplying the order
+         * @param requestedSourceMassKg finite gross sample request
+         * @param durationSeconds elapsed extraction interval
+         * @return ordinary physical extraction result
+         */
+        public ExtractionResult extractForFreighter(FleetId fleetId, String siteId,
+                double requestedSourceMassKg, double durationSeconds) {
+            var fleet = freight.findFreighter(fleetId).orElseThrow();
+            if (fleet.phase() != FreightPhase.AT_SOURCE)
+                throw new IllegalStateException("Source report requires an assigned collection order");
+            var order = freight.findOrder(fleet.activeOrderId()).orElseThrow();
+            var placement = world.findFleet(fleetId).orElseThrow();
+            var outpost = industry.sourceOutposts().outpost(siteId);
+            if (fleet.phase() != FreightPhase.AT_SOURCE || placement.locationKind() != FleetLocationKind.IN_SYSTEM
+                    || !placement.systemId().equals(outpost.site().systemId())
+                    || !order.orderedSystems().get(0).equals(placement.systemId())
+                    || !order.commodityId().equals(outpost.source().sourceState().outputCommodityId()))
+                throw new IllegalStateException("Source report requires the actual local collection order");
+            var source = outpost.source();
+            String owner = fleet.stableFactionId();
+            var prior = discovery.knowledgeFor(owner);
+            var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
+                    com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, source.sourceId());
+            if (prior.knowledge(object).stream().anyMatch(k -> k.resourceKnowledge().level().ordinal()
+                    >= com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION.ordinal()))
+                return extract(siteId, requestedSourceMassKg, durationSeconds);
+            double seconds = world.getAuthoritativeWorldTick()
+                    * (double) world.findSession(placement.systemId()).orElseThrow().getClock().getFixedStepSeconds();
+            var observed = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                            com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                            Optional.of(prior.knowledge(object).flatMap(k -> k.classificationId()).orElse(order.commodityId())), Optional.of(source.position()),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION,
+                                    Optional.empty(), Optional.empty()),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PURCHASED_OR_SHARED_MAP_DATA,
+                                    "freight-extraction-report:" + order.orderId() + ':' + siteId, seconds, java.util.OptionalDouble.empty())));
+            var result = extract(siteId, requestedSourceMassKg, durationSeconds);
+            if (result.committed() && result.outputMassStoredKg() > 0d) replaceDiscoveryOwner(observed);
+            return result;
+        }
+
+        /**
+         * Copies a seller's existing resource observation without consulting physical source truth.
+         * The campaign validates contact and settles the disclosed price before adopting the result.
+         * @param seller existing archive owner
+         * @param object exact observed resource
+         * @param receiptId durable paid-report provenance
+         * @return runtime-bound exact-archive transfer, without mutation
+         */
+        public ResourceMapTransfer previewResourceMap(String seller,
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String receiptId) {
+            if (!object.resourceObject()) throw new IllegalArgumentException("Not a resource map");
+            var source = discovery.knowledgeFor(seller).knowledge(object).orElseThrow();
+            if (source.knownLocation().isEmpty()) throw new IllegalStateException("Seller has no resource coordinate");
+            var evidence = source.evidence().stream().max(java.util.Comparator.comparingDouble(
+                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence::observedAtSeconds)).orElseThrow();
+            var prior = discovery.knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+            var next = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object, source.state(),
+                            source.classificationId(), source.knownLocation(), source.resourceKnowledge(),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PURCHASED_OR_SHARED_MAP_DATA,
+                                    receiptId, evidence.observedAtSeconds(), evidence.freshUntilSeconds())));
+            var states = new ArrayList<>(discovery.knowledgeStates());
+            states.removeIf(state -> state.ownerId().equals(next.ownerId())); states.add(next);
+            var candidate = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                    discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
+            return new ResourceMapTransfer(this, discovery, candidate);
+        }
+
+        /** Exact-archive single-use resource transfer; it contains no new physical measurements. */
+        public static final class ResourceMapTransfer {
+            private final LiveRuntime owner;
+            private final Stage20DiscoveryPersistentState baseline, candidate;
+            private boolean used;
+            private ResourceMapTransfer(LiveRuntime owner, Stage20DiscoveryPersistentState baseline,
+                    Stage20DiscoveryPersistentState candidate) {
+                this.owner = owner; this.baseline = baseline; this.candidate = candidate;
+            }
+        }
+
+        /**
+         * Adopts a prevalidated report only after the caller's conserved payment succeeds.
+         * @param transfer exact current archive transfer
+         * @param settlement validated conserved payment, throwing if it cannot settle
+         */
+        public void receiveResourceMap(ResourceMapTransfer transfer, Runnable settlement) {
+            if (transfer.owner != this || transfer.used || transfer.baseline != discovery)
+                throw new IllegalStateException("Resource report is stale or belongs to another runtime");
+            Objects.requireNonNull(settlement).run();
+            transfer.used = true; discovery = transfer.candidate;
+        }
+
+        private void replaceDiscoveryOwner(com.spacesim.world.Stage20DiscoveryKnowledgeState observed) {
+            var states = new ArrayList<>(discovery.knowledgeStates());
+            states.removeIf(state -> state.ownerId().equals(observed.ownerId())); states.add(observed);
+            discovery = new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
+                    discovery.worldGenerationVersion(), discovery.worldFingerprint(), states);
         }
 
         /**

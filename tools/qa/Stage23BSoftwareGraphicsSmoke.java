@@ -284,6 +284,45 @@ public class Stage23BSoftwareGraphicsSmoke {
   try { run(args); }
   finally { if(hiddenWindow!=0){GL.setCapabilities(null);GLFW.glfwDestroyWindow(hiddenWindow);GLFW.glfwTerminate();} }
  }
+ static void resourceMap(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
+  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-resource-map-fixture.s25"));
+  com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
+  processor.keyDown(Input.Keys.F9);game.render();
+  if(!fixture.equals(campaign(game).captureState()))throw new AssertionError("Map contact fixture changed on actual UI load");
+  var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+  var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+  var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+  var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+  var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+  var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).findFirst().orElseThrow());game.render();
+  var offer=com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game)).get(0);
+  selectRow(workspace,game,offer.selection().stableId());
+  String[] parts=offer.selection().stableId().split("\\|",-1);
+  var npc=campaign(game).coordinator().npcMissions().npcs().stream().filter(n->n.npcId().equals(parts[1])).findFirst().orElseThrow();
+  var archived=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(npc.factionContentId()).entries().stream().filter(k->k.object().objectId().equals(parts[2])).findFirst().orElseThrow();
+  var before=campaign(game).captureState();long wallet=campaign(game).playerState().orElseThrow().walletMilliCredits();
+  long treasury=campaign(game).coordinator().runtime().world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits();
+  screenshot("stage23b-resource-map-offer");keyboardAction(renderer,game,"pilot.buy-resource-map");
+  if(!before.equals(campaign(game).captureState()))throw new AssertionError("Map preview changed live state");
+  keyboardAction(renderer,game,"pilot.physical-confirm");
+  var received=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).knowledge(archived.object()).orElseThrow();
+  long price=com.spacesim.campaign.Stage228CampaignAuthority.RESOURCE_MAP_PRICE_MILLI_CREDITS;
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=wallet-price
+    ||campaign(game).coordinator().runtime().world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits()!=treasury+price
+    ||!received.knownLocation().equals(archived.knownLocation())||received.lastUpdatedSeconds()!=archived.lastUpdatedSeconds())throw new AssertionError("Map sale changed money or observation freshness incorrectly");
+  processor.keyDown(Input.Keys.F8);game.render();var purchased=campaign(game).captureState();processor.keyDown(Input.Keys.F9);game.render();
+  if(!purchased.equals(campaign(game).captureState()))throw new AssertionError("Paid map lost on actual UI save/load");
+  hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INTELLIGENCE).findFirst().orElseThrow());game.render();
+  String intel="personal-resource:"+archived.object().systemId().value()+":"+archived.object().kind()+":"+archived.object().objectId();
+  selectRow(workspace,game,intel);keyboardAction(renderer,game,"focus");
+  if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+    ||!workspace.view().selection().stableId().equals("resource:"+archived.object().objectId()))throw new AssertionError("Paid resource coordinate did not focus the actual local marker");
+  screenshot("stage23b-resource-map-known-marker");
+  if(campaign(game).canPurchaseResourceMap(parts[1],parts[2])||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
+  System.out.println("Resource map keyboard preview/payment/native save/load/known resource focus passed; only contact geometry is a fixture");
+ }
  static void run(String[] args) throws Exception {
   GL.createCapabilities(); System.out.println("Renderer: "+GL11.glGetString(GL11.GL_RENDERER));
   GdxNativesLoader.load();Gdx.files=new Lwjgl3Files();var glCtor=Class.forName("com.badlogic.gdx.backends.lwjgl3.Lwjgl3GL20").getDeclaredConstructor();glCtor.setAccessible(true);Gdx.gl20=(com.badlogic.gdx.graphics.GL20)glCtor.newInstance();Gdx.gl=Gdx.gl20;
@@ -296,6 +335,9 @@ public class Stage23BSoftwareGraphicsSmoke {
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
   var pendingSave=(java.nio.file.Path)save.get(game);
+  if(Boolean.getBoolean("stage23b.resourceMapOnly")){
+   resourceMap(game,pendingSave);game.dispose();System.out.println("Resource map graphical probe passed");return;
+  }
   if(Boolean.getBoolean("stage23b.repairOnly")){
    var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
    var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);

@@ -32,8 +32,11 @@ class GeneratedCampaignStationAcquisitionTest {
             assertFalse(key.startsWith("pilot-market|"), "Remote station knowledge cannot disclose dock-only market quotes");
             if (key.startsWith("pilot-station|")) {
                 String id = key.substring("pilot-station|".length());
-                assertTrue(personal.entries().stream().anyMatch(e -> e.object().objectId().equals(id)
-                        && e.knownLocation().isPresent()), "Every personal station row requires received coordinates");
+                boolean known = personal.entries().stream().anyMatch(e -> e.object().objectId().equals(id)
+                        && e.knownLocation().isPresent());
+                assertTrue(known || c.canDockAtPersonalStation(id),
+                        "Station rows require received coordinates or actual immediate dock contact");
+                if (!known) assertNull(row.focusSystem(), "Immediate contact cannot invent saved coordinates");
             }
         }
         assertEquals(before, c.captureState());

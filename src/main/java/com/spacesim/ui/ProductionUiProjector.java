@@ -312,6 +312,7 @@ public final class ProductionUiProjector {
                                 "Назначение", com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT
                                         .equals(offered.fitId()) ? "Добыча свободных тел и перевозка руды" : "Перевозка грузов",
                                 "Оплата", "Личный кошелёк → казна продавца", "Условия", "Стыковка у местной станции продавца; существующий свободный пустой корпус",
+                                "Навигация", "Продавец передаст архивные координаты собственных гражданских станций",
                                 "После покупки", "Активный корабль сохраняется; для смены управления отстыкуйтесь и остановитесь")),
                         "Предложение действующего оператора при физической стыковке; координаты корпуса не раскрываются",
                         null, 0, world.worldTick()));
@@ -356,6 +357,7 @@ public final class ProductionUiProjector {
         }
         rows.put(Tab.INDUSTRY, List.copyOf(industry));
         var contacts = new ArrayList<>(rows.get(Tab.CONTACTS));
+        contacts.addAll(GeneratedCampaignResourceMapUi.rows(campaign));
         for (var reputation : campaign.coordinator().npcMissions().reputations()) {
             if (!reputation.subjectActorId().equals(authorizedFaction)) continue;
             contacts.add(row("reputation:" + reputation.ownerId(), "Репутация у «" + label(reputation.ownerId()) + "»",

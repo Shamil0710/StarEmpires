@@ -385,6 +385,11 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException("Reserve purchase cannot settle");
         playerState = adapter.player();
         initializePilotMarkets();
+        return receiveSellerStationBriefing(fleetId, seller);
+    }
+
+    private int receiveSellerStationBriefing(FleetId fleetId, String seller) {
+        var runtime = coordinator.runtime();
         var permitted = runtime.industry().industrial().stations().stream()
                 .filter(s -> s.stableFactionId().equals(seller)
                         && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0)
@@ -824,7 +829,7 @@ public final class Stage228CampaignAuthority {
                 com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, p.station, p.commodity,
                 switch (p.action) {
                     case "BUY", "SELL", "LOAD_CONSUMABLE", "START_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT" -> p.kilograms;
-                    case "PURCHASE", "PURCHASE_STATION" -> 1;
+                    case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP" -> 1;
                     default -> 0;
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
                         - (p.action.equals("SELL") ? playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
@@ -880,6 +885,33 @@ public final class Stage228CampaignAuthority {
     }
 
     private void executePilotAction(String action, String stationId, String commodity, int kg) {
+        if ("BUY_RESOURCE_MAP".equals(action)) {
+            if (!canPurchaseResourceMap(stationId, commodity))
+                throw new IllegalStateException("Contact the actual map seller; only its archived resource reports are offered");
+            var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(stationId)).findFirst().orElseThrow();
+            var object = coordinator.runtime().discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
+                    .filter(k -> k.object().kind() == com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE
+                            && k.object().objectId().equals(commodity)).findFirst().orElseThrow().object();
+            var runtime = coordinator.runtime();
+            var transfer = runtime.previewResourceMap(npc.factionContentId(), object, "paid-resource-map:" + stationId + ':' + commodity);
+            long wallet = playerState.walletMilliCredits();
+            if (wallet < RESOURCE_MAP_PRICE_MILLI_CREDITS) throw new IllegalStateException("Insufficient personal funds for resource map");
+            runtime.receiveResourceMap(transfer, () -> {
+                var payer = new com.spacesim.components.WalletComponent(wallet);
+                if (!runtime.world().transferToFactionTreasury(npc.factionContentId(), payer, "PLAYER",
+                        RESOURCE_MAP_PRICE_MILLI_CREDITS, "personal-resource-map-purchase"))
+                    throw new IllegalStateException("Resource map consideration cannot settle");
+            });
+            replacePilotFinancialDocking(wallet - RESOURCE_MAP_PRICE_MILLI_CREDITS, playerState.dockedAt(), playerState.discoveredObjects());
+            if (!playerState.discoveredSystemIds().contains(object.systemId())) {
+                var systems = new java.util.ArrayList<>(playerState.discoveredSystemIds()); systems.add(object.systemId());
+                var p = playerState;
+                playerState = new PlayerState(p.walletMilliCredits(), p.factionContentId(), p.reputations(), p.ownedFleetIds(),
+                        p.activeFleetId(), systems, p.discoveredObjects(), p.homeSystemId(), p.dockedAt(), p.fleetOrders(),
+                        p.threatIntel(), p.ownedConstructionProjectIds(), p.ownedStations());
+            }
+            return;
+        }
         if (action.equals("ACKNOWLEDGE_JOURNAL")) {
             if (playerState == null) throw new IllegalStateException("No initialized personal authority");
             playerJournal = playerJournal.acknowledge(Long.parseLong(stationId));
@@ -1171,7 +1203,11 @@ public final class Stage228CampaignAuthority {
             if (!new com.spacesim.player.PlayerOwnershipService(adapter).purchaseFactionFleet(
                     offeredId, offered.stableFactionId(), PILOT_SHIP_PRICE_MILLI_CREDITS))
                 throw new IllegalStateException("Reserve ownership or consideration rejected");
-            playerState = adapter.player(); return;
+            playerState = adapter.player();
+            int briefingCount = receiveSellerStationBriefing(offeredId, offered.stableFactionId());
+            if (briefingCount > 0) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    "SELLER_STATION_BRIEFING", offered.stableFactionId(), "paid-ship-sale", briefingCount, 0, offeredId);
+            return;
         }
         if ("SWITCH".equals(action)) {
             var selected = new com.spacesim.world.FleetId(Long.parseLong(stationId));
@@ -1797,6 +1833,29 @@ public final class Stage228CampaignAuthority {
         for (String id : due) {
             reconcileOnePlayerMission(id, runtimeCheckpoint);
         }
+    }
+
+    /** Published price of one archived local resource report, paid to the existing operator. */
+    public static final long RESOURCE_MAP_PRICE_MILLI_CREDITS = 100_000L;
+
+    /**
+     * Checks an available local dispatcher's actual archive without revealing source truth.
+     * @param npcId physically contacted civilian dispatcher
+     * @param sourceId exact resource offered in its archive
+     * @return whether a new known resource coordinate can currently be purchased
+     */
+    public boolean canPurchaseResourceMap(String npcId, String sourceId) {
+        if (!npcId.startsWith("npc.stage23b.dispatcher:") || !canContactNpc(npcId)) return false;
+        var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(npcId)).findFirst().orElseThrow();
+        var archives = coordinator.runtime().discoveryState();
+        var offered = archives.knowledgeFor(npc.factionContentId()).entries().stream()
+                .filter(k -> k.object().kind() == com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE
+                        && k.object().objectId().equals(sourceId)).findFirst().orElse(null);
+        if (offered == null || offered.knownLocation().isEmpty()
+                || offered.resourceKnowledge().level().ordinal()
+                    < com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION.ordinal()) return false;
+        return archives.knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).knowledge(offered.object())
+                .filter(k -> k.knownLocation().isPresent()).isEmpty();
     }
 
     /**
