@@ -71,10 +71,21 @@ public final class Stage21CGeneratedWorldRuntimePersistenceCodec {
      */
     public static Stage21CGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
-        if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
+        return decode(new ByteArrayInputStream(bytes), bytes.length);
+    }
+
+    /**
+     * Decodes one bounded nested checkpoint without duplicating its bytes.
+     * @param source exact bounded checkpoint input
+     * @param length declared checkpoint length
+     * @return validated immutable state
+     */
+    static Stage21CGeneratedWorldRuntimePersistentState decode(java.io.InputStream source, int length) {
+        Objects.requireNonNull(source, "source");
+        if (length <= 0 || length > MAX_BYTES) {
             throw new IllegalArgumentException("Stage-21C checkpoint size is outside bounded range");
         }
-        try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream input = new DataInputStream(source)) {
             if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Invalid Stage-21C checkpoint magic");
             }
@@ -85,8 +96,8 @@ public final class Stage21CGeneratedWorldRuntimePersistenceCodec {
             int schemaVersion = input.readInt();
             String runtimeVersion = input.readUTF();
             Stage21BGeneratedWorldRuntimePersistentState stage21B =
-                    Stage21BGeneratedWorldRuntimePersistenceCodec.decode(
-                            readPayload(input, MAX_STAGE21B_PAYLOAD_BYTES, "Stage-21B runtime"));
+                    BoundedCheckpointPayload.decode(input, MAX_STAGE21B_PAYLOAD_BYTES, "Stage-21B runtime",
+                            Stage21BGeneratedWorldRuntimePersistenceCodec::decode);
             DiplomaticLifecycleState diplomacy = DiplomaticLifecycleStateCodec.decode(
                     readPayload(input, MAX_DIPLOMACY_PAYLOAD_BYTES, "Stage-21C diplomacy"));
             Stage19ConflictState warfare = Stage19ConflictStateCodec.decode(

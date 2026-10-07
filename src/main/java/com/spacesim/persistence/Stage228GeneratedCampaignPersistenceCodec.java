@@ -233,8 +233,8 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                             + schemaVersion + "/" + runtimeVersion);
         }
         Stage21IGeneratedWorldRuntimePersistentState stage21 =
-                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
-                        readPayload(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime"));
+                BoundedCheckpointPayload.decode(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime",
+                        Stage21IGeneratedWorldRuntimePersistenceCodec::decode);
         Stage228SmallCraftPersistentState smallCraft = Stage228SmallCraftPersistenceCodec.decode(
                 readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
         requireEnd(in);
@@ -252,8 +252,8 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                             + schemaVersion + "/" + runtimeVersion);
         }
         Stage21IGeneratedWorldRuntimePersistentState stage21 =
-                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
-                        readPayload(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime"));
+                BoundedCheckpointPayload.decode(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime",
+                        Stage21IGeneratedWorldRuntimePersistenceCodec::decode);
         Stage228SmallCraftPersistentState smallCraft = Stage228SmallCraftPersistenceCodec.decode(
                 readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
         Stage228HangarPersistentState hangars = Stage228HangarPersistenceCodec.decode(
@@ -274,8 +274,8 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                             + schemaVersion + "/" + runtimeVersion);
         }
         Stage21IGeneratedWorldRuntimePersistentState stage21 =
-                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
-                        readPayload(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime"));
+                BoundedCheckpointPayload.decode(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime",
+                        Stage21IGeneratedWorldRuntimePersistenceCodec::decode);
         Stage228SmallCraftPersistentState smallCraft = Stage228SmallCraftPersistenceCodec.decode(
                 readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
         Stage228HangarPersistentState hangars = Stage228HangarPersistenceCodec.decode(
@@ -300,8 +300,8 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                             + schemaVersion + "/" + runtimeVersion);
         }
         Stage21IGeneratedWorldRuntimePersistentState stage21 =
-                Stage21IGeneratedWorldRuntimePersistenceCodec.decode(
-                        readPayload(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime"));
+                BoundedCheckpointPayload.decode(in, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime",
+                        Stage21IGeneratedWorldRuntimePersistenceCodec::decode);
         Stage228SmallCraftPersistentState smallCraft = Stage228SmallCraftPersistenceCodec.decode(
                 readPayload(in, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft"));
         Stage228HangarPersistentState hangars = Stage228HangarPersistenceCodec.decode(

@@ -67,10 +67,21 @@ public final class Stage21HGeneratedWorldRuntimePersistenceCodec {
      */
     public static Stage21HGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
-        if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
+        return decode(new ByteArrayInputStream(bytes), bytes.length);
+    }
+
+    /**
+     * Decodes one bounded nested checkpoint without duplicating its bytes.
+     * @param source exact bounded checkpoint input
+     * @param length declared checkpoint length
+     * @return validated immutable state
+     */
+    static Stage21HGeneratedWorldRuntimePersistentState decode(java.io.InputStream source, int length) {
+        Objects.requireNonNull(source, "source");
+        if (length <= 0 || length > MAX_BYTES) {
             throw new IllegalArgumentException("Stage-21H checkpoint size outside bounded range");
         }
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream in = new DataInputStream(source)) {
             if (in.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Invalid Stage-21H checkpoint magic");
             }
@@ -81,8 +92,8 @@ public final class Stage21HGeneratedWorldRuntimePersistenceCodec {
             int schemaVersion = in.readInt();
             String runtimeVersion = in.readUTF();
             Stage21GGeneratedWorldRuntimePersistentState stage21G =
-                    Stage21GGeneratedWorldRuntimePersistenceCodec.decode(
-                            readPayload(in, MAX_STAGE21G_PAYLOAD_BYTES, "Stage-21G runtime"));
+                    BoundedCheckpointPayload.decode(in, MAX_STAGE21G_PAYLOAD_BYTES, "Stage-21G runtime",
+                            Stage21GGeneratedWorldRuntimePersistenceCodec::decode);
             Stage21HNpcMissionState npcMissions = Stage21HNpcMissionStateCodec.decode(
                     readPayload(in, MAX_NPC_MISSION_PAYLOAD_BYTES, "Stage-21H NPC/mission state"));
             if (in.read() != -1) {

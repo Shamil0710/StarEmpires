@@ -67,10 +67,21 @@ public final class Stage21GGeneratedWorldRuntimePersistenceCodec {
      */
     public static Stage21GGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
-        if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
+        return decode(new ByteArrayInputStream(bytes), bytes.length);
+    }
+
+    /**
+     * Decodes one bounded nested checkpoint without duplicating its bytes.
+     * @param source exact bounded checkpoint input
+     * @param length declared checkpoint length
+     * @return validated immutable state
+     */
+    static Stage21GGeneratedWorldRuntimePersistentState decode(java.io.InputStream source, int length) {
+        Objects.requireNonNull(source, "source");
+        if (length <= 0 || length > MAX_BYTES) {
             throw new IllegalArgumentException("Stage-21G checkpoint size outside bounded range");
         }
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream in = new DataInputStream(source)) {
             if (in.readInt() != MAGIC) throw new IllegalArgumentException("Invalid Stage-21G checkpoint magic");
             int version = in.readInt();
             if (version != FILE_FORMAT_VERSION) {
@@ -79,8 +90,8 @@ public final class Stage21GGeneratedWorldRuntimePersistenceCodec {
             int schemaVersion = in.readInt();
             String runtimeVersion = in.readUTF();
             Stage21FGeneratedWorldRuntimePersistentState stage21F =
-                    Stage21FGeneratedWorldRuntimePersistenceCodec.decode(
-                            readPayload(in, MAX_STAGE21F_PAYLOAD_BYTES, "Stage-21F runtime"));
+                    BoundedCheckpointPayload.decode(in, MAX_STAGE21F_PAYLOAD_BYTES, "Stage-21F runtime",
+                            Stage21FGeneratedWorldRuntimePersistenceCodec::decode);
             SettlementRecoveryState recovery = SettlementRecoveryStateCodec.decode(
                     readPayload(in, MAX_RECOVERY_PAYLOAD_BYTES, "Stage-21G recovery state"));
             if (in.read() != -1) throw new IllegalArgumentException("Trailing bytes after Stage-21G checkpoint");

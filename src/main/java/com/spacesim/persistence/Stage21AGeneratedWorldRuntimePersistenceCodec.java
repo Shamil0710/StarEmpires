@@ -72,10 +72,21 @@ public final class Stage21AGeneratedWorldRuntimePersistenceCodec {
      */
     public static Stage21AGeneratedWorldRuntimePersistentState decode(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
-        if (bytes.length <= 0 || bytes.length > MAX_BYTES) {
+        return decode(new ByteArrayInputStream(bytes), bytes.length);
+    }
+
+    /**
+     * Decodes one bounded nested checkpoint without duplicating its bytes.
+     * @param source exact bounded checkpoint input
+     * @param length declared checkpoint length
+     * @return validated immutable state
+     */
+    static Stage21AGeneratedWorldRuntimePersistentState decode(java.io.InputStream source, int length) {
+        Objects.requireNonNull(source, "source");
+        if (length <= 0 || length > MAX_BYTES) {
             throw new IllegalArgumentException("Stage-21A checkpoint size is outside bounded range");
         }
-        try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream input = new DataInputStream(source)) {
             if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Invalid Stage-21A checkpoint magic");
             }

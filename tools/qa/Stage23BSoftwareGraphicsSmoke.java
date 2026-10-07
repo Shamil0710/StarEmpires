@@ -284,6 +284,37 @@ public class Stage23BSoftwareGraphicsSmoke {
   try { run(args); }
   finally { if(hiddenWindow!=0){GL.setCapabilities(null);GLFW.glfwDestroyWindow(hiddenWindow);GLFW.glfwTerminate();} }
  }
+ static void ordinaryMiningLoad(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
+  var source=java.nio.file.Path.of(System.getProperty("stage23b.ordinaryMiningCheckpoint"));
+  var saved=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(source);
+  java.nio.file.Files.copy(source,path,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+  processor.keyDown(Input.Keys.F9);game.render();
+  if(!saved.equals(campaign(game).captureState()))throw new AssertionError("Actual ordinary mining checkpoint changed on graphical load");
+  long tickBefore=campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick();
+  var freightBefore=campaign(game).coordinator().runtime().freight().capture();
+  var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+  var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+  var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+  var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+  var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+  var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INTELLIGENCE).findFirst().orElseThrow());game.render();
+  var knowledge=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+  var resource=knowledge.entries().stream().filter(e->e.object().resourceObject()&&e.knownLocation().isPresent()).findFirst().orElseThrow();
+  String intel="personal-resource:"+resource.object().systemId().value()+":"+resource.object().kind()+":"+resource.object().objectId();
+  selectRow(workspace,game,intel);keyboardAction(renderer,game,"focus");
+  if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+    ||!workspace.view().selection().stableId().equals("resource:"+resource.object().objectId()))throw new AssertionError("Actual sampled source did not focus its known marker");
+  screenshot("stage23b-ordinary-mining-known-marker");
+  // Focusing a different system changes the persisted presentation/scheduler selection.
+  if(!saved.playerState().equals(campaign(game).playerState().orElseThrow())
+    ||!saved.playerJournal().equals(campaign(game).playerJournal())
+    ||tickBefore!=campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick()
+    ||!freightBefore.equals(campaign(game).coordinator().runtime().freight().capture())
+    ||!knowledge.equals(campaign(game).coordinator().runtime().discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)))throw new AssertionError("Ordinary mining inspection changed player assets, time or knowledge");
+  int glError=GL11.glGetError();if(glError!=0)throw new AssertionError("Ordinary mining inspection GL error: "+glError);
+  System.out.println("Actual ordinary mining checkpoint graphical load/known resource focus passed; no geometry or equipment fixture");
+ }
  static void resourceMap(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
   var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-resource-map-fixture.s25"));
   com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
@@ -335,6 +366,9 @@ public class Stage23BSoftwareGraphicsSmoke {
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
   var pendingSave=(java.nio.file.Path)save.get(game);
+  if(System.getProperty("stage23b.ordinaryMiningCheckpoint")!=null){
+   ordinaryMiningLoad(game,pendingSave);game.dispose();System.out.println("Ordinary mining checkpoint graphical probe passed");return;
+  }
   if(Boolean.getBoolean("stage23b.resourceMapOnly")){
    resourceMap(game,pendingSave);game.dispose();System.out.println("Resource map graphical probe passed");return;
   }
