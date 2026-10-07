@@ -72,6 +72,14 @@ coordinates fail rather than using runtime truth. Budget exhaustion saves a PAUS
 and never reports success. The original post-sale checkpoint remains separate. Until this
 route reaches its seller and the check passes, ordinary map acquisition remains unproven.
 
+The continuing actual journey's 224,541,883-byte native checkpoint at tick 20,000,000
+was restored exactly with the current classes, including the active physical jump 18 → 13.
+`Stage23BActualCheckpointIntegrity` then advanced only that separately restored owner to
+tick 20,000,001 through one ordinary frame; the personal wallet and owned fleet roster
+stayed unchanged. The original file and running journey were untouched. Evidence:
+`target/stage23b-actual-map-checkpoint-integrity.log`. This verifies continued loading of a
+larger real in-flight save; it does not claim arrival or successful map purchase.
+
 The ordinary `GeneratedWorldCommandGame` now binds a `ProductionUiWorkspace` and
 `ProductionUiProjector` to the existing `Stage228CampaignAuthority`. The existing current-system
 and galaxy renderers, physical map scaling, mouse wheel zoom, middle-button pan and fleet follow
