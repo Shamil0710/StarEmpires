@@ -15,6 +15,27 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — full regression after archived maps and logistics dispatchers
+
+At commit `31807cd4`, `mvn -B -ntp -Ptest-parallel test` completed on Java 17:
+2563 tests, zero failures, zero errors, one standard `Stage19JLongSoakTest` skip.
+The run finished at 23:15 Moscow time in 38:46 minutes; evidence is
+`target/stage23b-current-full-tests.log`. This includes actual freight route report
+production, paid resource/station/route map transactions, legal dispatcher ownership,
+personal equipment handling, native restoration and the existing campaign regressions.
+
+This was the full test phase, not clean verify, packaging or a new graphics run.
+The existing ordinary map journey remained active against its original packaged JAR;
+no clean or JAR replacement was performed. Its latest observed tick was 28,220,612,
+with the genuine 7-to-2 jump still approaching the gate (phase end 32,974,443).
+It has not yet contacted the seller or purchased a map. The engineering remainder
+and Stage23B ACTIVE/PARTIAL status remain in force.
+
+Equipment acquisition review also confirmed that finished-product handling exists
+but no `BUY_PRODUCT` command currently bridges a foreign operator's ready stock to
+personal ownership. Ordinary purchase, finite handling, legal stock ownership and
+subsequent paid fitting therefore still require a connected gameplay path.
+
 ### 2026-10-07 — dispatchers at actual logistics hubs
 
 New-game dispatcher placement now considers the common civilian endpoint registry, including
