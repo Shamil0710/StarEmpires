@@ -2439,6 +2439,9 @@ public final class Stage228CampaignAuthority {
     }
 
     private com.spacesim.economy.FinishedProductTransferWorkQueue.Context productTransferContext(String stationId, boolean loading) {
+        // Permission to service or handle an individually owned used module at a foreign yard
+        // does not confer ownership of that station's unassigned finished-product stock.
+        if (!ownsProductionStation(stationId)) return null;
         var physical = moduleTransferContext(stationId, loading); if (physical == null) return null;
         var fleet = coordinator.runtime().freight().findFreighter(playerState.activeFleetId()).orElseThrow();
         return new com.spacesim.economy.FinishedProductTransferWorkQueue.Context(physical.source(), physical.destination(), physical.handling(),

@@ -15,6 +15,29 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — finished-product handling requires personal station ownership
+
+Equipment acquisition review found that product handling reused the used-module service
+contact, which permits a legally operated foreign civilian yard. This accidentally admitted
+`LOAD_PRODUCT` from foreign ready stock without a purchase, although native pending-product
+validation requires a personally owned station. `productTransferContext` now independently
+requires personal station ownership for both directions, including ongoing work. Permission
+to repair or handle personally owned used modules remains separate. The product inventory
+projection no longer offers a foreign station as the unload destination.
+
+The new regression supplies two finite physical products at an explicitly fixtured berth,
+loads one through the ordinary handling queue, then restores the same campaign without
+personal station ownership. Foreign service contact remains valid; one product remains on
+the station and one in the personal hold. Both fresh-product commands are refused, the UI
+exposes neither action for that foreign station, all state remains exactly unchanged, and
+native round-trip succeeds. This is an authority regression, not ordinary equipment purchase.
+
+`GeneratedCampaignPersonalProductTransportTest,GeneratedCampaignPersonalRefitTest,GeneratedCampaignPersonalRepairTest`
+passed 13 tests with zero failures/errors/skips (`target/stage23b-product-stock-authority-validation.log`).
+`git diff --check` passed. The previous full 2563-test run predates this change;
+no new full suite, clean verify or graphics run is claimed. Ordinary paid acquisition of
+foreign ready products still needs its own price, ownership, settlement and finite handling path.
+
 ### 2026-10-07 — full regression after archived maps and logistics dispatchers
 
 At commit `31807cd4`, `mvn -B -ntp -Ptest-parallel test` completed on Java 17:

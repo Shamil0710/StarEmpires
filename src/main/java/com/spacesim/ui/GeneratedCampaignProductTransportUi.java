@@ -28,7 +28,7 @@ public final class GeneratedCampaignProductTransportUi {
         var fleet = campaign.playerState().orElseThrow().activeFleetId();
         if (fleet == null || runtime.freight().findFreighter(fleet).isEmpty()) return List.of();
         var hold = runtime.freight().moduleCargoStorage(fleet);
-        String docked = campaign.dockedModuleStationId().orElse("");
+        String docked = campaign.dockedModuleStationId().filter(campaign::ownsProductionStation).orElse("");
         for (var station : runtime.industry().industrial().stations()) {
             if (!campaign.ownsProductionStation(station.stationId())) continue;
             var store = runtime.infrastructure().endpoint(station.stationId()).storage();
