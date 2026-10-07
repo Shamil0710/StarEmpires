@@ -327,6 +327,11 @@ public class Stage23BSoftwareGraphicsSmoke {
   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).findFirst().orElseThrow());game.render();
+  var conversationBefore=campaign(game).captureState();
+  var conversation=com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(campaign(game)).get(0);
+  selectRow(workspace,game,conversation.selection().stableId());
+  screenshot("stage23b-dispatcher-conversation");
+  if(!conversationBefore.equals(campaign(game).captureState()))throw new AssertionError("Dispatcher conversation changed authority");
   var offer=com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game)).get(0);
   selectRow(workspace,game,offer.selection().stableId());
   String[] parts=offer.selection().stableId().split("\\|",-1);

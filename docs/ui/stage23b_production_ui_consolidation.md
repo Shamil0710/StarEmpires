@@ -15,6 +15,34 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — local dispatcher service overview and ordinary map probe
+
+The Contacts surface now lists a dispatcher conversation only while the personal ship is
+actually docked at that available NPC's saved posting. It shows the number of purchasable
+archived resource reports and existing OFFERED contracts, the conserved map price, and
+explicit empty states. Opening this overview grants no knowledge, money, coordinates or
+remote contact. Undocking removes the conversation; exact restoration preserves access.
+This remains a service overview, not completion of all NPC conversations or route sharing.
+
+`GeneratedCampaignNpcPlacementTest,GeneratedCampaignResourceMapPurchaseTest,ProductionUiCampaignIntegrationTest`
+passed 7 tests without failures/errors (`target/stage23b-dispatcher-conversation-integration.log`).
+The RTX 4070 graphical probe selected the conversation, then performed keyboard map preview,
+payment, native save/load and known-resource focus. The overview screenshot was inspected
+(`stage23b-dispatcher-conversation.png` in the temporary directory). This graphical contact
+geometry is explicitly a fixture; it does not prove an ordinary arrival.
+
+`Stage23BOrdinaryResourceMapJourney` checks an existing actual berth, immutable UI/preview,
+conserved payment, unchanged source observation age, exact transferred knowledge and a native
+checkpoint round-trip. On the real post-mining/sale checkpoint it found no local offers:
+the actual dispatcher is posted at `industry.2`, in system 2, and has five archived reports.
+Remote purchase was correctly rejected; no posting or geometry was changed.
+`Stage23BOrdinaryMiningJourney` now has the resumable `stage23b.journey.resourceMap=true`
+mode. It requires personally archived seller coordinates, flies and jumps through ordinary
+commands/ticks, docks at the actual posting and invokes the paid-map check. Missing personal
+coordinates fail rather than using runtime truth. Budget exhaustion saves a PAUSED checkpoint
+and never reports success. The original post-sale checkpoint remains separate. Until this
+route reaches its seller and the check passes, ordinary map acquisition remains unproven.
+
 The ordinary `GeneratedWorldCommandGame` now binds a `ProductionUiWorkspace` and
 `ProductionUiProjector` to the existing `Stage228CampaignAuthority`. The existing current-system
 and galaxy renderers, physical map scaling, mouse wheel zoom, middle-button pan and fleet follow

@@ -22,6 +22,7 @@ class GeneratedCampaignNpcPlacementTest {
     @Test void knowingThePostingSystemDoesNotGrantRemoteDispatcherContact() {
         var campaign = Stage228CampaignAuthority.create(1);
         for (var npc : campaign.coordinator().npcMissions().npcs()) assertFalse(campaign.canContactNpc(npc.npcId()));
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(campaign).isEmpty());
         campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());
         assertTrue(campaign.coordinator().npcMissions().npcs().stream().anyMatch(n ->
                 campaign.playerState().orElseThrow().discoveredSystemIds().contains(n.locationSystemId())));
@@ -30,6 +31,7 @@ class GeneratedCampaignNpcPlacementTest {
             assertFalse(campaign.canContactNpc(npc.npcId()), "Station briefing is not a physical contact");
         }
         var restored = Stage228CampaignAuthority.restore(campaign.captureState());
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(restored).isEmpty());
         for (var npc : restored.coordinator().npcMissions().npcs()) assertFalse(restored.canContactNpc(npc.npcId()));
         var npc = campaign.coordinator().npcMissions().npcs().stream().filter(n ->
                 campaign.playerState().orElseThrow().discoveredSystemIds().contains(n.locationSystemId())).findFirst().orElseThrow();
@@ -53,6 +55,19 @@ class GeneratedCampaignNpcPlacementTest {
         campaign.submitPilotAction(campaign.previewPilotAction("DOCK", station.stationId(), "", 0));
         assertTrue(campaign.canContactNpc(npc.npcId()));
         assertTrue(Stage228CampaignAuthority.restore(campaign.captureState()).canContactNpc(npc.npcId()));
+        var contacted = campaign.captureState();
+        var conversations = com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(campaign);
+        assertEquals(1, conversations.size());
+        assertEquals("dispatcher-contact|" + npc.npcId(), conversations.get(0).selection().stableId());
+        assertNull(conversations.get(0).focusSystem(), "Conversation must not reveal navigation coordinates");
+        var worldUi = new com.spacesim.ui.GeneratedWorldUiModel(1, runtime, campaign.coordinator().content());
+        var projected = new com.spacesim.ui.ProductionUiProjector(npc.factionContentId()).capture(campaign, worldUi.capture());
+        assertTrue(projected.rows(com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).contains(conversations.get(0)));
+        assertEquals(contacted, campaign.captureState(), "Conversation must not transfer knowledge or money");
+        assertEquals(conversations, com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(
+                Stage228CampaignAuthority.restore(contacted)));
+        campaign.submitPilotAction(campaign.previewPilotAction("UNDOCK", "", "", 0));
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(campaign).isEmpty());
     }
 
     @Test void postingsUseExistingArchivesWithoutChangingPhysicalOrFinancialState() {

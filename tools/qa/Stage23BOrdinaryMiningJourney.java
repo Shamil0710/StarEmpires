@@ -18,9 +18,35 @@ public final class Stage23BOrdinaryMiningJourney {
  private static boolean budgetActive;
  public static void main(String[] args) throws Exception {
   if(MAX_TICKS<=0 || MAX_FLIGHT_TICKS<=0 || CHECKPOINT_INTERVAL<=0)throw new IllegalArgumentException("Probe tick budgets and checkpoint interval must be positive");
-  try { journey(); }
-  catch(ProbePaused paused){System.out.println("JOURNEY PAUSED tick="+world().getAuthoritativeWorldTick()+" checkpoint="+CHECKPOINT+"; ordinary mining/sale is not yet proven");}
+  try { if(Boolean.getBoolean("stage23b.journey.resourceMap")) resourceMapJourney(); else journey(); }
+  catch(ProbePaused paused){System.out.println("JOURNEY PAUSED tick="+world().getAuthoritativeWorldTick()+" checkpoint="+CHECKPOINT+"; requested journey is not yet proven");}
   finally {if(campaign!=null){campaign.coordinator().setPaused(true);Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,campaign.captureState());}}
+ }
+ private static void resourceMapJourney() throws Exception {
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact resource-map journey checkpoint");
+  campaign.coordinator().setTimeScale(1d);
+  startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  var runtime=campaign.coordinator().runtime();
+  var personal=runtime.discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+  var npc=campaign.coordinator().npcMissions().npcs().stream()
+   .filter(n->n.npcId().startsWith("npc.stage23b.dispatcher:"))
+   .filter(n->runtime.discoveryState().knowledgeFor(n.factionContentId()).entries().stream()
+    .anyMatch(e->e.object().resourceObject()&&e.knownLocation().isPresent()&&personal.knowledge(e.object()).filter(k->k.knownLocation().isPresent()).isEmpty()))
+   .findFirst().orElseThrow();
+  var posting=npc.knowledge().stream().filter(k->k.factId().equals(npc.npcId()+":posting")).findFirst().orElseThrow();
+  var known=personal.entries().stream().filter(k->k.object().objectId().equals(posting.subjectId())&&k.knownLocation().isPresent()).findFirst()
+   .orElseThrow(()->new IllegalStateException("No personal navigation knowledge for actual map seller; truth coordinates are forbidden"));
+  if(campaign.playerState().orElseThrow().docked()&&!campaign.canContactNpc(npc.npcId()))action("UNDOCK","","",0);
+  travel(known.object().systemId());
+  fly(known.knownLocation().orElseThrow(),500);
+  if(!campaign.playerState().orElseThrow().docked())action("DOCK",posting.subjectId(),"",0);
+  if(!campaign.canContactNpc(npc.npcId()))throw new AssertionError("Physical arrival did not establish actual seller contact");
+  Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,campaign.captureState());
+  var purchased=CHECKPOINT.resolveSibling(CHECKPOINT.getFileName()+".map.s25");
+  Stage23BOrdinaryResourceMapJourney.main(new String[]{CHECKPOINT.toString(),purchased.toString()});
+  campaign=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(purchased));
  }
  private static void journey() throws Exception {
   if(java.nio.file.Files.exists(CHECKPOINT)) {

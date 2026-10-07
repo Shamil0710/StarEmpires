@@ -357,6 +357,7 @@ public final class ProductionUiProjector {
         }
         rows.put(Tab.INDUSTRY, List.copyOf(industry));
         var contacts = new ArrayList<>(rows.get(Tab.CONTACTS));
+        contacts.addAll(GeneratedCampaignDispatcherContactUi.rows(campaign));
         contacts.addAll(GeneratedCampaignResourceMapUi.rows(campaign));
         for (var reputation : campaign.coordinator().npcMissions().reputations()) {
             if (!reputation.subjectActorId().equals(authorizedFaction)) continue;
