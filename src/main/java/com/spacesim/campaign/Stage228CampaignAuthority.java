@@ -829,7 +829,7 @@ public final class Stage228CampaignAuthority {
                 com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, p.station, p.commodity,
                 switch (p.action) {
                     case "BUY", "SELL", "LOAD_CONSUMABLE", "START_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT" -> p.kilograms;
-                    case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP", "BUY_STATION_MAP" -> 1;
+                    case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP", "BUY_STATION_MAP", "BUY_ROUTE_MAP" -> 1;
                     default -> 0;
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
                         - (p.action.equals("SELL") ? playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
@@ -885,6 +885,30 @@ public final class Stage228CampaignAuthority {
     }
 
     private void executePilotAction(String action, String stationId, String commodity, int kg) {
+        if ("BUY_ROUTE_MAP".equals(action)) {
+            if (!canPurchaseRouteMap(stationId, commodity)) throw new IllegalStateException("Contact the actual seller of this completed-route archive");
+            var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(stationId)).findFirst().orElseThrow();
+            var runtime = coordinator.runtime();
+            var source = runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
+                    .filter(k -> k.evidence().stream().anyMatch(e -> com.spacesim.world.Stage23FreightRouteReport.offerKey(k.object(), e.provenanceId()).equals(commodity))).findFirst().orElseThrow();
+            var evidence = source.evidence().stream().filter(e -> com.spacesim.world.Stage23FreightRouteReport.offerKey(source.object(), e.provenanceId()).equals(commodity)).findFirst().orElseThrow();
+            var report = com.spacesim.world.Stage23FreightRouteReport.decode(source.object(), evidence).orElseThrow();
+            var transfer = runtime.previewRouteReport(npc.factionContentId(), stationId, source.object(), evidence.provenanceId());
+            var p = playerState;
+            if (p.walletMilliCredits() < RESOURCE_MAP_PRICE_MILLI_CREDITS) throw new IllegalStateException("Insufficient personal route-map funds");
+            var systems = new java.util.ArrayList<>(p.discoveredSystemIds());
+            for (var system : report.systems()) if (!systems.contains(system)) systems.add(system);
+            var candidate = new PlayerState(p.walletMilliCredits() - RESOURCE_MAP_PRICE_MILLI_CREDITS, p.factionContentId(),
+                    p.reputations(), p.ownedFleetIds(), p.activeFleetId(), systems, p.discoveredObjects(), p.homeSystemId(),
+                    p.dockedAt(), p.fleetOrders(), p.threatIntel(), p.ownedConstructionProjectIds(), p.ownedStations());
+            runtime.receiveResourceMap(transfer, () -> {
+                if (!runtime.world().transferToFactionTreasury(npc.factionContentId(), new com.spacesim.components.WalletComponent(p.walletMilliCredits()),
+                        "PLAYER", RESOURCE_MAP_PRICE_MILLI_CREDITS, "personal-route-map-purchase"))
+                    throw new IllegalStateException("Route map consideration cannot settle");
+            });
+            playerState = candidate;
+            return;
+        }
         if ("BUY_RESOURCE_MAP".equals(action) || "BUY_STATION_MAP".equals(action)) {
             boolean stationMap = "BUY_STATION_MAP".equals(action);
             if (!(stationMap ? canPurchaseStationMap(stationId, commodity) : canPurchaseResourceMap(stationId, commodity)))
@@ -1883,6 +1907,36 @@ public final class Stage228CampaignAuthority {
         return station.isPresent() && runtime.discoveryState().knowledgeFor(
                 com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).knowledge(offered.object())
                 .filter(k -> k.knownLocation().isPresent()).isEmpty();
+    }
+
+    /**
+     * Offers an actual archived delivery path, never a mutable current order plan.
+     * @param npcId actually contacted dispatcher
+     * @param reportId exact immutable route receipt
+     * @return whether the report adds a historical chart or unknown receiver coordinates
+     */
+    public boolean canPurchaseRouteMap(String npcId, String reportId) {
+        if (!npcId.startsWith("npc.stage23b.dispatcher:") || !canContactNpc(npcId)) return false;
+        var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(npcId)).findFirst().orElseThrow();
+        var runtime = coordinator.runtime();
+        for (var source : runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries()) {
+            if (source.knownLocation().isEmpty() || runtime.infrastructure().endpoints().stream().noneMatch(s ->
+                    s.stationId().equals(source.object().objectId()) && s.systemId().equals(source.object().systemId())
+                            && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0
+                            && source.classificationId().equals(java.util.Optional.of(s.stationArchetypeId())))) continue;
+            for (var evidence : source.evidence()) {
+                if (!com.spacesim.world.Stage23FreightRouteReport.offerKey(source.object(), evidence.provenanceId()).equals(reportId)) continue;
+                var report = com.spacesim.world.Stage23FreightRouteReport.decode(source.object(), evidence);
+                if (report.isEmpty()) return false;
+                var path = report.orElseThrow().systems();
+                if (path.stream().anyMatch(s -> runtime.world().getTopology().findSystem(s).isEmpty())) return false;
+                for (int i = 1; i < path.size(); i++) if (!runtime.world().getTopology().neighbors(path.get(i - 1)).contains(path.get(i))) return false;
+                return path.stream().anyMatch(s -> !playerState.discoveredSystemIds().contains(s))
+                        || runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+                        .knowledge(source.object()).filter(k -> k.knownLocation().isPresent()).isEmpty();
+            }
+        }
+        return false;
     }
 
     /**

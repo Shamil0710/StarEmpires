@@ -908,6 +908,33 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             return new ResourceMapTransfer(this, discovery, candidate);
         }
 
+        /**
+         * Prevalidates a paid copy of one actually recorded route and its receiver coordinates.
+         * Caller admission binds the supplied NPC identity to its real contacted archive owner.
+         * @param seller actual operator archive owner
+         * @param sellerNpc actual contacted NPC
+         * @param object observed receiver station
+         * @param reportId exact original route evidence identity
+         * @return single-use current-archive transfer, without live mutation
+         */
+        public ResourceMapTransfer previewRouteReport(String seller, String sellerNpc,
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef object, String reportId) {
+            var source = discovery.knowledgeFor(seller).knowledge(object).orElseThrow();
+            var evidence = source.evidence().stream().filter(e -> e.provenanceId().equals(reportId)).findFirst().orElseThrow();
+            var report = com.spacesim.world.Stage23FreightRouteReport.decode(object, evidence).orElseThrow();
+            var personal = discovery.knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+            var copied = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(personal,
+                    new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object, source.state(),
+                            source.classificationId(), source.knownLocation(), source.resourceKnowledge(),
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PURCHASED_OR_SHARED_MAP_DATA,
+                                    com.spacesim.world.Stage23FreightRouteReport.sharedProvenance(sellerNpc, report),
+                                    evidence.observedAtSeconds(), evidence.freshUntilSeconds())));
+            var states = new ArrayList<>(discovery.knowledgeStates()); states.removeIf(s -> s.ownerId().equals(copied.ownerId())); states.add(copied);
+            return new ResourceMapTransfer(this, discovery, new Stage20DiscoveryPersistentState(discovery.envelopeVersion(),
+                    discovery.rootSeed(), discovery.worldGenerationVersion(), discovery.worldFingerprint(), states));
+        }
+
         /** Exact-archive single-use map transfer; it contains no new physical measurements. */
         public static final class ResourceMapTransfer {
             private final LiveRuntime owner;

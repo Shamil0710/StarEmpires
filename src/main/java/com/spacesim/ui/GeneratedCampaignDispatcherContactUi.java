@@ -26,6 +26,9 @@ public final class GeneratedCampaignDispatcherContactUi {
                     .filter(e -> campaign.canPurchaseResourceMap(npc.npcId(), e.object().objectId())).count();
             long stations = runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
                     .filter(e -> campaign.canPurchaseStationMap(npc.npcId(), e.object().objectId())).count();
+            long routes = runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries().stream()
+                    .flatMap(k -> k.evidence().stream().map(e -> com.spacesim.world.Stage23FreightRouteReport.offerKey(k.object(), e.provenanceId())))
+                    .filter(key -> campaign.canPurchaseRouteMap(npc.npcId(), key)).count();
             long offers = state.missions().stream().filter(m -> m.issuerNpcId().equals(npc.npcId())
                     && m.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED).count();
             result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
@@ -35,6 +38,8 @@ public final class GeneratedCampaignDispatcherContactUi {
                             "Цена карты", "100 кредитов из личного кошелька",
                             "Карты станций", stations == 0 ? "Новых карт станций для вас нет"
                                     : stations + " — выберите навигационную карту в списке контактов",
+                            "Пройденные маршруты", routes == 0 ? "Новых архивных маршрутов для вас нет"
+                                    : routes + " — выберите маршрутную карту в списке контактов",
                             "Сведения ресурсной карты", "Архивное положение участка и подтверждённый образец; время наблюдения сохраняется",
                             "Предложения работы", offers == 0 ? "Доступных предложений нет"
                                     : offers + " — выберите контракт в списке контактов",

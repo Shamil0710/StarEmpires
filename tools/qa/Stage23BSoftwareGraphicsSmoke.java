@@ -317,7 +317,8 @@ public class Stage23BSoftwareGraphicsSmoke {
  }
  static void resourceMap(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
   boolean stationMap=Boolean.getBoolean("stage23b.stationMapOnly");
-  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-resource-map-fixture.s25"));
+  boolean routeMap=Boolean.getBoolean("stage23b.routeMapOnly");
+  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of(routeMap?"target/stage23b-route-map-fixture.s25":"target/stage23b-resource-map-fixture.s25"));
   com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
   processor.keyDown(Input.Keys.F9);game.render();
   if(!fixture.equals(campaign(game).captureState()))throw new AssertionError("Map contact fixture changed on actual UI load");
@@ -333,32 +334,40 @@ public class Stage23BSoftwareGraphicsSmoke {
   selectRow(workspace,game,conversation.selection().stableId());
   screenshot("stage23b-dispatcher-conversation");
   if(!conversationBefore.equals(campaign(game).captureState()))throw new AssertionError("Dispatcher conversation changed authority");
-  var offer=(stationMap?com.spacesim.ui.GeneratedCampaignStationMapUi.rows(campaign(game)):com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game))).get(0);
+  var offer=(routeMap?com.spacesim.ui.GeneratedCampaignRouteMapUi.offers(campaign(game)):stationMap?com.spacesim.ui.GeneratedCampaignStationMapUi.rows(campaign(game)):com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game))).get(0);
   selectRow(workspace,game,offer.selection().stableId());
   String[] parts=offer.selection().stableId().split("\\|",-1);
   var npc=campaign(game).coordinator().npcMissions().npcs().stream().filter(n->n.npcId().equals(parts[1])).findFirst().orElseThrow();
-  var archived=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(npc.factionContentId()).entries().stream().filter(k->k.object().objectId().equals(parts[2])).findFirst().orElseThrow();
+  var archived=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(npc.factionContentId()).entries().stream().filter(k->routeMap?k.evidence().stream().anyMatch(e->com.spacesim.world.Stage23FreightRouteReport.offerKey(k.object(),e.provenanceId()).equals(parts[2])):k.object().objectId().equals(parts[2])).findFirst().orElseThrow();
   var before=campaign(game).captureState();long wallet=campaign(game).playerState().orElseThrow().walletMilliCredits();
   long treasury=campaign(game).coordinator().runtime().world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits();
-  screenshot(stationMap?"stage23b-station-map-offer":"stage23b-resource-map-offer");keyboardAction(renderer,game,stationMap?"pilot.buy-station-map":"pilot.buy-resource-map");
+  screenshot(routeMap?"stage23b-route-map-offer":stationMap?"stage23b-station-map-offer":"stage23b-resource-map-offer");keyboardAction(renderer,game,routeMap?"pilot.buy-route-map":stationMap?"pilot.buy-station-map":"pilot.buy-resource-map");
   if(!before.equals(campaign(game).captureState()))throw new AssertionError("Map preview changed live state");
   keyboardAction(renderer,game,"pilot.physical-confirm");
   var received=campaign(game).coordinator().runtime().discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).knowledge(archived.object()).orElseThrow();
   long price=com.spacesim.campaign.Stage228CampaignAuthority.RESOURCE_MAP_PRICE_MILLI_CREDITS;
   if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=wallet-price
     ||campaign(game).coordinator().runtime().world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits()!=treasury+price
-    ||!received.knownLocation().equals(archived.knownLocation())||received.lastUpdatedSeconds()!=archived.lastUpdatedSeconds())throw new AssertionError("Map sale changed money or observation freshness incorrectly");
+    ||!received.knownLocation().equals(archived.knownLocation())||!routeMap&&received.lastUpdatedSeconds()!=archived.lastUpdatedSeconds())throw new AssertionError("Map sale changed money or observation freshness incorrectly");
+  if(routeMap){
+   var original=archived.evidence().stream().filter(e->com.spacesim.world.Stage23FreightRouteReport.offerKey(archived.object(),e.provenanceId()).equals(parts[2])).findFirst().orElseThrow();
+   var report=com.spacesim.world.Stage23FreightRouteReport.decode(archived.object(),original).orElseThrow();
+   var copied=received.evidence().stream().filter(e->com.spacesim.world.Stage23FreightRouteReport.decodeShared(received.object(),e).filter(r->r.equals(report)).isPresent()).findFirst().orElseThrow();
+   if(copied.observedAtSeconds()!=original.observedAtSeconds()||!copied.freshUntilSeconds().equals(original.freshUntilSeconds())
+     ||!campaign(game).playerState().orElseThrow().discoveredSystemIds().containsAll(report.systems()))throw new AssertionError("Route path or individual observation age changed");
+  }
   processor.keyDown(Input.Keys.F8);game.render();var purchased=campaign(game).captureState();processor.keyDown(Input.Keys.F9);game.render();
   if(!purchased.equals(campaign(game).captureState()))throw new AssertionError("Paid map lost on actual UI save/load");
   hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INTELLIGENCE).findFirst().orElseThrow());game.render();
-  String intel=stationMap?"station:"+archived.object().objectId():"personal-resource:"+archived.object().systemId().value()+":"+archived.object().kind()+":"+archived.object().objectId();
+  String intel=routeMap?com.spacesim.ui.GeneratedCampaignRouteMapUi.personal(campaign(game)).get(0).selection().stableId():stationMap?"station:"+archived.object().objectId():"personal-resource:"+archived.object().systemId().value()+":"+archived.object().kind()+":"+archived.object().objectId();
+  if(routeMap){selectRow(workspace,game,intel);screenshot("stage23b-route-map-personal");}
   selectRow(workspace,game,intel);keyboardAction(renderer,game,"focus");
   if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
-    ||!workspace.view().selection().stableId().equals((stationMap?"station:":"resource:")+archived.object().objectId()))throw new AssertionError("Paid map coordinate did not focus the actual local marker");
+    ||!workspace.view().selection().stableId().equals((stationMap||routeMap?"station:":"resource:")+archived.object().objectId()))throw new AssertionError("Paid map coordinate did not focus the actual local marker");
   screenshot(stationMap?"stage23b-station-map-known-marker":"stage23b-resource-map-known-marker");
-  if((stationMap?campaign(game).canPurchaseStationMap(parts[1],parts[2]):campaign(game).canPurchaseResourceMap(parts[1],parts[2]))||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
-  System.out.println((stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; only contact geometry is a fixture");
+  if((routeMap?campaign(game).canPurchaseRouteMap(parts[1],parts[2]):stationMap?campaign(game).canPurchaseStationMap(parts[1],parts[2]):campaign(game).canPurchaseResourceMap(parts[1],parts[2]))||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
+  System.out.println((routeMap?"Route":stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; contact geometry"+(routeMap?" and historical observation":"")+" are explicit fixtures");
  }
  static void run(String[] args) throws Exception {
   GL.createCapabilities(); System.out.println("Renderer: "+GL11.glGetString(GL11.GL_RENDERER));
@@ -375,7 +384,7 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(System.getProperty("stage23b.ordinaryMiningCheckpoint")!=null){
    ordinaryMiningLoad(game,pendingSave);game.dispose();System.out.println("Ordinary mining checkpoint graphical probe passed");return;
   }
-  if(Boolean.getBoolean("stage23b.resourceMapOnly")||Boolean.getBoolean("stage23b.stationMapOnly")){
+  if(Boolean.getBoolean("stage23b.resourceMapOnly")||Boolean.getBoolean("stage23b.stationMapOnly")||Boolean.getBoolean("stage23b.routeMapOnly")){
    resourceMap(game,pendingSave);game.dispose();System.out.println("Archived map graphical probe passed");return;
   }
   if(Boolean.getBoolean("stage23b.repairOnly")){

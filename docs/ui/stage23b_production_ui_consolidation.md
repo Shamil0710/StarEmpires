@@ -15,6 +15,37 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — paid copies of completed route archives
+
+`BUY_ROUTE_MAP` now offers only a canonical frozen delivery report in the actually contacted
+dispatcher's archive. Current transport plans and cumulative delivery counters are never sources.
+Admission binds the exact receiver object, validates a civilian endpoint and the stored topology path,
+and requires new personal systems or receiver coordinates. Unpaid offers hide names/coordinates.
+
+An exact-state preview and single-use archive transfer settle 100 credits from the personal wallet
+into the real operator treasury, then adopt the archived receiver and only the reported systems.
+Paid evidence is marked shared, not a personal flight, and preserves the individual route observation
+time/freshness even when the player has a newer separate observation of the station. Threat intel,
+assets and travel orders remain independent. Knowing the receiver cannot authorize remote trading.
+Repeated/stale/foreign confirmations are rejected; learned routes persist in existing v16 fields.
+
+Contacts, the dispatcher service overview, keyboard confirmation, journal and personal Intelligence
+charts are connected. A personal chart lists the historical path and its own original timestamp;
+map focus selects its actual archived receiver marker. The existing personal planner can use only
+the systems actually transferred, with its ordinary fitted-fuel/readiness checks.
+
+`GeneratedCampaignRouteMapPurchaseTest,Stage23FreightRouteReportTest,GeneratedCampaignResourceMapPurchaseTest,GeneratedCampaignStationMapPurchaseTest,GeneratedCampaignNpcPlacementTest,ProductionUiCampaignIntegrationTest`
+passed 12 tests (`target/stage23b-paid-route-map-validation.log`). Route producer authenticity remains
+covered by the preceding actual freight-unload acceptance; the route-purchase test explicitly uses
+berth geometry and a historical-observation fixture without changing cargo, delivery counters, money
+or personal knowledge. It is transactional proof, not a unified ordinary-play journey.
+
+The RTX 4070 `stage23b.routeMapOnly=true` probe passed keyboard preview/payment, historical path/date
+checks, exact native UI save/load and receiver focus (`target/stage23b-paid-route-map-graphics.log`).
+Offer/personal-chart screenshots were visually inspected. Strict Javadoc passed
+(`target/stage23b-paid-route-map-javadoc.log`). The long ordinary physical map-seller journey is still
+running; its arrival, purchase and a complete ordinary route-information chain remain unproven.
+
 ### 2026-10-07 — immutable route evidence from actual freight delivery
 
 Completed navigation paths are now frozen at a successful `unloadAtOrderDestination`, not derived

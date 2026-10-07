@@ -111,6 +111,7 @@ public final class GeneratedCampaignJournalUi {
             case "SELLER_STATION_BRIEFING" -> "Получены координаты гражданских станций из архива продавца корабля";
             case "BUY_RESOURCE_MAP" -> "Карта ресурсного участка куплена у местного оператора";
             case "BUY_STATION_MAP" -> "Навигационная карта станции куплена у местного оператора";
+            case "BUY_ROUTE_MAP" -> "Архив пройденного маршрута куплен у местного оператора";
             case "REPAIR_SERVICE_SETTLED" -> "Денежный резерв ремонта перечислен владельцу верфи";
             case "REFIT_SERVICE_SETTLED" -> "Денежный резерв переоснащения перечислен владельцу верфи";
             case "ALLOCATE_FACILITY_RESOURCES" -> "Ресурсы станции перераспределены между установками";
