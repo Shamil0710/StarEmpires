@@ -1960,11 +1960,16 @@ public final class Stage228CampaignAuthority {
         var fleet = world.findFleet(playerState.activeFleetId()).orElse(null);
         if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
                 || !fleet.systemId().equals(npc.locationSystemId()) || world.findFleetJump(fleet.fleetId()).isPresent()) return false;
-        var station = coordinator.runtime().industry().industrial().stations().stream()
+        var endpoint = coordinator.runtime().infrastructure().endpoints().stream()
                 .filter(s -> s.stationId().equals(posting.subjectId()) && s.systemId().equals(npc.locationSystemId())
-                        && s.stableFactionId().equals(npc.factionContentId())).findFirst().orElse(null);
-        if (station == null) return false;
-        var endpoint = coordinator.runtime().infrastructure().endpoint(station.stationId());
+                        && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0).findFirst().orElse(null);
+        if (endpoint == null) return false;
+        var market = pilotMarketReference(endpoint.stationId()).orElse(null);
+        if (market == null) return false;
+        var legal = world.findSession(endpoint.systemId()).orElseThrow().getEntityRegistry().require(market.entityId())
+                .getComponent(com.spacesim.components.FactionComponent.class);
+        var operator = world.findFactionRuntimeId(npc.factionContentId());
+        if (legal == null || operator.isEmpty() || legal.factionId != operator.orElseThrow()) return false;
         var physical = coordinator.runtime().arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElse(null);
         return physical != null && physical.position().distanceTo(endpoint.position()) <= 1000d
                 && Math.hypot(physical.velocityXMps(), physical.velocityYMps()) <= 1d;

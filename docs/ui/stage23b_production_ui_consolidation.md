@@ -15,6 +15,29 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — dispatchers at actual logistics hubs
+
+New-game dispatcher placement now considers the common civilian endpoint registry, including
+logistics hubs. The previous industrial-instance-only loop excluded the Union's existing hub despite
+its archived coordinates and funded operator. Industrial stations retain priority, preserving the
+Imperial posting; exactly one dispatcher is installed per eligible actual faction. Endpoint ownership
+uses the same industrial-owner/territorial fallback policy as initial market commissioning, and the
+station must exist in that operator's archive. No stock, fleet, money or physical geometry is added.
+
+Physical contact now validates the actual registered market faction against the dispatcher's
+operator. Territorial presence or an old posting alone cannot authorize contact after a legal owner
+change. The actual berth, speed, fleet ownership, availability and discovered-system checks remain.
+The Union dispatcher at `hub.14` is available after real DOCK; no industrial station object is required.
+This is new-game roster authoring only: restore retains an empty/partial historical roster and the
+long running ordinary journey continues with its own historical dispatcher placement.
+
+`GeneratedCampaignNpcPlacementTest,GeneratedCampaignResourceMapPurchaseTest,GeneratedCampaignStationMapPurchaseTest,GeneratedCampaignRouteMapPurchaseTest,ProductionUiCampaignIntegrationTest`
+passed 10 tests (`target/stage23b-logistics-dispatcher-validation.log`). The new logistics test declares
+its berth geometry fixture, verifies contact/UI/native restoration and rejects a contradictory legal
+market operator. Existing archive/physical/financial invariants and empty-roster restore remain covered.
+Strict Javadoc passed (`target/stage23b-logistics-dispatcher-javadoc.log`). This does not prove a new
+ordinary mining/map journey using the new roster or mark Stage23B complete.
+
 ### 2026-10-07 — paid copies of completed route archives
 
 `BUY_ROUTE_MAP` now offers only a canonical frozen delivery report in the actually contacted

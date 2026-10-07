@@ -35,9 +35,14 @@ final class GeneratedCampaignNpcPlacement {
         var factions = new HashSet<String>();
         var postings = new java.util.HashMap<String, StaticObjectRef>();
         var service = coordinator.npcMissionService();
-        for (var station : coordinator.runtime().industry().industrial().stations().stream()
-                .sorted(java.util.Comparator.comparing(s -> s.stationId())).toList()) {
-            String faction = station.stableFactionId();
+        var runtime = coordinator.runtime();
+        for (var station : runtime.infrastructure().endpoints().stream()
+                .sorted(java.util.Comparator.comparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::generatedIndustrial)
+                        .reversed().thenComparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::stationId)).toList()) {
+            var owner = runtime.industry().industrial().stations().stream().filter(s -> s.stationId().equals(station.stationId()))
+                    .map(s -> s.stableFactionId()).findFirst().or(() -> runtime.world().controllingFaction(station.systemId()));
+            if (owner.isEmpty()) continue;
+            String faction = owner.orElseThrow();
             if (factions.contains(faction)
                     || GeneratedCampaignStationSalePolicy.priceMilliCredits(station.stationArchetypeId()) == 0
                     || coordinator.runtime().world().findFactionEconomicState(faction).isEmpty()) continue;

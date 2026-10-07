@@ -5,6 +5,40 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignNpcPlacementTest {
+    @Test void existingUnionLogisticsHubGetsANewGameDispatcherWithActualBerthAndLegalOperatorChecks() {
+        var c = Stage228CampaignAuthority.create(1);
+        var npc = c.coordinator().npcMissions().npcs().stream().filter(n -> n.factionContentId().equals("faction.beta")).findFirst().orElseThrow();
+        var posting = npc.knowledge().stream().filter(k -> k.factId().equals(npc.npcId() + ":posting")).findFirst().orElseThrow();
+        assertEquals("hub.14", posting.subjectId());
+        var r = c.coordinator().runtime();
+        assertTrue(r.industry().industrial().stations().stream().noneMatch(s -> s.stationId().equals(posting.subjectId())),
+                "Logistics dispatchers must not require an industrial-station instance");
+        c.submitIndependentPilotStart(c.previewIndependentPilotStart());
+        assertFalse(c.canContactNpc(npc.npcId()));
+        var endpoint = r.infrastructure().endpoint(posting.subjectId());
+        var fleet = r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
+        // Explicit berth fixture verifies the logistics contact boundary, not ordinary travel.
+        r.world().beginFleetTransfer(fleet.id(), endpoint.systemId()); r.world().completeFleetTransfer(fleet.id(), 0, 0);
+        fleet = r.world().findFleet(fleet.id()).orElseThrow();
+        var local = r.arrival().materialization(fleet.systemId());
+        if (local.physicalState(fleet.localEntityId()).isEmpty()) local.registerPhysicalState(fleet.localEntityId(),
+                com.spacesim.world.LocalPhysicalKinematics.stationary(endpoint.position()));
+        local.updatePhysicalState(fleet.localEntityId(), com.spacesim.world.LocalPhysicalKinematics.stationary(endpoint.position()));
+        c.coordinator().setPaused(false); c.advanceFrame(c.coordinator().session().fixedStepSeconds()); c.coordinator().setPaused(true);
+        c.submitPilotAction(c.previewPilotAction("DOCK", endpoint.stationId(), "", 0));
+        assertTrue(c.canContactNpc(npc.npcId()));
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(c).stream().anyMatch(row ->
+                row.selection().stableId().equals("dispatcher-contact|" + npc.npcId())));
+        var saved = c.captureState();
+        assertTrue(Stage228CampaignAuthority.restore(saved).canContactNpc(npc.npcId()));
+        var legal = r.world().findSession(endpoint.systemId()).orElseThrow().getEntityRegistry()
+                .require(c.pilotMarketReference(endpoint.stationId()).orElseThrow().entityId())
+                .getComponent(com.spacesim.components.FactionComponent.class);
+        legal.factionId = r.world().findFactionRuntimeId("faction.alpha").orElseThrow();
+        assertFalse(c.canContactNpc(npc.npcId()), "Territorial presence and an old posting cannot substitute for the actual legal operator");
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(c).isEmpty());
+    }
+
     @Test void ordinaryTickReviewsRefreshOnlyExistingAffiliatedDispatchers() {
         var campaign = Stage228CampaignAuthority.create(1);
         var initial = campaign.coordinator().npcMissions();
