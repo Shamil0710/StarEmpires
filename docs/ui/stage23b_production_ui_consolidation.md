@@ -15,6 +15,34 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-07 — immutable route evidence from actual freight delivery
+
+Completed navigation paths are now frozen at a successful `unloadAtOrderDestination`, not derived
+from a transport order's cumulative delivered-mass counter. `rerouteRemaining` retains that counter
+while changing the current path, so the counter cannot establish which path was historically flown.
+Old counters and plain station observations are deliberately not backfilled into route reports.
+
+The existing cargo transfer prepares validated discovery data without publishing it; only a committed
+unload adopts it into the actual operator's archive. The real destination identity, classification and
+coordinates accompany a `PHYSICAL_VISIT_OR_SURVEY` receipt containing the immutable order/path.
+`Stage23FreightRouteReport` encodes this metadata in the existing evidence provenance field and
+decodes only canonical records bound to their actual destination system. Native layout is unchanged.
+Loading alone creates no reports. Repeated deliveries of the same order/path preserve the original
+observation age; later rerouting cannot overwrite the stored path. Other actor archives stay private.
+
+The existing conserved-freight acceptance path checks ordinary fitted jumps, mid-transit native
+save/load, rejected unloading, two actual partial destination transfers and exact final restoration.
+It now verifies that rejection publishes no route and repeated transfer neither duplicates nor
+refreshes its archive. Fixtures and engineering travel helpers in this acceptance test remain its
+existing limitations; this is not the separate human ordinary-play acceptance.
+
+`Stage23FreightRouteReportTest,Stage205GeneratedWorldPlayableAcceptanceTest,GeneratedCampaignResourceMapPurchaseTest,GeneratedCampaignStationMapPurchaseTest`
+passed 8 tests (`target/stage23b-freight-route-evidence-validation.log`). The final receipt adoption
+and repeat-delivery checks passed 4 tests plus strict Javadoc
+(`target/stage23b-freight-route-evidence-final-validation.log`). Player purchase/transfer of these
+historical route reports is still pending; this slice provides its actual persisted source, not a UI
+or ordinary route-knowledge completion claim. The long physical map-seller journey remains active.
+
 ### 2026-10-07 — paid station navigation charts
 
 `BUY_STATION_MAP` copies a contacted dispatcher's existing civilian station record for 100 credits,

@@ -1055,14 +1055,28 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             TransportOrderState order = freight.findOrder(fleetState.activeOrderId()).orElseThrow();
             RuntimeEndpoint endpoint = infrastructure.endpoint(order.destinationEndpointId());
             HandlingCapability handling = holdHandling(fleetId, endpoint.handlingCapability());
+            var routeReport = new com.spacesim.world.Stage23FreightRouteReport.Report(order.orderId(), order.orderedSystems());
+            var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(endpoint.systemId(),
+                    com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE, endpoint.stationId());
+            var prior = discovery.knowledgeFor(order.stableFactionId());
+            var received = prior;
+            String receipt = com.spacesim.world.Stage23FreightRouteReport.provenance(routeReport);
+            if (prior.knowledge(object).stream().flatMap(k -> k.evidence().stream()).noneMatch(e -> e.provenanceId().equals(receipt))) {
+                double seconds = world.getAuthoritativeWorldTick() * (double) world.findSession(endpoint.systemId()).orElseThrow().getClock().getFixedStepSeconds();
+                received = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                        new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                                Optional.of(endpoint.stationArchetypeId()), Optional.of(endpoint.position()),
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(),
+                                new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                        com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY,
+                                        receipt, seconds, java.util.OptionalDouble.empty())));
+            }
             Stage20FreightRuntime.CargoOperationResult result = freight.unloadCommodity(
-                    fleetId,
-                    endpoint.storage(),
-                    massKg,
-                    handling,
-                    handling.openInterval(durationSeconds));
+                    fleetId, endpoint.storage(), massKg, handling, handling.openInterval(durationSeconds));
             if (result.transferred()) {
                 synchronizeFreightEngineeringCargo(fleetId);
+                if (received != prior) replaceDiscoveryOwner(received);
             }
             return result;
         }

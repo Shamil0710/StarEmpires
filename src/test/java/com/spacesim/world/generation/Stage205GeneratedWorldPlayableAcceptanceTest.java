@@ -174,7 +174,27 @@ class Stage205GeneratedWorldPlayableAcceptanceTest {
         double destinationBefore = delivery.infrastructure()
                 .endpoint(candidate.order().destinationEndpointId())
                 .storage().commodityMassKg(candidate.order().commodityId());
-        assertTrue(delivery.unloadAtOrderDestination(fleetId, cargoMass, 60d).transferred());
+        var knowledgeBeforeDelivery = delivery.discoveryState();
+        assertFalse(delivery.unloadAtOrderDestination(fleetId, Double.MAX_VALUE, 60d).transferred());
+        assertEquals(knowledgeBeforeDelivery, delivery.discoveryState(), "Rejected unload cannot publish a route");
+        assertTrue(delivery.unloadAtOrderDestination(fleetId, cargoMass / 2, 60d).transferred());
+        var destinationRef = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(
+                candidate.order().orderedSystems().get(candidate.order().orderedSystems().size() - 1),
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE,
+                candidate.order().destinationEndpointId());
+        var route = delivery.discoveryState().knowledgeFor(candidate.order().stableFactionId()).knowledge(destinationRef)
+                .orElseThrow().evidence().stream().map(e -> com.spacesim.world.Stage23FreightRouteReport.decode(destinationRef, e))
+                .flatMap(java.util.Optional::stream).findFirst().orElseThrow();
+        assertEquals(candidate.order().orderId(), route.orderId());
+        assertEquals(candidate.order().orderedSystems(), route.systems());
+        var firstReceiptKnowledge = delivery.discoveryState();
+        delivery.advanceFrame(delivery.world().findSession(delivery.world().getActiveSystemId()).orElseThrow().getClock().getFixedStepSeconds());
+        assertTrue(delivery.unloadAtOrderDestination(fleetId, cargoMass / 2, 60d).transferred());
+        assertEquals(firstReceiptKnowledge, delivery.discoveryState(), "Repeated delivery of the same path must not refresh or duplicate its archive");
+        for (var owner : knowledgeBeforeDelivery.knowledgeStates()) {
+            if (!owner.ownerId().equals(candidate.order().stableFactionId()))
+                assertEquals(owner, delivery.discoveryState().knowledgeFor(owner.ownerId()), "Operator delivery cannot grant another actor's navigation");
+        }
         assertEquals(destinationBefore + cargoMass,
                 delivery.infrastructure().endpoint(candidate.order().destinationEndpointId())
                         .storage().commodityMassKg(candidate.order().commodityId()), 0d);
