@@ -14,6 +14,7 @@ public final class Stage23BOrdinaryResourceMapJourney {
         var runtime = campaign.coordinator().runtime();
         if (!campaign.playerState().orElseThrow().docked()) throw new AssertionError("Actual seller contact required");
         var before = campaign.captureState();
+        var archivesBefore = runtime.discoveryState();
         long tick = runtime.world().getAuthoritativeWorldTick();
         var rows = GeneratedCampaignResourceMapUi.rows(campaign);
         if (!before.equals(campaign.captureState())) throw new AssertionError("UI created knowledge");
@@ -29,6 +30,9 @@ public final class Stage23BOrdinaryResourceMapJourney {
             for (var report : runtime.discoveryState().knowledgeFor(npc.factionContentId()).entries()) {
                 String objectId = report.object().objectId();
                 if (!campaign.canPurchaseResourceMap(npc.npcId(), objectId)) continue;
+                String selection = "pilot-resource-map|" + npc.npcId() + '|' + objectId;
+                if (rows.stream().noneMatch(row -> row.selection().stableId().equals(selection)))
+                    throw new AssertionError("Actual map purchase is absent from the production UI");
                 var preview = campaign.previewPilotAction("BUY_RESOURCE_MAP", npc.npcId(), objectId, 1);
                 if (!preview.allowed() || !before.equals(campaign.captureState())) throw new AssertionError("Invalid map preview");
                 long treasury = runtime.world().findFactionEconomicState(npc.factionContentId()).orElseThrow().treasuryMilliCredits();
@@ -47,6 +51,11 @@ public final class Stage23BOrdinaryResourceMapJourney {
                         || runtime.world().getAuthoritativeWorldTick() != tick)
                     throw new AssertionError("Non-conserved or invented map knowledge");
                 var purchased = campaign.captureState();
+                for (var archive : archivesBefore.knowledgeStates()) {
+                    if (!archive.ownerId().equals(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+                            && !archive.equals(runtime.discoveryState().knowledgeFor(archive.ownerId())))
+                        throw new AssertionError("Purchasing a copy changed another actor's archive");
+                }
                 Stage228GeneratedCampaignPersistenceCodec.write(Path.of(args[1]), purchased);
                 var restored = Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(Path.of(args[1])));
                 if (!purchased.equals(restored.captureState())) throw new AssertionError("Non-exact purchased map checkpoint");
