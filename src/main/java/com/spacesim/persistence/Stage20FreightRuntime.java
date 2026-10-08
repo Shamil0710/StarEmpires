@@ -519,6 +519,18 @@ public final class Stage20FreightRuntime {
      */
     public boolean publishHandledPersonalProduct(com.spacesim.economy.FinishedProductTransferWorkQueue.CompletionPermit permit,
             double seconds) {
+        return permit.order().purchasePayment() == null && publishHandledPersonalProduct(permit, seconds, () -> true);
+    }
+
+    /**
+     * Commits an optional purchase settlement after freight capacity and provenance preflight.
+     * @param permit completed physical handling authority
+     * @param seconds actual world time
+     * @param settlement atomic owning money settlement
+     * @return whether goods, provenance and payment committed
+     */
+    public boolean publishHandledPersonalProduct(com.spacesim.economy.FinishedProductTransferWorkQueue.CompletionPermit permit,
+            double seconds, java.util.function.BooleanSupplier settlement) {
         Objects.requireNonNull(permit); requireNonNegativeFinite(seconds, "finished product handling time");
         var order = permit.order();
         var fleet = requireFreighter(order.fleetId());
@@ -529,7 +541,7 @@ public final class Stage20FreightRuntime {
             return false;
         if (!order.loading() && productLots.values().stream().filter(l -> l.fleetId().equals(order.fleetId()) && l.productId().equals(order.productId()))
                 .mapToLong(Stage20FreightPersistentState.ProductCargoLotState::count).sum() < order.count()) return false;
-        if (!permit.publish()) return false;
+        if (!permit.publish(settlement)) return false;
         updateProductProvenance(order.fleetId(), order.loading() ? permit.source() : permit.destination(), order.productId(),
                 order.count(), order.loading(), seconds);
         refreshFreighterHold(order.fleetId()); return true;

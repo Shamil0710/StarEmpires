@@ -91,6 +91,33 @@ class FinishedProductTransferWorkQueueTest {
     }
 
     private FinishedProductTransferWorkQueue queue(State state) { return new FinishedProductTransferWorkQueue(Stage22CivilianMiningProductionPath.loadProducts(), state); }
+    @Test void failedPurchaseSettlementCannotMoveProductsAndCompletionCannotPayTwice() {
+        var source = storage("station", 1); var hold = storage("freight-hold:1", 0);
+        var stores = Map.of(source.stationId(), source, hold.stationId(), hold);
+        var payment = new FinishedProductPurchasePayment("faction.stellar_empire", FinishedProductPurchasePayment.quote(PRODUCT, 1));
+        var queue = queue(State.empty());
+        queue.start(new Order("purchase", new FleetId(1), "station", "freight-hold:1", PRODUCT, 1, 0, 0, payment),
+                context(source, hold), stores::get, 0);
+        queue.advance(1, stores::get, o -> context(source, hold), o -> handling.openInterval(1), CompletionPermit::publish);
+        assertEquals(payment, queue.capture().orders().get(0).purchasePayment());
+        var deniedBudget = handling.openInterval(1);
+        assertTrue(queue.advance(2, stores::get, o -> context(source, hold), o -> deniedBudget,
+                permit -> { assertFalse(permit.publish()); return permit.publish(() -> false); }).isEmpty());
+        assertEquals(mass / 2, deniedBudget.remainingMassKg());
+        assertEquals(1, source.snapshotProductCountById().get(PRODUCT)); assertEquals(0, hold.productCount(PRODUCT));
+        var payments = new java.util.concurrent.atomic.AtomicInteger();
+        var escaped = new AtomicReference<CompletionPermit>();
+        assertEquals(1, queue.advance(3, stores::get, o -> context(source, hold), o -> handling.openInterval(1), permit -> {
+            escaped.set(permit);
+            assertTrue(permit.publish(() -> { payments.incrementAndGet(); return true; }));
+            assertFalse(permit.publish(() -> { payments.incrementAndGet(); return true; }));
+            return true;
+        }).size());
+        assertFalse(escaped.get().publish(() -> { payments.incrementAndGet(); return true; }));
+        assertEquals(1, payments.get()); assertEquals(1, hold.productCount(PRODUCT));
+        assertTrue(source.snapshotProductCountById().isEmpty());
+    }
+
     private Order order(String id, long fleet, long tick) { return new Order(id, new FleetId(fleet), "station", "freight-hold:" + fleet, PRODUCT, 1, tick, 0); }
     private Context context(Stage18StationStorage source, Stage18StationStorage destination) { return new Context(source, destination, handling, mass * 3); }
     private Stage18StationStorage storage(String id, int count) {

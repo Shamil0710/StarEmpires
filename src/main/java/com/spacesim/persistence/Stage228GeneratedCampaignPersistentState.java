@@ -60,9 +60,9 @@ public record Stage228GeneratedCampaignPersistentState(
         com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction) {
 
     /** Current M22.8 campaign envelope schema. */
-    public static final int CURRENT_VERSION = 16;
+    public static final int CURRENT_VERSION = 17;
     /** Current M22.8 campaign runtime contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v16";
+    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v17";
 
     /**
      * Source-compatible envelope without granting yard structures or work.

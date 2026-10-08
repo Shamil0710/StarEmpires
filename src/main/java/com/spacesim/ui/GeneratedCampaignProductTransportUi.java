@@ -15,7 +15,7 @@ public final class GeneratedCampaignProductTransportUi {
     private GeneratedCampaignProductTransportUi() { }
 
     /**
-     * Projects actual stock only at personally owned stations and in the active personal hold.
+     * Projects personal stock and physically contacted civilian product offers.
      * @param campaign live campaign authority
      * @return immutable stock and pending handling rows
      */
@@ -30,12 +30,28 @@ public final class GeneratedCampaignProductTransportUi {
         var hold = runtime.freight().moduleCargoStorage(fleet);
         String docked = campaign.dockedModuleStationId().filter(campaign::ownsProductionStation).orElse("");
         for (var station : runtime.industry().industrial().stations()) {
-            if (!campaign.ownsProductionStation(station.stationId())) continue;
+            boolean own = campaign.ownsProductionStation(station.stationId());
+            if (!own && !campaign.hasCivilianProductPurchaseContact(station.stationId())) continue;
             var store = runtime.infrastructure().endpoint(station.stationId()).storage();
             for (var entry : store.snapshot().productCountById().entrySet()) {
                 var definition = engineering.findModule(entry.getKey());
                 String name = definition == null ? "Готовый товар" : definition.displayName();
                 var product = products.findProduct(entry.getKey());
+                if (!own) {
+                    if (store.productCount(entry.getKey()) <= 0) continue;
+                    long price = com.spacesim.economy.FinishedProductPurchasePayment.quote(entry.getKey(), 1);
+                    result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
+                            "pilot-product-buy|" + station.stationId() + '|' + entry.getKey()), name, "Готовые изделия продавца",
+                            store.productCount(entry.getKey()) + " шт. доступно", List.of(InfoSection.of("Покупка оборудования",
+                            "Цена единицы", String.format(Locale.ROOT, "%.3f кр.", price / 1000d),
+                            "Масса единицы", String.format(Locale.ROOT, "%.1f кг", product.unitMassKg()),
+                            "Доставка", "Погрузка в личный трюм за игровые такты; товар остаётся у продавца до завершения",
+                            "Оплата", "Деньги резервируются при подтверждении и поступают оператору после погрузки",
+                            "Отмена", "Возвращает деньги и освобождает товар; выполненная обработка не возвращается")),
+                            "Фактический запас гражданского оператора при личной стыковке",
+                            station.systemId(), fleet.value(), runtime.world().getAuthoritativeWorldTick()));
+                    continue;
+                }
                 result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
                         "pilot-product-load|" + station.stationId() + '|' + entry.getKey()), name, "Готовые товары на станции",
                         store.productCount(entry.getKey()) + " шт. доступно", List.of(InfoSection.of("Физический запас",
@@ -58,16 +74,17 @@ public final class GeneratedCampaignProductTransportUi {
                     runtime.freight().findFreighter(fleet).orElseThrow().currentSystemId(), fleet.value(), runtime.world().getAuthoritativeWorldTick()));
         }
         for (var order : campaign.productTransfers().orders()) {
-            if (!order.fleetId().equals(fleet) || !campaign.ownsProductionStation(order.stationId())) continue;
+            if (!order.fleetId().equals(fleet) || !campaign.ownsProductionStation(order.stationId()) && order.purchasePayment() == null) continue;
             double mass = products.findProduct(order.productId()).unitMassKg() * order.count();
             result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
                     "product-transfer-cancel|" + order.stationId() + '|' + order.orderId()),
-                    order.loading() ? "Погрузка готового товара" : "Выгрузка готового товара", "Обработка товара",
+                    order.purchasePayment() != null ? "Покупка и погрузка оборудования" : order.loading() ? "Погрузка готового товара" : "Выгрузка готового товара", "Обработка товара",
                     String.format(Locale.ROOT, "%.1f %%", order.completedHandlingKg() / mass * 100),
                     List.of(InfoSection.of("Конечная обработка", "Количество", order.count() + " шт.",
                     "Обработано", String.format(Locale.ROOT, "%.1f / %.1f кг", order.completedHandlingKg(), mass),
                     "Источник", order.sourceStorageId(), "Получатель", order.destinationStorageId(),
-                    "Отмена", "Освободит резерв; выполненная обработка не возвращается")),
+                    "Денежный резерв", order.purchasePayment() == null ? "Нет" : String.format(Locale.ROOT, "%.3f кр.", order.purchasePayment().reservedMilliCredits() / 1000d),
+                    "Отмена", "Освободит товар и вернёт денежный резерв; выполненная обработка не возвращается")),
                     "Товар остаётся у источника до завершения; пауза останавливает работу",
                     runtime.industry().industrial().station(order.stationId()).systemId(), fleet.value(), order.startedAtTick()));
         }

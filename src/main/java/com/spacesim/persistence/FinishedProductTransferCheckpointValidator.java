@@ -35,7 +35,14 @@ final class FinishedProductTransferCheckpointValidator {
                     .anyMatch(e -> e.id().equals(ref.stationEntityId()) && e.market() != null && e.identity() != null
                             && (e.identity().name().equals("Generated market " + order.stationId())
                             || e.identity().name().equals("Generated market v2 " + order.stationId()))));
-            if (!owner) throw new IllegalArgumentException("Product handling requires its actual personal station owner");
+            if (order.purchasePayment() == null) {
+                if (!owner) throw new IllegalArgumentException("Product handling requires its actual personal station owner");
+            } else {
+                if (owner) throw new IllegalArgumentException("Personal stock cannot claim a foreign product purchase");
+                var placement = stage20.worldState().fleets().stream().filter(f -> f.id().equals(order.fleetId())).findFirst().orElseThrow();
+                ShipyardRepairCheckpointValidator.validateCivilianBerth(order.stationId(),
+                        order.purchasePayment().sellerFactionId(), stage20, player, placement);
+            }
             var station = stage20.campaign().industrialState().stationStorages().stream()
                     .filter(s -> s.stationId().equals(order.stationId())).findFirst().orElseThrow(
                             () -> new IllegalArgumentException("Product handling station storage is absent"));

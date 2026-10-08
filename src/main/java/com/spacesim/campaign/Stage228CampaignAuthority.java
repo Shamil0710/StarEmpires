@@ -828,7 +828,7 @@ public final class Stage228CampaignAuthority {
         if (!p.action.equals("ACKNOWLEDGE_JOURNAL")) recordPersonalCommit(
                 com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, p.station, p.commodity,
                 switch (p.action) {
-                    case "BUY", "SELL", "LOAD_CONSUMABLE", "START_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT" -> p.kilograms;
+                    case "BUY", "SELL", "LOAD_CONSUMABLE", "START_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT" -> p.kilograms;
                     case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP", "BUY_STATION_MAP", "BUY_ROUTE_MAP" -> 1;
                     default -> 0;
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
@@ -959,22 +959,39 @@ public final class Stage228CampaignAuthority {
         var world = runtime.world();
         if ("CANCEL_PRODUCT_TRANSFER".equals(action)) {
             var job = productTransfers.capture().orders().stream().filter(o -> o.orderId().equals(commodity)).findFirst().orElseThrow();
-            if (!ownsProductionStation(stationId) || !job.stationId().equals(stationId))
+            if ((!ownsProductionStation(stationId) && job.purchasePayment() == null) || !job.stationId().equals(stationId)
+                    || !playerState.ownedFleetIds().contains(job.fleetId()) || !job.fleetId().equals(playerState.activeFleetId()))
                 throw new IllegalStateException("Wrong product handling owner");
-            productTransfers.cancel(commodity, this::productStorage); return;
+            cancelProductTransfer(job); return;
         }
-        if ("LOAD_PRODUCT".equals(action) || "UNLOAD_PRODUCT".equals(action)) {
+        if ("LOAD_PRODUCT".equals(action) || "UNLOAD_PRODUCT".equals(action) || "BUY_PRODUCT".equals(action)) {
             if (!productTransfers.capture().orders().isEmpty() || !moduleTransfers.capture().orders().isEmpty()
                     || !refitQueue.capture().orders().isEmpty() || !repairQueue.capture().orders().isEmpty()
                     || !runtime.freight().personalMiningOrders().isEmpty()) throw new IllegalStateException("Finish current physical work first");
-            var context = productTransferContext(stationId, "LOAD_PRODUCT".equals(action));
+            boolean purchase = "BUY_PRODUCT".equals(action);
+            com.spacesim.economy.FinishedProductPurchasePayment payment = null;
+            if (purchase) {
+                if (ownsProductionStation(stationId) || !civilianRepairOperator(stationId, null))
+                    throw new IllegalStateException("No foreign civilian product operator");
+                long fee = com.spacesim.economy.FinishedProductPurchasePayment.quote(commodity, kg);
+                if (playerState.walletMilliCredits() < fee) throw new IllegalStateException("Insufficient money for ready equipment");
+                payment = new com.spacesim.economy.FinishedProductPurchasePayment(
+                        runtime.industry().industrial().station(stationId).stableFactionId(), fee);
+            }
+            var context = productTransferContext(stationId, !"UNLOAD_PRODUCT".equals(action), payment);
             if (context == null || kg <= 0) throw new IllegalStateException("Product handling requires actual own stationary docked ship and station");
             if (handlingUsedThisTick(stationId)) throw new IllegalStateException("This tick's endpoint handling is already spent");
             var fleet = runtime.freight().findFreighter(playerState.activeFleetId()).orElseThrow();
             var order = new com.spacesim.economy.FinishedProductTransferWorkQueue.Order(
                     "player-product-transfer:" + fleet.fleetId().value() + ':' + world.getAuthoritativeWorldTick(), fleet.fleetId(),
-                    context.source().stationId(), context.destination().stationId(), commodity, kg, world.getAuthoritativeWorldTick(), 0d);
-            productTransfers.start(order, context, this::productStorage, world.getAuthoritativeWorldTick()); return;
+                    context.source().stationId(), context.destination().stationId(), commodity, kg, world.getAuthoritativeWorldTick(), 0d, payment);
+            productTransfers.start(order, context, this::productStorage, world.getAuthoritativeWorldTick());
+            if (payment != null) {
+                replacePilotFinancialDocking(playerState.walletMilliCredits() - payment.reservedMilliCredits(), playerState.dockedAt(), playerState.discoveredObjects());
+                world.findSession(fleet.currentSystemId()).orElseThrow().getLedger().recordMoneyTransfer("PLAYER",
+                        "PLAYER_PRODUCT_ESCROW:" + order.orderId(), payment.reservedMilliCredits(), "paid-product-reserve.v1");
+            }
+            return;
         }
         if (!productTransfers.capture().orders().isEmpty() && java.util.Set.of("START_REFIT", "START_REFIT_USED", "START_REPAIR",
                 "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_CONSUMABLE", "LOAD_MODULE", "UNLOAD_MODULE").contains(action))
@@ -2438,10 +2455,25 @@ public final class Stage228CampaignAuthority {
         advanceProductTransfersAtTick(tick, budgets);
     }
 
-    private com.spacesim.economy.FinishedProductTransferWorkQueue.Context productTransferContext(String stationId, boolean loading) {
-        // Permission to service or handle an individually owned used module at a foreign yard
-        // does not confer ownership of that station's unassigned finished-product stock.
-        if (!ownsProductionStation(stationId)) return null;
+    /**
+     * Checks physical contact with an existing foreign civilian product operator without exposing remote stock.
+     * @param stationId existing station
+     * @return whether ready equipment may be offered at this actual berth
+     */
+    public boolean hasCivilianProductPurchaseContact(String stationId) {
+        if (playerState == null || ownsProductionStation(stationId)
+                || coordinator.runtime().industry().industrial().stations().stream().noneMatch(s -> s.stationId().equals(stationId))) return false;
+        return civilianRepairOperator(stationId, null) && moduleTransferContext(stationId, true) != null;
+    }
+
+    private com.spacesim.economy.FinishedProductTransferWorkQueue.Context productTransferContext(String stationId, boolean loading,
+            com.spacesim.economy.FinishedProductPurchasePayment payment) {
+        if (payment == null) {
+            if (!ownsProductionStation(stationId)) return null;
+        } else if (!loading || ownsProductionStation(stationId) || !civilianRepairOperator(stationId, null)
+                || !payment.sellerFactionId().equals(coordinator.runtime().industry().industrial().station(stationId).stableFactionId())
+                || coordinator.runtime().world().findFactionEconomicState(payment.sellerFactionId()).orElseThrow().treasuryMilliCredits()
+                        > Long.MAX_VALUE - payment.reservedMilliCredits()) return null;
         var physical = moduleTransferContext(stationId, loading); if (physical == null) return null;
         var fleet = coordinator.runtime().freight().findFreighter(playerState.activeFleetId()).orElseThrow();
         return new com.spacesim.economy.FinishedProductTransferWorkQueue.Context(physical.source(), physical.destination(), physical.handling(),
@@ -2454,18 +2486,41 @@ public final class Stage228CampaignAuthority {
         var completed = productTransfers.advance(tick, this::productStorage, order -> {
             if (playerState == null || !order.fleetId().equals(playerState.activeFleetId())
                     || handlingUsedThisTick(order.stationId()) && !budgets.containsKey(order.stationId())) return null;
-            return productTransferContext(order.stationId(), order.loading());
+            return productTransferContext(order.stationId(), order.loading(), order.purchasePayment());
         }, order -> budgets.computeIfAbsent(order.stationId(), station -> runtime.infrastructure().endpoint(station)
                 .handlingCapability().openInterval(coordinator.session().fixedStepSeconds())),
-                permit -> runtime.freight().publishHandledPersonalProduct(permit, tick * (double) coordinator.session().fixedStepSeconds()));
+                permit -> runtime.freight().publishHandledPersonalProduct(permit, tick * (double) coordinator.session().fixedStepSeconds(), () -> {
+                    var payment = permit.order().purchasePayment();
+                    return payment == null || runtime.world().transferToFactionTreasury(payment.sellerFactionId(),
+                            new com.spacesim.components.WalletComponent(payment.reservedMilliCredits()),
+                            "PLAYER_PRODUCT_ESCROW:" + permit.order().orderId(), payment.reservedMilliCredits(), "paid-product-complete.v1");
+                }));
         for (var order : completed) {
             runtime.synchronizeFreightEngineeringCargo(order.fleetId());
+            if (order.purchasePayment() != null) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    "PRODUCT_PURCHASE_SETTLED", order.stationId(), order.purchasePayment().sellerFactionId(), order.count(), 0, order.fleetId());
             recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "PRODUCT_TRANSFER_COMPLETED",
                     order.stationId(), order.productId(), order.count(), 0, order.fleetId());
         }
     }
 
+    private void cancelProductTransfer(com.spacesim.economy.FinishedProductTransferWorkQueue.Order order) {
+        long refund = order.purchasePayment() == null ? 0 : order.purchasePayment().reservedMilliCredits();
+        long balance = Math.addExact(playerState.walletMilliCredits(), refund);
+        productTransfers.cancel(order.orderId(), this::productStorage);
+        if (refund > 0) {
+            replacePilotFinancialDocking(balance, playerState.dockedAt(), playerState.discoveredObjects());
+            var system = coordinator.runtime().infrastructure().endpoint(order.stationId()).systemId();
+            coordinator.runtime().world().findSession(system).orElseThrow().getLedger().recordMoneyTransfer(
+                    "PLAYER_PRODUCT_ESCROW:" + order.orderId(), "PLAYER", refund, "paid-product-refund.v1");
+        }
+    }
+
     private void reconcileModuleLosses() {
+        for (var order : productTransfers.capture().orders()) {
+            var carrier = coordinator.runtime().freight().findFreighter(order.fleetId());
+            if (carrier.isEmpty() || !carrier.orElseThrow().operational()) cancelProductTransfer(order);
+        }
         if (moduleCustody.modules().isEmpty() && moduleTransfers.capture().orders().isEmpty()) return;
         var lost = coordinator.runtime().freight().capture().freighters().stream().filter(f -> !f.operational())
                 .map(f -> f.cargoStorage().stationId()).collect(java.util.stream.Collectors.toSet());

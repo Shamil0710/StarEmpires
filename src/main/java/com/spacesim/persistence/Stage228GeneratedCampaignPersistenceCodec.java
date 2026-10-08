@@ -24,7 +24,7 @@ import java.util.Objects;
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 16;
+    private static final int FILE_VERSION = 17;
     private static final int M22_8M_FILE_VERSION = 4;
     private static final String M22_8M_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
     private static final int MAX_PLAYER_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -123,7 +123,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
                 case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case M22_8C_FILE_VERSION -> decodeM22_8C(in);
-                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, FILE_VERSION -> decodeCurrent(in, fileVersion);
+                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, FILE_VERSION -> decodeCurrent(in, fileVersion);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
             };
@@ -346,6 +346,8 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         if (fileVersion < 15 && stage21.stage21HRuntime().npcMissionState().missions().stream().anyMatch(m ->
                 m.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST))
             throw new IllegalArgumentException("Personal physical supply contracts require native campaign v15");
+        if (fileVersion < 17 && products.orders().stream().anyMatch(order -> order.purchasePayment() != null))
+            throw new IllegalArgumentException("Held finished product purchases require native campaign v17");
         requireEnd(in);
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,

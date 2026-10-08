@@ -796,8 +796,9 @@ public final class GeneratedWorldCommandUiRenderer {
                 width = inspectorRect.width() - 32f * scale;
             } else {
                 boolean loading = physicalProductTransfer.equals("LOAD_PRODUCT");
-                ids = new String[]{"pilot.less", "pilot.more", loading ? "pilot.load-product" : "pilot.unload-product"};
-                labels = new String[]{"− ШТ", "+ ШТ", (loading ? "ПОГРУЗИТЬ " : "ВЫГРУЗИТЬ ") + physicalPilotKilograms + " ШТ"};
+                boolean purchase = physicalProductTransfer.equals("BUY_PRODUCT");
+                ids = new String[]{"pilot.less", "pilot.more", purchase ? "pilot.buy-product" : loading ? "pilot.load-product" : "pilot.unload-product"};
+                labels = new String[]{"− ШТ", "+ ШТ", (purchase ? "КУПИТЬ " : loading ? "ПОГРУЗИТЬ " : "ВЫГРУЗИТЬ ") + physicalPilotKilograms + " ШТ"};
                 width = (inspectorRect.width() - 40f * scale) / 3f;
             }
         }

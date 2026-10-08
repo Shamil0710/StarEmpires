@@ -369,6 +369,55 @@ public class Stage23BSoftwareGraphicsSmoke {
   if((routeMap?campaign(game).canPurchaseRouteMap(parts[1],parts[2]):stationMap?campaign(game).canPurchaseStationMap(parts[1],parts[2]):campaign(game).canPurchaseResourceMap(parts[1],parts[2]))||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
   System.out.println((routeMap?"Route":stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; contact geometry"+(routeMap?" and historical observation":"")+" are explicit fixtures");
  }
+ static void productPurchase(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
+  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-product-purchase-fixture.s25"));
+  com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
+  processor.keyDown(Input.Keys.F9);game.render();
+  if(!fixture.equals(campaign(game).captureState()))throw new AssertionError("Product fixture changed on UI load");
+  var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+  var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+  var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+  var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+  var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+  var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+  var offer=com.spacesim.ui.GeneratedCampaignProductTransportUi.rows(campaign(game)).stream().filter(r->r.selection().stableId().startsWith("pilot-product-buy|")).findFirst().orElseThrow();
+  String[] parts=offer.selection().stableId().split("\\|",-1);
+  String station=parts[1],product=parts[2];
+  String seller=campaign(game).coordinator().runtime().industry().industrial().station(station).stableFactionId();
+  long wallet=campaign(game).playerState().orElseThrow().walletMilliCredits();
+  long treasury=campaign(game).coordinator().runtime().world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits();
+  long fee=com.spacesim.economy.FinishedProductPurchasePayment.quote(product,1);
+  selectRow(workspace,game,offer.selection().stableId());screenshot("stage23b-product-purchase-offer");
+  var before=campaign(game).captureState();keyboardAction(renderer,game,"pilot.buy-product");
+  if(!before.equals(campaign(game).captureState()))throw new AssertionError("Product preview changed state");
+  keyboardAction(renderer,game,"pilot.physical-confirm");
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=wallet-fee||campaign(game).productTransfers().orders().size()!=1)throw new AssertionError("Product reserve failed");
+  processor.keyDown(Input.Keys.F8);game.render();var pending=campaign(game).captureState();processor.keyDown(Input.Keys.F9);game.render();
+  if(!pending.equals(campaign(game).captureState()))throw new AssertionError("Purchase escrow or handling lost on UI save/load");
+  hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+  String cancel="product-transfer-cancel|"+station+'|'+campaign(game).productTransfers().orders().get(0).orderId();
+  selectRow(workspace,game,cancel);screenshot("stage23b-product-purchase-pending");
+  keyboardAction(renderer,game,"pilot.cancel-product-transfer");keyboardAction(renderer,game,"pilot.physical-confirm");
+  if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=wallet||!campaign(game).productTransfers().orders().isEmpty())throw new AssertionError("Purchase cancellation failed");
+  selectRow(workspace,game,offer.selection().stableId());keyboardAction(renderer,game,"pilot.buy-product");keyboardAction(renderer,game,"pilot.physical-confirm");
+  var c=campaign(game);c.coordinator().setPaused(false);
+  for(int tick=0;tick<1000&&!c.productTransfers().orders().isEmpty();tick++)c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+  c.coordinator().setPaused(true);game.render();
+  var fleet=c.playerState().orElseThrow().activeFleetId();
+  if(!c.productTransfers().orders().isEmpty()||c.playerState().orElseThrow().walletMilliCredits()!=wallet-fee
+   ||c.coordinator().runtime().world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits()!=treasury+fee
+   ||c.coordinator().runtime().freight().moduleCargoStorage(fleet).productCount(product)!=1
+   ||c.coordinator().runtime().infrastructure().endpoint(station).storage().productCount(product)!=0)throw new AssertionError("Physical purchase settlement failed");
+  processor.keyDown(Input.Keys.F8);game.render();var completed=campaign(game).captureState();processor.keyDown(Input.Keys.F9);game.render();
+  if(!completed.equals(campaign(game).captureState()))throw new AssertionError("Completed purchase lost on UI save/load");
+  hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+  click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+  selectRow(workspace,game,"pilot-product-unload||"+product);screenshot("stage23b-product-purchase-cargo");
+  if(GL11.glGetError()!=0)throw new AssertionError("Product purchase GL error");
+  System.out.println("Product purchase keyboard preview/escrow/native resume/refund/finite handling/settlement passed; berth, stock and funding are explicit fixtures");
+ }
  static void run(String[] args) throws Exception {
   GL.createCapabilities(); System.out.println("Renderer: "+GL11.glGetString(GL11.GL_RENDERER));
   GdxNativesLoader.load();Gdx.files=new Lwjgl3Files();var glCtor=Class.forName("com.badlogic.gdx.backends.lwjgl3.Lwjgl3GL20").getDeclaredConstructor();glCtor.setAccessible(true);Gdx.gl20=(com.badlogic.gdx.graphics.GL20)glCtor.newInstance();Gdx.gl=Gdx.gl20;
@@ -381,6 +430,9 @@ public class Stage23BSoftwareGraphicsSmoke {
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
   var pendingSave=(java.nio.file.Path)save.get(game);
+  if(Boolean.getBoolean("stage23b.productPurchaseOnly")){
+   productPurchase(game,pendingSave);game.dispose();System.out.println("Product purchase graphical probe passed");return;
+  }
   if(System.getProperty("stage23b.ordinaryMiningCheckpoint")!=null){
    ordinaryMiningLoad(game,pendingSave);game.dispose();System.out.println("Ordinary mining checkpoint graphical probe passed");return;
   }

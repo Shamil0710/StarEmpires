@@ -113,7 +113,7 @@ public final class FinishedProductTransferWorkQueue {
             if (offered < remaining && order.completedHandlingKg() + offered < mass(order)) {
                 budget.consume(offered);
                 orders.put(order.orderId(), new Order(order.orderId(), order.fleetId(), order.sourceStorageId(), order.destinationStorageId(),
-                        order.productId(), order.count(), order.startedAtTick(), order.completedHandlingKg() + offered));
+                        order.productId(), order.count(), order.startedAtTick(), order.completedHandlingKg() + offered, order.purchasePayment()));
                 continue;
             }
             // Release only this fully handled reservation for atomic publication; others remain unavailable.
@@ -178,9 +178,25 @@ public final class FinishedProductTransferWorkQueue {
      * @param count reserved whole units
      * @param startedAtTick actual original completed tick
      * @param completedHandlingKg actual already spent processing mass
+     * @param purchasePayment exact held foreign purchase, or null for personal stock handling
      */
     public record Order(String orderId, FleetId fleetId, String sourceStorageId, String destinationStorageId,
-            String productId, int count, long startedAtTick, double completedHandlingKg) {
+            String productId, int count, long startedAtTick, double completedHandlingKg, FinishedProductPurchasePayment purchasePayment) {
+        /**
+         * Creates ordinary personal-stock handling with no financial claim.
+         * @param orderId unique job
+         * @param fleetId carrying fleet
+         * @param sourceStorageId source
+         * @param destinationStorageId destination
+         * @param productId product
+         * @param count whole units
+         * @param startedAtTick actual start
+         * @param completedHandlingKg spent handling
+         */
+        public Order(String orderId, FleetId fleetId, String sourceStorageId, String destinationStorageId,
+                String productId, int count, long startedAtTick, double completedHandlingKg) {
+            this(orderId, fleetId, sourceStorageId, destinationStorageId, productId, count, startedAtTick, completedHandlingKg, null);
+        }
         /**
          * Validates a bounded immutable handling intent.
          * @param orderId unique pending job
@@ -191,6 +207,7 @@ public final class FinishedProductTransferWorkQueue {
          * @param count reserved whole units
          * @param startedAtTick actual original completed tick
          * @param completedHandlingKg actual already spent processing mass
+         * @param purchasePayment exact held purchase, or null for personal stock
          */
         public Order {
             text(orderId); Objects.requireNonNull(fleetId); text(sourceStorageId); text(destinationStorageId); text(productId);
@@ -198,6 +215,9 @@ public final class FinishedProductTransferWorkQueue {
             if (sourceStorageId.equals(destinationStorageId) || sourceStorageId.equals(hold) == destinationStorageId.equals(hold)
                     || count <= 0 || startedAtTick < 0 || !Double.isFinite(completedHandlingKg) || completedHandlingKg < 0d)
                 throw new IllegalArgumentException("Invalid physical product handling evidence");
+            if (purchasePayment != null && (!destinationStorageId.equals(hold)
+                    || purchasePayment.reservedMilliCredits() != FinishedProductPurchasePayment.quote(productId, count)))
+                throw new IllegalArgumentException("Purchase payment does not match reserved physical products");
         }
         /** @return whether the station supplies the freight hold */
         public boolean loading() { return destinationStorageId.equals(com.spacesim.persistence.Stage20FreightPersistentState.cargoHoldId(fleetId)); }
@@ -282,9 +302,19 @@ public final class FinishedProductTransferWorkQueue {
          * @return whether the exact unchanged physical transaction committed
          */
         public boolean publish() {
+            return order.purchasePayment() == null && publish(() -> true);
+        }
+        /**
+         * Settles the owning purchase only after all unchanged goods preconditions pass.
+         * @param settlement atomic money settlement which leaves both physical stores unchanged
+         * @return whether money and products committed once
+         */
+        public boolean publish(java.util.function.BooleanSupplier settlement) {
+            Objects.requireNonNull(settlement);
             if (!active || published || !sourceSnapshot.equals(source().snapshot()) || !destinationSnapshot.equals(destination().snapshot())
                     || source().productCount(order.productId()) < order.count() || !destination().canAddProduct(order.productId(), order.count()))
                 return false;
+            if (!settlement.getAsBoolean()) return false;
             source().removeProduct(order.productId(), order.count()); destination().addProduct(order.productId(), order.count());
             published = true; return true;
         }

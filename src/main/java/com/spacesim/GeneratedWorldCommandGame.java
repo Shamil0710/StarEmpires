@@ -332,6 +332,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "pilot.unload-module" -> previewPilotPhysical("UNLOAD_MODULE");
             case "pilot.cancel-module-transfer" -> previewPilotPhysical("CANCEL_MODULE_TRANSFER");
             case "pilot.load-product" -> previewPilotPhysical("LOAD_PRODUCT");
+            case "pilot.buy-product" -> previewPilotPhysical("BUY_PRODUCT");
             case "pilot.unload-product" -> previewPilotPhysical("UNLOAD_PRODUCT");
             case "pilot.cancel-product-transfer" -> previewPilotPhysical("CANCEL_PRODUCT_TRANSFER");
             case "pilot.cancel-refit" -> previewPilotPhysical("CANCEL_REFIT");
@@ -436,6 +437,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 || action.equals("CANCEL_MODULE_TRANSFER") && pieces[0].equals("module-transfer-cancel"));
         boolean productTransfer = workspace.tab() == Tab.INDUSTRY && pieces.length == 3
                 && (action.equals("LOAD_PRODUCT") && pieces[0].equals("pilot-product-load")
+                || action.equals("BUY_PRODUCT") && pieces[0].equals("pilot-product-buy")
                 || action.equals("UNLOAD_PRODUCT") && pieces[0].equals("pilot-product-unload")
                 || action.equals("CANCEL_PRODUCT_TRANSFER") && pieces[0].equals("product-transfer-cancel"));
         boolean asset = workspace.tab() == Tab.SHIPS && (action.equals("PURCHASE") && pieces[0].equals("pilot-reserve")
@@ -471,7 +473,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         if (productTransfer) {
             status = pendingPilotPhysical.allowed() ? action.equals("CANCEL_PRODUCT_TRANSFER")
-                    ? "Подтвердите отмену: товар останется у источника; выполненная обработка не возвращается."
+                    ? "Подтвердите отмену: товар останется у источника, денежный резерв вернётся; выполненная обработка не возвращается."
+                    : action.equals("BUY_PRODUCT") ? String.format(java.util.Locale.ROOT,
+                    "Подтвердите покупку %d шт.: %.3f кр. в резерв. Оператор получит оплату после физической погрузки в трюм.",
+                    pilotKilograms, -pendingPilotPhysical.walletChangeMilliCredits() / 1000d)
                     : "Подтвердите обработку " + pilotKilograms + " шт. товара. Перенос завершится после работы на общих тактах."
                     : "Перенос недоступен: проверьте стыковку, владение, доступный товар, обработку и место.";
             refreshProjection(); return true;
@@ -832,6 +837,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 : selectedPilot.startsWith("module-transfer-cancel|") ? "CANCEL_MODULE_TRANSFER" : "" : "";
         renderer.bindModuleTransferAction(moduleTransferAction);
         String productTransferAction = workspace.tab() == Tab.INDUSTRY ? selectedPilot.startsWith("pilot-product-load|") ? "LOAD_PRODUCT"
+                : selectedPilot.startsWith("pilot-product-buy|") ? "BUY_PRODUCT"
                 : selectedPilot.startsWith("pilot-product-unload|") ? "UNLOAD_PRODUCT"
                 : selectedPilot.startsWith("product-transfer-cancel|") ? "CANCEL_PRODUCT_TRANSFER" : "" : "";
         renderer.bindProductTransferAction(productTransferAction);
