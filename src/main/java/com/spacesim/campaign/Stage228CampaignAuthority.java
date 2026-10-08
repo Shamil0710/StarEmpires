@@ -1644,6 +1644,7 @@ public final class Stage228CampaignAuthority {
         return coordinator.advanceFrame(realDeltaSeconds, tick -> {
             advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
+            GeneratedCampaignMarketWorkingCapital.review(this);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
@@ -1677,6 +1678,7 @@ public final class Stage228CampaignAuthority {
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
             advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
+            GeneratedCampaignMarketWorkingCapital.review(this);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
@@ -2503,6 +2505,10 @@ public final class Stage228CampaignAuthority {
     }
 
     private void cancelProductTransfer(com.spacesim.economy.FinishedProductTransferWorkQueue.Order order) {
+        cancelProductTransfer(order, false);
+    }
+
+    private void cancelProductTransfer(com.spacesim.economy.FinishedProductTransferWorkQueue.Order order, boolean lostBuyer) {
         long refund = order.purchasePayment() == null ? 0 : order.purchasePayment().reservedMilliCredits();
         long balance = Math.addExact(playerState.walletMilliCredits(), refund);
         productTransfers.cancel(order.orderId(), this::productStorage);
@@ -2511,13 +2517,15 @@ public final class Stage228CampaignAuthority {
             var system = coordinator.runtime().infrastructure().endpoint(order.stationId()).systemId();
             coordinator.runtime().world().findSession(system).orElseThrow().getLedger().recordMoneyTransfer(
                     "PLAYER_PRODUCT_ESCROW:" + order.orderId(), "PLAYER", refund, "paid-product-refund.v1");
+            if (lostBuyer) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    "PRODUCT_PURCHASE_REFUNDED", order.stationId(), order.productId(), order.count(), refund, order.fleetId());
         }
     }
 
     private void reconcileModuleLosses() {
         for (var order : productTransfers.capture().orders()) {
             var carrier = coordinator.runtime().freight().findFreighter(order.fleetId());
-            if (carrier.isEmpty() || !carrier.orElseThrow().operational()) cancelProductTransfer(order);
+            if (carrier.isEmpty() || !carrier.orElseThrow().operational()) cancelProductTransfer(order, true);
         }
         if (moduleCustody.modules().isEmpty() && moduleTransfers.capture().orders().isEmpty()) return;
         var lost = coordinator.runtime().freight().capture().freighters().stream().filter(f -> !f.operational())

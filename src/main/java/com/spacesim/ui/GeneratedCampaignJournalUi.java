@@ -40,6 +40,7 @@ public final class GeneratedCampaignJournalUi {
                     || e.action().equals("YARD_MATERIAL_DELIVERED") || e.action().equals("SUPPLY_OFFER_AVAILABLE")
                     ? " кг" : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
                     || e.action().equals("LOAD_PRODUCT") || e.action().equals("UNLOAD_PRODUCT")
+                    || java.util.Set.of("BUY_PRODUCT", "PRODUCT_PURCHASE_SETTLED", "PRODUCT_PURCHASE_REFUNDED").contains(e.action())
                     || e.action().equals("PRODUCT_TRANSFER_COMPLETED") ? " шт."
                     : java.util.Set.of("REPAIR_SERVICE_SETTLED", "REFIT_SERVICE_SETTLED").contains(e.action()) ? " мкр." : "";
             result.add(new Row(new UiSelection(SelectionKind.SURFACE_ROW, "personal-event:" + e.sequence()),
@@ -77,6 +78,9 @@ public final class GeneratedCampaignJournalUi {
         };
         return switch (e.action()) {
             case "LOAD_PRODUCT" -> "Погрузка готового товара поставлена в очередь";
+            case "BUY_PRODUCT" -> "Покупка оборудования подтверждена; товар и деньги зарезервированы";
+            case "PRODUCT_PURCHASE_SETTLED" -> "Оборудование доставлено в трюм; денежный резерв перечислен продавцу";
+            case "PRODUCT_PURCHASE_REFUNDED" -> "Корабль потерян до доставки оборудования; денежный резерв возвращён";
             case "UNLOAD_PRODUCT" -> "Выгрузка готового товара поставлена в очередь";
             case "CANCEL_PRODUCT_TRANSFER" -> "Обработка товара отменена; резерв освобождён";
             case "PRODUCT_TRANSFER_COMPLETED" -> "Перемещение готового товара завершено";

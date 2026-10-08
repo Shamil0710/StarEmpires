@@ -271,15 +271,20 @@ public final class ProductionUiProjector {
                             case JUMP_PENDING -> "Подготовка прыжка";
                             case IN_TRANSIT -> "В пути";
                             case ARRIVING -> "Прибытие";
-                        }, "Цель", campaign.coordinator().runtime().world().getTopology().findSystem(jump.destinationSystemId()).orElseThrow().name(),
+                        }, "Цель", player.discoveredSystemIds().contains(jump.destinationSystemId())
+                                ? campaign.coordinator().runtime().world().getTopology().findSystem(jump.destinationSystemId()).orElseThrow().name()
+                                : "Неизвестная система",
                         "Граница фазы", "Такт " + jump.phaseEndsTick(), "Время", "Продолжите кампанию: Пробел; полёт сохраняется вместе с миром"));
                 if (id.equals(player.activeFleetId()) && placement.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM
                         && jump == null) {
                     var ordinaryWorld = campaign.coordinator().runtime().world();
+                    int unknownDirection = 0;
                     for (var destination : ordinaryWorld.getTopology().neighbors(placement.systemId())) {
                         var fuel = ordinaryWorld.planFleetRouteFuel(id, List.of(placement.systemId(), destination));
                         craftRows.add(row("pilot-jump|" + destination.value(),
-                                ordinaryWorld.getTopology().findSystem(destination).orElseThrow().name(), "Прыжки личного корабля",
+                                player.discoveredSystemIds().contains(destination)
+                                        ? ordinaryWorld.getTopology().findSystem(destination).orElseThrow().name()
+                                        : "Неизвестное направление " + ++unknownDirection, "Прыжки личного корабля",
                                 !player.docked() && fuel.supported() && fuel.feasible() ? "Можно проверить вылет" : "Вылет недоступен",
                                 List.of(InfoSection.of("Вылет по прямому ребру", "Отправление", ordinaryWorld.getTopology().findSystem(placement.systemId()).orElseThrow().name(),
                                         "Необходимое изменение скорости", String.format(Locale.ROOT, "%.1f м/с", fuel.requiredDeltaVMps()),

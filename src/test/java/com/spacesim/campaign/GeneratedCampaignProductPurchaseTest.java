@@ -109,6 +109,10 @@ class GeneratedCampaignProductPurchaseTest {
         assertEquals(wallet, c.playerState().orElseThrow().walletMilliCredits());
         assertEquals(treasury, c.coordinator().runtime().world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits());
         assertEquals(1, c.coordinator().runtime().infrastructure().endpoint(station).storage().productCount(PRODUCT));
+        var refund = c.playerJournal().entries().stream().filter(e -> e.action().equals("PRODUCT_PURCHASE_REFUNDED")).toList();
+        assertEquals(1, refund.size());
+        assertEquals(FinishedProductPurchasePayment.quote(PRODUCT, 1), refund.get(0).walletDeltaMilliCredits());
+        assertEquals(1, refund.get(0).quantity());
         assertTrue(c.coordinator().runtime().freight().capture().productLots().isEmpty());
         roundTrip(c);
     }

@@ -15,6 +15,67 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-08 — actual paid resource chart after ordinary inter-system arrival
+
+The long-running actual journey reached system 2 and physically docked at `industry.2`.
+Its historical Imperial dispatcher offered five existing extraction reports. The 3 GiB combined
+journey/helper process exhausted heap while encoding the purchased snapshot; that attempt was
+not treated as durable success. The pre-purchase dock checkpoint survived. A separate 4 GiB
+process completed the same purchase and exact native reload from that actual saved berth.
+
+`target/stage23b-ordinary-map-purchase-actual.log` records the 100-credit transfer and copied
+conductor-ore occurrence in system 3, with its original observation time of approximately
+0.4 simulation seconds. All non-player archives remained unchanged. The purchased checkpoint
+is `target/stage23b-ordinary-map-journey.s25.map.s25` (224,543,188 bytes at this acceptance).
+The original dock checkpoint remains available for independent UI verification.
+
+NVIDIA RTX 4070 keyboard purchase, pure preview, conserved payment, F8/F9 exact restoration
+and personally known resource-marker focus passed directly from the actual voyage checkpoint:
+`target/stage23b-ordinary-map-purchase-graphics.log`. No position, stock or actor fixtures were
+added by this graphical run. The smoke helper accepts `stage23b.resourceMapCheckpoint` for this
+actual-snapshot path. QA still selected the inter-system itinerary from runtime topology; this
+does not claim ordinary acquisition of every navigation connection, resource grade or reserve.
+
+### 2026-10-08 — actual station funding and finite operator working capital
+
+Repeated mining used the existing personally owned ship and previously sampled personal
+resource coordinate, followed by a real return to the archived market berth. Actual recovery
+was 2000.270386950544 kg of metallic ore. The real market could not buy a 1000-kg batch from its
+opening cash. Civilian working-capital review now replenishes an actually docked foreign market
+up to the existing opening target using its legal operator's available treasury above reserve
+floor. It creates no money or goods, does not fund personally owned stations, preserves legacy
+prices, and does nothing on restore or pause. Both registered market identity versions are supported.
+
+The QA chooses sale batches from actual handling and available market cash. 1943 kg was sold
+for 34,974 credits; wallet reached 84,967 credits against the personally known existing station's
+70,000-credit price. The operator then had zero treasury and eight market credits, so the remaining
+57.44356604564314 kg correctly stayed aboard. The requested complete 2000-kg sale was refused;
+the actual station-funding requirement was already met. `Stage23BActualFundingIntegrity` audited
+retained real sale receipts, exact personal/market/treasury money conservation, unchanged owned
+ships and berth, affordable station price, and exact native restoration:
+`target/stage23b-actual-station-funding-integrity.log`. No stock, cash, geometry or actor fixtures
+were introduced in this ordinary funding path.
+
+`GeneratedCampaignMarketWorkingCapitalTest,GeneratedCampaignPhysicalMarketTest,GeneratedCampaignPilotPhysicalTest,GeneratedCampaignPersonalSupplyContractTest`
+passed 10 tests (`target/stage23b-market-working-capital-validation.log`). The working-capital tests
+explicitly remit existing market cash to the real treasury to create a deficit, check pause/restore,
+one-time conserved replenishment, reserve-floor refusal and personally owned market exclusion.
+The ordinary station journey probe now supports `stage23b.journey.stationPurchase`; arrival and
+purchase remain unproven until that physical continuation completes.
+
+### 2026-10-08 — unvisited jump names and purchase journal
+
+Direct local departure choices retain exploratory travel but label unvisited destinations as
+unknown directions. In-flight status also withholds their authoritative names until personally
+discovered. Projection and preview do not add discovery or change live state. Paid equipment
+reservation, delivery and loss refund have explicit journal descriptions and whole-unit counts;
+automatic loss refund records the actual wallet credit once.
+
+The jump/route/UI regression passed 8 tests (`target/stage23b-unvisited-jump-privacy-validation.log`).
+Final purchase/journal/jump checks passed 9 tests plus strict Javadoc
+(`target/stage23b-journal-navigation-validation.log`). These are scoped checks; Stage23B remains
+ACTIVE/PARTIAL and the final full verification is still pending.
+
 ### 2026-10-08 — ordinary starter contact at every existing civilian desk
 
 New campaigns author a local dispatcher at each eligible existing civilian station, rather

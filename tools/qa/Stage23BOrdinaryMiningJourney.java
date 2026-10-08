@@ -14,13 +14,50 @@ public final class Stage23BOrdinaryMiningJourney {
  private static final long MAX_TICKS=Long.getLong("stage23b.journey.maxTicks",Long.MAX_VALUE);
  private static final long MAX_FLIGHT_TICKS=Long.getLong("stage23b.journey.maxFlightTicks",20_000_000L);
  private static final long CHECKPOINT_INTERVAL=Long.getLong("stage23b.journey.checkpointInterval",100_000L);
+ private static final int MINING_TARGET_KG=Integer.getInteger("stage23b.journey.miningKg",1);
  private static long startedTick;
  private static boolean budgetActive;
  public static void main(String[] args) throws Exception {
-  if(MAX_TICKS<=0 || MAX_FLIGHT_TICKS<=0 || CHECKPOINT_INTERVAL<=0)throw new IllegalArgumentException("Probe tick budgets and checkpoint interval must be positive");
-  try { if(Boolean.getBoolean("stage23b.journey.resourceMap")) resourceMapJourney(); else journey(); }
+  if(MAX_TICKS<=0 || MAX_FLIGHT_TICKS<=0 || CHECKPOINT_INTERVAL<=0 || MINING_TARGET_KG<=0)throw new IllegalArgumentException("Probe tick budgets and mining request must be positive");
+  try { if(Boolean.getBoolean("stage23b.journey.stationPurchase")) stationPurchaseJourney();
+        else if(Boolean.getBoolean("stage23b.journey.resourceMap")) resourceMapJourney(); else journey(); }
   catch(ProbePaused paused){System.out.println("JOURNEY PAUSED tick="+world().getAuthoritativeWorldTick()+" checkpoint="+CHECKPOINT+"; requested journey is not yet proven");}
   finally {if(campaign!=null){campaign.coordinator().setPaused(true);Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,campaign.captureState());}}
+ }
+ private static void stationPurchaseJourney() throws Exception {
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact station journey checkpoint");
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  String station=System.getProperty("stage23b.journey.stationId","industry.2");
+  if(campaign.ownsProductionStation(station)){System.out.println("STATION ALREADY PERSONALLY OWNED "+station);return;}
+  long price=campaign.stationSalePriceMilliCredits(station);
+  if(price<=0 || campaign.playerState().orElseThrow().walletMilliCredits()<price)throw new IllegalStateException("No affordable personally known existing station offer");
+  var known=campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+      .entries().stream().filter(k->k.object().objectId().equals(station)&&k.knownLocation().isPresent()).findFirst()
+      .orElseThrow(()->new IllegalStateException("No personal station navigation archive"));
+  if(campaign.playerState().orElseThrow().docked()
+      &&!campaign.pilotMarketReference(station).orElseThrow().equals(campaign.playerState().orElseThrow().dockedAt()))action("UNDOCK","","",0);
+  travel(known.object().systemId());fly(known.knownLocation().orElseThrow(),500);
+  if(!campaign.playerState().orElseThrow().docked())action("DOCK",station,"",0);
+  var runtime=campaign.coordinator().runtime();var industrial=runtime.captureState().campaign().industrialState();
+  String seller=runtime.industry().industrial().station(station).stableFactionId();
+  long wallet=campaign.playerState().orElseThrow().walletMilliCredits();
+  long treasury=world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits();
+  int fleetCount=world().getFleetPlacements().size();
+  var owned=campaign.playerState().orElseThrow().ownedFleetIds();
+  long delta=action("PURCHASE_STATION",station,"",0);
+  if(delta!=-price || campaign.playerState().orElseThrow().walletMilliCredits()!=wallet-price
+      ||world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits()!=treasury+price
+      ||!campaign.ownsProductionStation(station)||!owned.equals(campaign.playerState().orElseThrow().ownedFleetIds())
+      ||world().getFleetPlacements().size()!=fleetCount||!industrial.equals(runtime.captureState().campaign().industrialState()))
+      throw new AssertionError("Non-conserved ordinary station acquisition or changed physical industry");
+  var acquired=campaign.captureState();
+  var restored=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(Stage228GeneratedCampaignPersistenceCodec.encode(acquired)));
+  if(!acquired.equals(restored.captureState()))throw new AssertionError("Non-exact purchased station checkpoint");
+  Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT.resolveSibling(CHECKPOINT.getFileName()+".purchased.s25"),acquired);
+  System.out.println("ORDINARY STATION PURCHASE PASS station="+station+" priceMilliCredits="+price
+      +" walletMilliCredits="+campaign.playerState().orElseThrow().walletMilliCredits()+" tick="+world().getAuthoritativeWorldTick());
  }
  private static void resourceMapJourney() throws Exception {
   var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT);
@@ -65,6 +102,7 @@ public final class Stage23BOrdinaryMiningJourney {
   startedTick=world().getAuthoritativeWorldTick();
   budgetActive=true;
   var miner=campaign.coordinator().runtime().freight().capture().freighters().stream()
+   .filter(f->MINING_TARGET_KG==1 || campaign.playerState().orElseThrow().ownedFleetIds().contains(f.fleetId()))
    .filter(f->f.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)).findFirst().orElseThrow();
   String miningDock="hub."+miner.currentSystemId().value();
   var original=miner;
@@ -88,19 +126,25 @@ public final class Stage23BOrdinaryMiningJourney {
   }
   System.out.println("MINER PURCHASED "+miner.fleetId()+" wallet="+campaign.playerState().orElseThrow().walletMilliCredits());
   var activeMining=campaign.coordinator().runtime().freight().capture().personalMiningOrders().stream().filter(o->o.fleetId().equals(fleetId())).findFirst();
+  boolean sellOnly=Boolean.getBoolean("stage23b.journey.sellOnly");
+  if(sellOnly && (!campaign.playerState().orElseThrow().docked()
+      || !campaign.pilotMarketReference(miningDock).orElseThrow().equals(campaign.playerState().orElseThrow().dockedAt())))
+      throw new IllegalStateException("Sale-only continuation requires the actual saved market berth");
   boolean hasOre=hasMinedOre();
-  if(!hasOre || activeMining.isPresent()) {
+  if(!sellOnly && (!hasOre || activeMining.isPresent())) {
    if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
   var source=campaign.coordinator().runtime().industry().sourceOutposts().sources().sources().stream()
    .filter(s->s.systemId().equals(fleet().systemId()) && s.sourceState().environment()==com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment.FREE_BODY)
    .filter(s->activeMining.isEmpty() || activeMining.orElseThrow().sourceId().equals(s.sourceId()))
-   .min(Comparator.comparingDouble(s->physical().position().distanceTo(s.position()))).orElseThrow();
-  fly(source.position(),500);
+   .filter(s->MINING_TARGET_KG==1 || personalCoordinate(s.sourceId()).isPresent())
+   .min(Comparator.comparingDouble(s->physical().position().distanceTo(MINING_TARGET_KG==1 ? s.position()
+        : personalCoordinate(s.sourceId()).orElseThrow()))).orElseThrow();
+  fly(MINING_TARGET_KG==1 ? source.position() : personalCoordinate(source.sourceId()).orElseThrow(),500);
   if(com.spacesim.ui.GeneratedCampaignMiningUi.rows(campaign).stream().noneMatch(row->row.selection().stableId().equals("pilot-mining|"+source.sourceId())))
    throw new AssertionError("Actual source contact is not reachable through production mining UI");
   double sourceBefore=source.sourceState().remainingAccessibleMassKg();
-  if(activeMining.isEmpty())action("START_MINING",source.sourceId(),"",1);
-  for(int i=0;i<100 && !hasMinedOre();i++)tick();
+  if(activeMining.isEmpty())action("START_MINING",source.sourceId(),"",MINING_TARGET_KG);
+  for(int i=0;i<Math.max(100,MINING_TARGET_KG*100L) && !hasMinedOre();i++)tick();
   if(campaign.coordinator().runtime().freight().capture().personalMiningOrders().stream().anyMatch(o->o.fleetId().equals(fleetId())))action("STOP_MINING","","",0);
   if(!hasMinedOre() || (!hasOre && source.sourceState().remainingAccessibleMassKg()>=sourceBefore))throw new AssertionError("No physical finite-source mining result");
   }
@@ -110,33 +154,50 @@ public final class Stage23BOrdinaryMiningJourney {
   if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact ordinary save/load");
   System.out.println("JOURNEY CHECKPOINT PASS tick="+world().getAuthoritativeWorldTick());
   Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,saved);
-  fly(campaign.coordinator().runtime().infrastructure().endpoint(miningDock).position(),500);
+  fly(MINING_TARGET_KG==1 ? campaign.coordinator().runtime().infrastructure().endpoint(miningDock).position()
+      : personalCoordinate(miningDock).orElseThrow(),500);
   if(!campaign.playerState().orElseThrow().docked())action("DOCK",miningDock,"",0);tick();
   var cargo=campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage();
   var ore=cargo.commodityMassByIdKg().entrySet().stream().filter(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=1).findFirst().orElseThrow();
-  int quantity=(int)Math.min(1000,Math.floor(ore.getValue()));
+  int quantity=(int)Math.min(MINING_TARGET_KG,Math.floor(ore.getValue()));
   double beforeCargo=cargo.commodityMassByIdKg().getOrDefault(ore.getKey(),0d);
   double beforeStock=campaign.coordinator().runtime().infrastructure().endpoint(miningDock).storage().commodityMassKg(ore.getKey());
   long beforeMoney=campaign.playerState().orElseThrow().walletMilliCredits();
-  var sell=campaign.previewPilotAction("SELL",miningDock,ore.getKey(),quantity);
-  if(!sell.allowed())throw new AssertionError("Ordinary mined cargo cannot be sold at its actual market");
-  campaign.submitPilotAction(sell);
+  long income=0;
+  for(int left=quantity;left>0;){
+   var endpoint=campaign.coordinator().runtime().infrastructure().endpoint(miningDock);
+   var ref=campaign.pilotMarketReference(miningDock).orElseThrow();
+   long liquid=world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
+       .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
+   long quote=campaign.pilotCommodityPrice(miningDock,ore.getKey(),false);
+   long physicalLimit=(long)Math.floor(endpoint.handlingCapability().massRateKgPerSecond()*campaign.coordinator().session().fixedStepSeconds());
+   int batch=(int)Math.min(left,Math.min(1000,Math.min(physicalLimit,liquid/quote)));
+   if(batch<=0)throw new IllegalStateException("No actual sale budget: handlingKg="+physicalLimit+" stationMilliCredits="+liquid+" quote="+quote);
+   var sell=campaign.previewPilotAction("SELL",miningDock,ore.getKey(),batch);
+   if(!sell.allowed())throw new AssertionError("Ordinary mined cargo cannot be sold at its actual market");
+   campaign.submitPilotAction(sell);income=Math.addExact(income,sell.walletChangeMilliCredits());left-=batch;
+   if(left>0)tick();
+  }
   double remainingCargo=campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage().commodityMassByIdKg().getOrDefault(ore.getKey(),0d);
   if(Math.abs(remainingCargo-(beforeCargo-quantity))>1e-8
       ||Math.abs(campaign.coordinator().runtime().infrastructure().endpoint(miningDock).storage().commodityMassKg(ore.getKey())-(beforeStock+quantity))>1e-8
-      ||campaign.playerState().orElseThrow().walletMilliCredits()!=beforeMoney+sell.walletChangeMilliCredits()
-      ||sell.walletChangeMilliCredits()<=0)throw new AssertionError("Non-conserved ordinary ore sale");
+      ||campaign.playerState().orElseThrow().walletMilliCredits()!=beforeMoney+income
+      ||income<=0)throw new AssertionError("Non-conserved ordinary ore sale");
   var completed=campaign.captureState();
   var restored=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(Stage228GeneratedCampaignPersistenceCodec.encode(completed)));
   if(!completed.equals(restored.captureState()))throw new AssertionError("Non-exact sale checkpoint");
   Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT.resolveSibling(CHECKPOINT.getFileName()+".sale.s25"),completed);
-  System.out.println("ORDINARY MINING SALE PASS quantity="+quantity+" commodity="+ore.getKey()+" incomeMilliCredits="+sell.walletChangeMilliCredits()+" tick="+world().getAuthoritativeWorldTick());
+  System.out.println("ORDINARY MINING SALE PASS quantity="+quantity+" commodity="+ore.getKey()+" incomeMilliCredits="+income+" tick="+world().getAuthoritativeWorldTick());
  }
  private static WorldSimulation world(){return campaign.coordinator().runtime().world();}
  private static FleetPlacementState fleet(){return world().findFleet(campaign.playerState().orElseThrow().activeFleetId()).orElseThrow();}
  private static LocalPhysicalKinematics physical(){var f=fleet();return campaign.coordinator().runtime().arrival().materialization(f.systemId()).physicalState(f.localEntityId()).orElseThrow();}
  private static boolean hasMinedOre(){return campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage().commodityMassByIdKg().entrySet().stream()
-   .anyMatch(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=1);}
+   .anyMatch(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=MINING_TARGET_KG);}
+ private static Optional<LocalPhysicalPosition> personalCoordinate(String id){
+  return campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .entries().stream().filter(k->k.object().objectId().equals(id)).flatMap(k->k.knownLocation().stream()).findFirst();
+ }
  private static long action(String verb,String target,String subject,int amount){
   var p=campaign.previewPilotAction(verb,target,subject,amount);
   if(!p.allowed())throw new IllegalStateException("Rejected "+verb+" target="+target+" at tick="+world().getAuthoritativeWorldTick());

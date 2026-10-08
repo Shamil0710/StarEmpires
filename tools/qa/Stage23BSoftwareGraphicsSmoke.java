@@ -318,7 +318,8 @@ public class Stage23BSoftwareGraphicsSmoke {
  static void resourceMap(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
   boolean stationMap=Boolean.getBoolean("stage23b.stationMapOnly");
   boolean routeMap=Boolean.getBoolean("stage23b.routeMapOnly");
-  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of(routeMap?"target/stage23b-route-map-fixture.s25":"target/stage23b-resource-map-fixture.s25"));
+  String actualMapCheckpoint=System.getProperty("stage23b.resourceMapCheckpoint");
+  var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of(actualMapCheckpoint!=null?actualMapCheckpoint:routeMap?"target/stage23b-route-map-fixture.s25":"target/stage23b-resource-map-fixture.s25"));
   com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(path,fixture);
   processor.keyDown(Input.Keys.F9);game.render();
   if(!fixture.equals(campaign(game).captureState()))throw new AssertionError("Map contact fixture changed on actual UI load");
@@ -367,7 +368,7 @@ public class Stage23BSoftwareGraphicsSmoke {
     ||!workspace.view().selection().stableId().equals((stationMap||routeMap?"station:":"resource:")+archived.object().objectId()))throw new AssertionError("Paid map coordinate did not focus the actual local marker");
   screenshot(stationMap?"stage23b-station-map-known-marker":"stage23b-resource-map-known-marker");
   if((routeMap?campaign(game).canPurchaseRouteMap(parts[1],parts[2]):stationMap?campaign(game).canPurchaseStationMap(parts[1],parts[2]):campaign(game).canPurchaseResourceMap(parts[1],parts[2]))||GL11.glGetError()!=0)throw new AssertionError("Duplicate map offer or GL error");
-  System.out.println((routeMap?"Route":stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; contact geometry"+(routeMap?" and historical observation":"")+" are explicit fixtures");
+  System.out.println((routeMap?"Route":stationMap?"Station":"Resource")+" map keyboard preview/payment/native save/load/known marker focus passed; "+(actualMapCheckpoint!=null?"actual ordinary voyage checkpoint; no geometry, stock or actor fixtures added":"contact geometry"+(routeMap?" and historical observation":"")+" are explicit fixtures"));
  }
  static void productPurchase(com.spacesim.GeneratedWorldCommandGame game,java.nio.file.Path path)throws Exception{
   var fixture=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.read(java.nio.file.Path.of("target/stage23b-product-purchase-fixture.s25"));

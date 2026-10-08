@@ -14,6 +14,34 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignPilotJumpTest {
+    @Test void localDepartureOptionsAndInFlightStatusDoNotNameUnvisitedSystems() {
+        var c = Stage228CampaignAuthority.create(1);
+        c.submitIndependentPilotStart(c.previewIndependentPilotStart());
+        var runtime = c.coordinator().runtime(); var player = c.playerState().orElseThrow();
+        var placed = runtime.world().findFleet(player.activeFleetId()).orElseThrow();
+        var destination = runtime.world().getTopology().neighbors(placed.systemId()).stream()
+                .filter(s -> !player.discoveredSystemIds().contains(s)).findFirst().orElseThrow();
+        String hiddenName = runtime.world().getTopology().findSystem(destination).orElseThrow().name();
+        var model = new com.spacesim.ui.GeneratedWorldUiModel(1, runtime, c.coordinator().content());
+        var projector = new com.spacesim.ui.ProductionUiProjector("faction.beta");
+        var before = c.captureState();
+        var row = projector.capture(c, model.capture()).rows(com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SHIPS).stream()
+                .filter(r -> r.selection().stableId().equals("pilot-jump|" + destination.value())).findFirst().orElseThrow();
+        assertTrue(row.name().startsWith("Неизвестное направление"));
+        assertFalse(row.toString().contains(hiddenName));
+        assertNull(row.focusSystem());
+        assertEquals(before, c.captureState());
+        var departure = c.previewPilotAction("JUMP", Long.toString(destination.value()), "", 0);
+        assertTrue(departure.allowed(), "The existing local connection remains explorable without remote identity disclosure");
+        c.submitPilotAction(departure);
+        var inFlight = c.captureState();
+        var ship = projector.capture(c, model.capture()).rows(com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SHIPS).stream()
+                .filter(r -> r.selection().stableId().equals("personal-ship:" + player.activeFleetId().value())).findFirst().orElseThrow();
+        assertFalse(ship.toString().contains(hiddenName));
+        assertTrue(ship.toString().contains("Неизвестная система"));
+        assertEquals(inFlight, c.captureState());
+    }
+
     @Test void departurePreviewIsPureForeignAndStaleTokensRejectAndOnlyNeighborsAreAdmitted() {
         var c = started(); var r = c.coordinator().runtime(); var p = placement(c);
         var destination = r.world().getTopology().neighbors(p.systemId()).get(0);
