@@ -15,6 +15,26 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-08 — ordinary starter contact at every existing civilian desk
+
+New campaigns author a local dispatcher at each eligible existing civilian station, rather
+than selecting only the first station for each faction. Eligibility still requires the actual
+operator, treasury, civilian station classification and matching operator archive coordinate.
+Primary dispatcher IDs and their industrial-first postings are preserved; additional IDs bind
+the exact station. No stock, physical asset, money or discovery is created by placement.
+Restore does not install missing desks in historical rosters.
+
+This removes the initial dead end at seed 1's real starter `hub.16`: its operator now has a
+local desk as well as the existing industrial desk. Ordinary initial DOCK establishes contact
+without travel/position fixtures. Viewing conversation remains pure, exact native restore keeps
+the contact, and other desks remain inaccessible remotely. Existing resource/station/route sale
+and funded shortage tests remain valid.
+
+`GeneratedCampaignNpcPlacementTest,GeneratedCampaignNpcSupplyOffersTest,GeneratedCampaignResourceMapPurchaseTest,GeneratedCampaignStationMapPurchaseTest,GeneratedCampaignRouteMapPurchaseTest,GeneratedCampaignOrdinaryDockContactTest`
+passed 12 tests (`target/stage23b-starter-dispatcher-validation.log`). Actual initial contact is
+proven; acquiring all navigation and completing a supply contract through ordinary play remain
+separate engineering work.
+
 ### 2026-10-08 — loss refunds captured together with surviving ownership
 
 Capture now reconciles existing equipment losses and the ordinary player authority references

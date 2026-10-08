@@ -28,7 +28,7 @@ final class GeneratedCampaignNpcPlacement {
         }
     }
 
-    /** Installs one dispatcher per actual faction with an archived civilian station. */
+    /** Installs a local dispatcher at each existing archived civilian station on new-game authoring only. */
     static void install(GeneratedCampaignCoordinator coordinator) {
         var snapshot = coordinator.runtime().captureState();
         var roster = new ArrayList<NpcState>();
@@ -43,22 +43,22 @@ final class GeneratedCampaignNpcPlacement {
                     .map(s -> s.stableFactionId()).findFirst().or(() -> runtime.world().controllingFaction(station.systemId()));
             if (owner.isEmpty()) continue;
             String faction = owner.orElseThrow();
-            if (factions.contains(faction)
-                    || GeneratedCampaignStationSalePolicy.priceMilliCredits(station.stationArchetypeId()) == 0
+            if (GeneratedCampaignStationSalePolicy.priceMilliCredits(station.stationArchetypeId()) == 0
                     || coordinator.runtime().world().findFactionEconomicState(faction).isEmpty()) continue;
             var ref = new StaticObjectRef(station.systemId(), StaticObjectKind.INFRASTRUCTURE, station.stationId());
             var archive = coordinator.runtime().discoveryState().knowledgeFor(faction);
             if (archive.knowledge(ref).filter(k -> k.knownLocation().isPresent()
                     && k.classificationId().equals(java.util.Optional.of(station.stationArchetypeId()))).isEmpty()) continue;
-            factions.add(faction);
-            postings.put(faction, ref);
-            roster.add(new NpcState("npc.stage23b.dispatcher:" + faction, "Диспетчер перевозок",
+            // Preserve the primary posting's established identity; additional local desks have exact station IDs.
+            String npcId = "npc.stage23b.dispatcher:" + faction + (factions.add(faction) ? "" : ':' + station.stationId());
+            postings.put(npcId, ref);
+            roster.add(new NpcState(npcId, "Диспетчер перевозок",
                     NpcRole.TRADE_LOGISTICS, faction, station.systemId(), NpcAvailability.AVAILABLE, List.of()));
         }
         service.installNpcRoster(roster);
         for (var npc : roster) {
             var archive = coordinator.runtime().discoveryState().knowledgeFor(npc.factionContentId());
-            service.receiveDiscovery(npc.npcId(), archive, postings.get(npc.factionContentId()), 0,
+            service.receiveDiscovery(npc.npcId(), archive, postings.get(npc.npcId()), 0,
                     npc.npcId() + ":posting");
             var observations = GeneratedCampaignFactionObservationPublisher.publish(snapshot, npc.factionContentId(), 0);
             for (var observation : observations.currentObservations())

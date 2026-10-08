@@ -112,7 +112,8 @@ class GeneratedCampaignNpcPlacementTest {
         var npcs = coordinator.npcMissions();
         assertFalse(npcs.npcs().isEmpty());
         assertTrue(npcs.missions().isEmpty());
-        assertEquals(npcs.npcs().size(), npcs.npcs().stream().map(n -> n.factionContentId()).distinct().count());
+        assertEquals(npcs.npcs().size(), npcs.npcs().stream().flatMap(n -> n.knowledge().stream()
+                .filter(k -> k.factId().equals(n.npcId() + ":posting")).map(k -> k.subjectId())).distinct().count());
         for (var npc : npcs.npcs()) {
             assertTrue(npc.knowledge().stream().anyMatch(k -> k.claimCode().startsWith("DISCOVERY.INFRASTRUCTURE.")));
             var actual = GeneratedCampaignFactionObservationPublisher.publish(before, npc.factionContentId(), 0);
@@ -124,6 +125,29 @@ class GeneratedCampaignNpcPlacementTest {
         var legacy = GeneratedCampaignCoordinator.create(1);
         assertTrue(GeneratedCampaignCoordinator.restore(legacy.captureState()).npcMissions().npcs().isEmpty(),
                 "Restoring an empty historical roster must not create postings");
+    }
+
+    @Test void actualStarterDockHasALocalDispatcherWithoutTravelOrGeometryFixtures() {
+        var c = Stage228CampaignAuthority.create(1);
+        c.submitIndependentPilotStart(c.previewIndependentPilotStart());
+        var runtime = c.coordinator().runtime();
+        var fleet = runtime.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
+        String station = "hub." + fleet.systemId().value();
+        var local = c.coordinator().npcMissions().npcs().stream().filter(n -> n.knowledge().stream()
+                .anyMatch(k -> k.factId().equals(n.npcId() + ":posting") && k.subjectId().equals(station))).findFirst().orElseThrow();
+        assertFalse(c.canContactNpc(local.npcId()));
+        assertTrue(com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(c).isEmpty());
+        c.submitPilotAction(c.previewPilotAction("DOCK", station, "", 0));
+        assertTrue(c.canContactNpc(local.npcId()));
+        var before = c.captureState();
+        var rows = com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(c);
+        assertEquals(1, rows.size());
+        assertEquals("dispatcher-contact|" + local.npcId(), rows.get(0).selection().stableId());
+        assertEquals(before, c.captureState());
+        var loaded = Stage228CampaignAuthority.restore(com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.decode(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.encode(before)));
+        assertEquals(before, loaded.captureState()); assertTrue(loaded.canContactNpc(local.npcId()));
+        assertEquals(rows, com.spacesim.ui.GeneratedCampaignDispatcherContactUi.rows(loaded));
     }
 }
 
