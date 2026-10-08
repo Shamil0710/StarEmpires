@@ -39,6 +39,7 @@ class GeneratedCampaignProductPurchaseTest {
         assertEquals(0, runtime.infrastructure().endpoint(station).storage().productCount(PRODUCT));
         assertEquals(0, runtime.freight().moduleCargoStorage(fleet).productCount(PRODUCT));
         assertFalse(c.previewPilotAction("UNDOCK", "", "", 0).allowed());
+        assertFalse(c.previewPilotAction("PURCHASE_STATION", station, "", 0).allowed(), "The seller cannot change during pending delivery");
         assertTrue(GeneratedCampaignProductTransportUi.rows(c).stream().anyMatch(r -> r.selection().stableId().startsWith("product-transfer-cancel|")));
         c.coordinator().setPaused(true); c.advanceFrame(1);
         assertEquals(0, c.productTransfers().orders().get(0).completedHandlingKg());
@@ -102,7 +103,8 @@ class GeneratedCampaignProductPurchaseTest {
         c.coordinator().setPaused(false); c.advanceFrame(c.coordinator().session().fixedStepSeconds());
         assertFalse(c.productTransfers().orders().isEmpty());
         c.coordinator().runtime().destroyLocalFreighter(fleet, com.spacesim.world.DestructionPolicy.destroyAll());
-        c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        var afterLoss = c.captureState();
+        assertEquals(afterLoss, c.captureState(), "Refund ledger and wallet must be captured together even before another frame");
         assertTrue(c.productTransfers().orders().isEmpty());
         assertEquals(wallet, c.playerState().orElseThrow().walletMilliCredits());
         assertEquals(treasury, c.coordinator().runtime().world().findFactionEconomicState(seller).orElseThrow().treasuryMilliCredits());

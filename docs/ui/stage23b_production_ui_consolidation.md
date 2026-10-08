@@ -15,6 +15,20 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-08 — loss refunds captured together with surviving ownership
+
+Capture now reconciles existing equipment losses and the ordinary player authority references
+before obtaining the Stage21 snapshot. A destroyed buyer's purchase refund, ledger transfer and
+removed fleet reference therefore enter one checkpoint even when no subsequent frame has run.
+The old redundant unpaid-only loss cancellation was removed; all undelivered product orders use
+the same reservation/refund cancellation path. A station purchase is refused during pending
+product handling so the buyer cannot replace the contracted seller before completion.
+
+`GeneratedCampaignProductPurchaseTest,GeneratedCampaignPersonalModuleTransportTest,GeneratedCampaignPersonalProductTransportTest,GeneratedCampaignPlayerAssetAffiliationTest,GeneratedCampaignStationAcquisitionTest`
+passed 17 tests (`target/stage23b-product-purchase-loss-capture-validation.log`). The loss test now
+captures immediately after actual destruction, checks idempotent state/ledger, the complete
+refund and unchanged seller stock/treasury, then verifies exact native restoration.
+
 ### 2026-10-08 — paid ready products with finite handling and native v17
 
 `BUY_PRODUCT` purchases existing, unreserved countable stock at an actual foreign civilian

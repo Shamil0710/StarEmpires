@@ -249,8 +249,10 @@ public final class Stage228CampaignAuthority {
      * @return current versioned M22.8 campaign checkpoint
      */
     public Stage228GeneratedCampaignPersistentState captureState() {
-        var accepted = coordinator.captureState();
         reconcileModuleLosses();
+        if (playerState != null) playerState = com.spacesim.player.PlayerRuntime.reconcileAuthorityReferences(
+                coordinator.runtime().world(), playerState);
+        var accepted = coordinator.captureState();
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
                 accepted,
@@ -994,7 +996,7 @@ public final class Stage228CampaignAuthority {
             return;
         }
         if (!productTransfers.capture().orders().isEmpty() && java.util.Set.of("START_REFIT", "START_REFIT_USED", "START_REPAIR",
-                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_CONSUMABLE", "LOAD_MODULE", "UNLOAD_MODULE").contains(action))
+                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_CONSUMABLE", "LOAD_MODULE", "UNLOAD_MODULE", "PURCHASE_STATION").contains(action))
             throw new IllegalStateException("Finish or cancel product handling first");
         if ("CANCEL_MODULE_TRANSFER".equals(action)) {
             var job = moduleTransfers.capture().orders().stream().filter(o -> o.orderId().equals(commodity)).findFirst().orElseThrow();
@@ -2427,10 +2429,6 @@ public final class Stage228CampaignAuthority {
     private void advanceModuleTransfersAtTick(long tick,
             java.util.Map<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget> budgets) {
         reconcileModuleLosses();
-        for (var order : productTransfers.capture().orders()) {
-            var fleet = coordinator.runtime().freight().findFreighter(order.fleetId()).orElse(null);
-            if (fleet == null || !fleet.operational()) productTransfers.cancel(order.orderId(), this::productStorage);
-        }
         var result = moduleTransfers.advance(tick, moduleCustody, order -> {
             String station = transferStation(order);
             if (handlingUsedThisTick(station) && !budgets.containsKey(station)) return null;
