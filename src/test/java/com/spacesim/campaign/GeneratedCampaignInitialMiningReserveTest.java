@@ -74,7 +74,7 @@ class GeneratedCampaignInitialMiningReserveTest {
         try (var in = new DataInputStream(new ByteArrayInputStream(encoded)); var out = new DataOutputStream(bytes)) {
             out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
             out.writeInt(15); out.writeInt(15); out.writeUTF("m22.8.generated-campaign.v15");
-            out.write(in.readAllBytes());
+            out.write(HistoricalCampaignTimeControlFixture.withoutIdleTimeControl(in.readAllBytes()));
         }
         return bytes.toByteArray();
     }

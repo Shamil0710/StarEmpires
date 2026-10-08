@@ -38,7 +38,8 @@ public final class GeneratedCampaignJournalUi {
             boolean unread = e.sequence() > journal.acknowledgedThroughSequence();
             String measure = e.action().equals("BUY") || e.action().equals("SELL") || e.action().equals("LOAD_CONSUMABLE")
                     || e.action().equals("YARD_MATERIAL_DELIVERED") || e.action().equals("SUPPLY_OFFER_AVAILABLE")
-                    ? " кг" : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
+                    ? " кг" : e.action().equals("TIME_SKIP_MINUTES_STARTED") ? " мин."
+                    : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
                     || e.action().equals("LOAD_PRODUCT") || e.action().equals("UNLOAD_PRODUCT")
                     || java.util.Set.of("BUY_PRODUCT", "PRODUCT_PURCHASE_SETTLED", "PRODUCT_PURCHASE_REFUNDED").contains(e.action())
                     || e.action().equals("PRODUCT_TRANSFER_COMPLETED") ? " шт."
@@ -77,6 +78,9 @@ public final class GeneratedCampaignJournalUi {
             default -> "Статус контракта изменён";
         };
         return switch (e.action()) {
+            case "TIME_SKIP_MINUTES_STARTED" -> "Начат пропуск на " + e.quantity() + " игровых минут";
+            case "TIME_SKIP_EVENT_STARTED" -> "Начат пропуск до следующего события";
+            case "TIME_SKIP_STOPPED" -> "Пропуск остановлен: " + e.subject();
             case "LOAD_PRODUCT" -> "Погрузка готового товара поставлена в очередь";
             case "BUY_PRODUCT" -> "Покупка оборудования подтверждена; товар и деньги зарезервированы";
             case "PRODUCT_PURCHASE_SETTLED" -> "Оборудование доставлено в трюм; денежный резерв перечислен продавцу";

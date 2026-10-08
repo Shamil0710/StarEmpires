@@ -46,7 +46,7 @@ class GeneratedCampaignProductPurchaseTest {
         c.coordinator().setPaused(false); c.advanceFrame(c.coordinator().session().fixedStepSeconds());
         assertTrue(c.productTransfers().orders().get(0).completedHandlingKg() > 0);
         var pending = c.captureState();
-        byte[] historical = Stage228GeneratedCampaignPersistenceCodec.encode(pending);
+        byte[] historical = HistoricalCampaignTimeControlFixture.withoutIdleTimeControl(Stage228GeneratedCampaignPersistenceCodec.encode(pending));
         java.nio.ByteBuffer.wrap(historical).putInt(4, 16);
         java.nio.ByteBuffer.wrap(historical).putInt(8, 16);
         byte[] runtimeV16 = "m22.8.generated-campaign.v16".getBytes(java.nio.charset.StandardCharsets.UTF_8);

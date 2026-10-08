@@ -41,6 +41,7 @@ import java.util.Objects;
  * @param moduleTransfers exact pending handling of individual equipment
  * @param productTransfers exact pending handling of reserved fresh products
  * @param yardConstruction exact retained physical yard construction
+ * @param timeSkip retained interactive clock request without elapsed-time grants
  */
 public record Stage228GeneratedCampaignPersistentState(
         int schemaVersion,
@@ -57,12 +58,44 @@ public record Stage228GeneratedCampaignPersistentState(
         ShipyardRefitQueueState refitQueue,
         com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
         com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
-        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction) {
+        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip) {
 
     /** Current M22.8 campaign envelope schema. */
-    public static final int CURRENT_VERSION = 17;
+    public static final int CURRENT_VERSION = 18;
     /** Current M22.8 campaign runtime contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v17";
+    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v18";
+
+    /**
+     * Source-compatible envelope without an outstanding time skip.
+     * @param schemaVersion current schema
+     * @param runtimeVersion current runtime
+     * @param stage21Runtime accepted authorities
+     * @param smallCraft actual craft
+     * @param hangars actual occupancy
+     * @param flightDeck actual deck work
+     * @param operations actual operations
+     * @param playerState durable player
+     * @param playerJournal committed history
+     * @param moduleCustody actual equipment
+     * @param repairQueue actual repair
+     * @param refitQueue actual refit
+     * @param moduleTransfers actual module handling
+     * @param productTransfers actual product handling
+     * @param yardConstruction actual construction
+     */
+    public Stage228GeneratedCampaignPersistentState(int schemaVersion, String runtimeVersion,
+            Stage21IGeneratedWorldRuntimePersistentState stage21Runtime, Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars, Stage228FlightDeckPersistentState flightDeck,
+            Stage228OperationsPersistentState operations, PlayerState playerState, PlayerJournalState playerJournal,
+            ShipyardModuleCustodyState moduleCustody, ShipyardRepairQueueState repairQueue, ShipyardRefitQueueState refitQueue,
+            com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+            com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+            com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations,
+                playerState, playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers,
+                yardConstruction, com.spacesim.simulation.CampaignTimeSkipState.idle());
+    }
 
     /**
      * Source-compatible envelope without granting yard structures or work.
@@ -294,6 +327,7 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param moduleTransfers actual incomplete equipment handling
      * @param productTransfers actual incomplete fresh-product handling
      * @param yardConstruction actual retained physical yard construction
+     * @param timeSkip exact pending interactive clock request
      */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -318,6 +352,11 @@ public record Stage228GeneratedCampaignPersistentState(
                 .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
         long tick = stage20.worldState().systems().stream().filter(s -> s.systemId().equals(stage20.activeSystemId()))
                 .findFirst().orElseThrow().simulationState().clock().tick();
+        Objects.requireNonNull(timeSkip);
+        if (timeSkip.active() && (playerState == null || timeSkip.startedTick() > tick || timeSkip.targetTick() <= tick
+                || timeSkip.journalSequence() >= playerJournal.nextSequence()
+                || timeSkip.fleetId() != (playerState.activeFleetId() == null ? 0 : playerState.activeFleetId().value())))
+            throw new IllegalArgumentException("Time skip requires its actual personal clock and controlled fleet");
         if (playerJournal.entries().stream().anyMatch(e -> e.tick() > tick))
             throw new IllegalArgumentException("Personal history cannot contain future commits");
         Objects.requireNonNull(moduleCustody, "moduleCustody");

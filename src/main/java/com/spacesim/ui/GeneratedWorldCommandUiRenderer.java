@@ -467,7 +467,8 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().draw(batch, "STAR EMPIRES", metrics.outerMargin(), height - 5f * metrics.scale());
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch, snapshot.activeSystemName() + "  •  такт " + snapshot.worldTick()
-                        + "  •  " + (paused ? "ПАУЗА" : String.format(Locale.ROOT, "×%.0f", timeScale)),
+                        + "  •  " + (timeSkipActive ? paused ? "ПРОПУСК НА ПАУЗЕ" : "ПРОПУСК ВРЕМЕНИ"
+                            : paused ? "ПАУЗА" : String.format(Locale.ROOT, "×%.0f", timeScale)),
                 width * 0.35f, height - 5f * metrics.scale(), width * 0.65f - metrics.outerMargin(), Align.right, false);
         batch.end();
         for (int index = 0; index < Tab.values().length; index++) {
@@ -571,7 +572,7 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(inspectorRect, "ВЫБЕРИТЕ ЗАПИСЬ", "Стрелки — выбор; Enter — открыть; Tab — перейти к действию.");
         } else {
             boolean navigable = selected.focusFleet() > 0 || selected.focusSystem() != null;
-            Rect details = physicalPilotActions || !factionActions.isEmpty() || supplyMissionQuantity ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
+            Rect details = timeSkipActions || physicalPilotActions || !factionActions.isEmpty() || supplyMissionQuantity ? new Rect(inspectorRect.x(), inspectorRect.y() + 156f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 156f * metrics.scale()) : missionActions || pilotStartActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
@@ -582,6 +583,7 @@ public final class GeneratedWorldCommandUiRenderer {
             if (missionActions) drawMissionActions();
             if (pilotStartActions) drawPilotStartActions();
             if (!factionActions.isEmpty()) drawFactionActions();
+            else if (timeSkipActions) drawTimeSkipActions();
             else if (physicalPilotActions) drawPhysicalPilotActions();
             if (navigable && !physicalPilotActions && factionActions.isEmpty()) {
                 Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
@@ -710,6 +712,33 @@ public final class GeneratedWorldCommandUiRenderer {
         Rect confirm=new Rect(inspectorRect.x()+16f*scale,inspectorRect.y()+12f*scale,inspectorRect.width()-32f*scale,36f*scale);
         button(confirm,"ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ РЕШЕНИЕ",factionConfirmation);
         if(factionConfirmation)hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-confirm",null,confirm));
+    }
+
+    private boolean timeSkipActions;
+    private boolean timeSkipActive;
+    private boolean timeSkipEditing;
+
+    /**
+     * Binds responsive time controls to the selected menu row.
+     * @param available whether time control is selected
+     * @param active whether a request is outstanding
+     * @param editing whether a numeric field owns keyboard input
+     */
+    public void bindTimeSkipActions(boolean available, boolean active, boolean editing) {
+        timeSkipActions = available; timeSkipActive = active; timeSkipEditing = editing;
+    }
+
+    private void drawTimeSkipActions() {
+        String[] labels = {"ИЗМЕНИТЬ МИНУТЫ", "ПРОПУСТИТЬ МИНУТЫ", "ДО СОБЫТИЯ", "ОТМЕНИТЬ ПРОПУСК"};
+        String[] ids = {"time.skip.edit", "time.skip.minutes", "time.skip.event", "time.skip.cancel"};
+        float scale = metrics.scale(); float width = (inspectorRect.width() - 36f * scale) / 2;
+        for (int i = 0; i < 4; i++) {
+            boolean enabled = !timeSkipEditing && (i == 3 ? timeSkipActive : !timeSkipActive);
+            Rect r = new Rect(inspectorRect.x() + 16f * scale + (i % 2) * (width + 4f * scale),
+                    inspectorRect.y() + (i < 2 ? 94f : 48f) * scale, width, 36f * scale);
+            button(r, labels[i], enabled);
+            if (enabled) hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, r));
+        }
     }
 
     private void drawPhysicalPilotActions() {

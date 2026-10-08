@@ -77,7 +77,8 @@ class GeneratedCampaignPersonalSupplyContractTest {
             var bytes = new java.io.ByteArrayOutputStream();
             try (var out = new java.io.DataOutputStream(bytes)) {
                 out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
-                out.writeInt(14); out.writeInt(14); out.writeUTF("m22.8.generated-campaign.v14"); out.write(in.readAllBytes());
+                out.writeInt(14); out.writeInt(14); out.writeUTF("m22.8.generated-campaign.v14");
+                out.write(HistoricalCampaignTimeControlFixture.withoutIdleTimeControl(in.readAllBytes()));
             }
             assertThrows(IllegalArgumentException.class, () -> com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.decode(bytes.toByteArray()),
                     "Historical native v14 cannot claim a new physical supply obligation");

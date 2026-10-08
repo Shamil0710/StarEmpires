@@ -171,7 +171,7 @@ class GeneratedCampaignPersonalRepairTest {
             try (var out = new java.io.DataOutputStream(buffer)) {
                 out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
                 out.writeInt(12); out.writeInt(12); out.writeUTF("m22.8.generated-campaign.v12");
-                out.write(in.readAllBytes());
+                out.write(HistoricalCampaignTimeControlFixture.withoutIdleTimeControl(in.readAllBytes()));
             }
             return buffer.toByteArray();
         } catch (java.io.IOException failure) { throw new AssertionError(failure); }

@@ -48,6 +48,9 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private Stage228CampaignAuthority.PlayerFactionFoundationPreview pendingFactionFoundation;
     private String pendingPilotSelection = "";
     private int pilotKilograms = 1;
+    private String timeSkipMinutes = "60";
+    private String timeSkipPreviousMinutes = "60";
+    private boolean editingTimeSkipMinutes;
     private float projectionAge;
     private String status = "Генерация мира…";
     private Path savePath;
@@ -90,13 +93,27 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
     private void refreshProjection() {
         production = projector.capture(campaign, snapshot, true);
+        updateTimeControls();
         projectionAge = 0f;
+    }
+
+    private void updateTimeControls() {
+        production = com.spacesim.ui.GeneratedCampaignTimeSkipUi.append(production, campaign, timeSkipMinutes, editingTimeSkipMinutes);
     }
 
     private InputAdapter input() {
         return new InputAdapter() {
             @Override
             public boolean keyDown(int keycode) {
+                if (editingTimeSkipMinutes) {
+                    if (keycode == Input.Keys.ENTER || keycode == Input.Keys.ESCAPE) {
+                        if (keycode == Input.Keys.ESCAPE) timeSkipMinutes = timeSkipPreviousMinutes;
+                        editingTimeSkipMinutes = false; updateTimeControls();
+                    } else if (keycode == Input.Keys.BACKSPACE && !timeSkipMinutes.isEmpty()) {
+                        timeSkipMinutes = timeSkipMinutes.substring(0, timeSkipMinutes.length() - 1); updateTimeControls();
+                    }
+                    return true;
+                }
                 if (workspace.searching()) {
                     if (keycode == Input.Keys.ENTER || keycode == Input.Keys.ESCAPE) workspace.endSearch();
                     return true; // Text editing never sends gameplay/time/save commands.
@@ -154,6 +171,12 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
 
             @Override
             public boolean keyTyped(char character) {
+                if (editingTimeSkipMinutes) {
+                    if (character >= '0' && character <= '9' && timeSkipMinutes.length() < 7) {
+                        timeSkipMinutes += character; updateTimeControls();
+                    }
+                    return true;
+                }
                 if (!workspace.searching()) return false;
                 workspace.type(character);
                 return true;
@@ -226,9 +249,29 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return true;
     }
 
+    private boolean timeSkipAction(String id) {
+        try {
+            if (id.equals("time.skip.cancel")) campaign.cancelTimeSkip();
+            else {
+                pendingPilotPhysical = null; pendingMissionPreview = null; pendingRoute = null;
+                pendingGovernment = null; pendingFactionFoundation = null; pendingPilotStart = null;
+                campaign.setPilotThrust(0, 0, false);
+                if (id.equals("time.skip.minutes")) campaign.startTimeSkipMinutes(Integer.parseInt(timeSkipMinutes));
+                else campaign.startTimeSkipUntilEvent();
+            }
+            status = campaign.lastTimeSkipMessage(); updateTimeControls();
+        } catch (RuntimeException exception) { status = "Пропуск не запущен: " + safeMessage(exception); }
+        return true;
+    }
+
     private boolean action(String id) {
         if (id.startsWith("pilot.government-")) return governmentAction(id.substring("pilot.government-".length()));
         return switch (id) {
+            case "time.skip.edit" -> {
+                timeSkipPreviousMinutes = timeSkipMinutes; timeSkipMinutes = "";
+                editingTimeSkipMinutes = true; updateTimeControls(); yield true;
+            }
+            case "time.skip.minutes", "time.skip.event", "time.skip.cancel" -> timeSkipAction(id);
             case "back" -> workspace.goBack();
             case "search" -> {
                 if (workspace.tab() == Tab.SYSTEM || workspace.tab() == Tab.GALAXY) switchTab(Tab.INTELLIGENCE);
@@ -717,6 +760,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     }
 
     private boolean setTimeScale(double scale) {
+        campaign.cancelTimeSkip();
         campaign.coordinator().setTimeScale(scale);
         status = "Скорость симуляции ×" + (int) scale;
         return true;
@@ -766,14 +810,21 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     public void render() {
         float delta = Math.min(0.1f, Math.max(0f, Gdx.graphics.getDeltaTime()));
         try {
-            boolean flying = !workspace.searching() && workspace.tab() == Tab.SYSTEM;
+            boolean flying = !workspace.searching() && !editingTimeSkipMinutes && workspace.tab() == Tab.SYSTEM;
+            if (flying && (Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.A)
+                    || Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.X)))
+                campaign.cancelTimeSkip();
             campaign.setPilotThrust(flying ? (Gdx.input.isKeyPressed(Input.Keys.D) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.A) ? 1 : 0) : 0,
                     flying ? (Gdx.input.isKeyPressed(Input.Keys.W) ? 1 : 0) - (Gdx.input.isKeyPressed(Input.Keys.S) ? 1 : 0) : 0,
                     flying && Gdx.input.isKeyPressed(Input.Keys.X));
-            campaign.advanceFrame(delta);
-            snapshot = model.capture();
+            boolean skipping = campaign.timeSkip().active();
+            if (skipping) campaign.advanceTimeSkipBudget(8_000_000L, 256);
+            else campaign.advanceFrame(delta);
             projectionAge += delta;
-            if (projectionAge >= 0.25f) refreshProjection();
+            if (!skipping || projectionAge >= 0.25f || !campaign.timeSkip().active()) snapshot = model.capture();
+            if (projectionAge >= 0.25f || skipping && !campaign.timeSkip().active()) refreshProjection();
+            if (skipping && !campaign.timeSkip().active()) status = campaign.lastTimeSkipMessage();
+            updateTimeControls();
         } catch (RuntimeException exception) {
             campaign.coordinator().setPaused(true);
             status = "Сведения недоступны; симуляция на паузе: " + safeMessage(exception);
@@ -789,6 +840,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         if (!selectedPilotStart()) pendingPilotStart = null;
         renderer.bindPilotStartActions(selectedPilotStart(), pendingPilotStart != null && pendingPilotStart.allowed());
         String selectedPilot = workspace.view().selection().stableId();
+        renderer.bindTimeSkipActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("time-control"),
+                campaign.timeSkip().active(), editingTimeSkipMinutes);
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),

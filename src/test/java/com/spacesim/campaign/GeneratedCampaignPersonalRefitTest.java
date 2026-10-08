@@ -332,7 +332,8 @@ class GeneratedCampaignPersonalRefitTest {
             var bytes = new ByteArrayOutputStream();
             try (var out = new DataOutputStream(bytes)) {
                 out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
-                out.writeInt(13); out.writeInt(13); out.writeUTF("m22.8.generated-campaign.v13"); out.write(in.readAllBytes());
+                out.writeInt(13); out.writeInt(13); out.writeUTF("m22.8.generated-campaign.v13");
+                out.write(HistoricalCampaignTimeControlFixture.withoutIdleTimeControl(in.readAllBytes()));
             }
             return bytes.toByteArray();
         }

@@ -15,6 +15,59 @@ below; dated sections retain the evidence and limitations of each implementation
 
 ## Implemented architecture
 
+### 2026-10-08 — responsive time skip in the ordinary player interface
+
+The menu now contains **Пропуск времени** with editable whole game minutes (1–1,000,000),
+skip by duration, skip until the next personal event, and cancellation. Event mode stops on
+a new personal journal entry or completion of the current jump phase; an initially idle
+delegated order may begin departure without being mistaken for its completion. It does not
+stop for unrelated NPC activity. Duration mode continues until its exact game-tick boundary.
+Both modes stop and pause when the controlled ship changes or is lost, personal ship damage
+increases, or the player's retained threat intelligence changes. Space pauses/resumes an
+outstanding request, cancellation retains already simulated progress, and manual flight input
+cancels it. Normal speed controls cancel the request before selecting their multiplier.
+
+Calculation runs on the existing authority thread in short batches, with an 8 ms soft budget
+and at most 256 iterations per rendered frame. Input and rendering run between batches;
+there is no concurrent mutable world or separate accelerated copy. One indivisible simulation
+tick can exceed the soft budget. Menus, inspections, and commands remain available, with
+the existing pause/preview rules. Strategic projections update at their existing 0.25-second
+presentation cadence. Starting a skip invalidates outstanding command previews.
+
+Native v18 retains the request, stopping boundary, previous speed, and personally observed
+safety conditions. Older native versions migrate with idle time controls. Saving/loading a
+paused request neither grants time nor silently completes work. The bounded control codec
+rejects malformed or trailing data. Historical test envelopes now omit the v18 suffix when
+constructing a real older layout rather than merely replacing its version header.
+
+This implementation retains exact ordinary ticks for NPCs, production, fuel, and deadlines.
+It is **not an instantaneous interval jump** and does not yet guarantee seconds-long travel
+for a multi-day route. The isolated actual 224 MB checkpoint benchmark previously measured
+approximately 608 ticks/s (about 61× at a 0.1-second fixed step), without rendering; that is
+performance evidence for the sampled world, not a guaranteed UI speed. Further interval
+optimization must preserve all world activity and stopping events.
+
+The RTX 4070 graphical probe (`stage23b.timeSkipOnly`,
+`target/stage23b-time-skip-graphics.log`) passed keyboard numeric entry, both modes,
+navigation across menus during progression, pause, exact F8/F9 restoration, resume,
+cancellation, and exact completion of one game minute. It starts an ordinary fresh pilot
+and adds no location, asset, or financial fixtures. Screenshots were inspected.
+
+The same probe also passed from the actual 224 MB ordinary journey checkpoint using
+`stage23b.timeSkipCheckpoint=target/stage23b-ordinary-map-journey.s25`;
+`target/stage23b-time-skip-actual-graphics.log` records exact paused-request restoration
+and completion of the requested minute. The slowest of four sampled menu-switch frames
+was approximately 161 ms; this is a limited measured sample, not a guaranteed frame bound.
+The input checkpoint was read-only; the probe saved to its separate temporary path.
+
+Final targeted functional validation: **34 tests, 0 failures, 0 errors**, including native
+flight-phase stops/resume, equivalence to ordinary whole-world ticks, damage interruption,
+codec bounds, and older repair/refit/supply/mining/product layouts. Results are in
+`target/stage23b-time-skip-final-validation.log`. That combined command subsequently failed
+Javadoc on a missing `@param` tag; the tag was corrected and the separate required Javadoc
+run passed without warnings (`target/stage23b-time-skip-javadoc.log`). These checks cover
+this feature and its affected paths, not final acceptance of all remaining Stage 23B work.
+
 ### 2026-10-08 — actual paid resource chart after ordinary inter-system arrival
 
 The long-running actual journey reached system 2 and physically docked at `industry.2`.

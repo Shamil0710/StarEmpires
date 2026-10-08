@@ -24,7 +24,7 @@ import java.util.Objects;
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 17;
+    private static final int FILE_VERSION = 18;
     private static final int M22_8M_FILE_VERSION = 4;
     private static final String M22_8M_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
     private static final int MAX_PLAYER_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -67,6 +67,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         byte[] transfers = ShipyardModuleTransferQueuePersistenceCodec.encode(checked.moduleTransfers());
         byte[] products = FinishedProductTransferQueuePersistenceCodec.encode(checked.productTransfers());
         byte[] yards = Stage23YardConstructionPersistenceCodec.encode(checked.yardConstruction());
+        byte[] timeSkip = CampaignTimeSkipPersistenceCodec.encode(checked.timeSkip());
         requirePayload(stage21, MAX_STAGE21_PAYLOAD_BYTES, "Stage-21I runtime");
         requirePayload(smallCraft, MAX_SMALL_CRAFT_PAYLOAD_BYTES, "M22.8A small craft");
         requirePayload(hangars, MAX_HANGAR_PAYLOAD_BYTES, "M22.8B hangars");
@@ -93,6 +94,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 writePayload(out, transfers);
                 writePayload(out, products);
                 writePayload(out, yards);
+                writePayload(out, timeSkip);
             }
             byte[] result = buffer.toByteArray();
             if (result.length <= 0 || result.length > MAX_BYTES) {
@@ -123,7 +125,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
                 case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case M22_8C_FILE_VERSION -> decodeM22_8C(in);
-                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, FILE_VERSION -> decodeCurrent(in, fileVersion);
+                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, FILE_VERSION -> decodeCurrent(in, fileVersion);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
             };
@@ -334,6 +336,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         var yards = fileVersion >= 12 ? Stage23YardConstructionPersistenceCodec.decode(
                 readPayload(in, Stage23YardConstructionPersistenceCodec.MAX_BYTES, "Physical yard construction"))
                 : com.spacesim.economy.Stage23YardConstructionWorkQueue.State.empty();
+        var timeSkip = fileVersion >= 18 ? CampaignTimeSkipPersistenceCodec.decode(
+                readPayload(in, CampaignTimeSkipPersistenceCodec.MAX_BYTES, "Interactive time skip"))
+                : com.spacesim.simulation.CampaignTimeSkipState.idle();
         if (fileVersion < 10 && custody.modules().stream().anyMatch(row -> row.stationId().startsWith("freight-hold:")))
             throw new IllegalArgumentException("Aboard equipment requires native campaign v10");
         if (fileVersion < 13 && repairs.orders().stream().anyMatch(order -> order.servicePayment() != null))
@@ -351,7 +356,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         requireEnd(in);
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
-                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards);
+                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards, timeSkip);
     }
 
     private static void requireEnd(DataInputStream in) throws IOException {

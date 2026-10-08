@@ -44,6 +44,8 @@ import java.util.function.LongFunction;
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
     private PlayerState playerState;
+    private com.spacesim.simulation.CampaignTimeSkipState timeSkip = com.spacesim.simulation.CampaignTimeSkipState.idle();
+    private String lastTimeSkipMessage = "";
     private com.spacesim.player.PlayerJournalState playerJournal = com.spacesim.player.PlayerJournalState.empty();
     private com.spacesim.economy.ShipyardModuleCustodyState moduleCustody =
             com.spacesim.economy.ShipyardModuleCustodyState.empty();
@@ -221,6 +223,7 @@ public final class Stage228CampaignAuthority {
         restored.moduleTransfers = new com.spacesim.economy.ShipyardModuleTransferWorkQueue(
                 com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), saved.moduleTransfers());
         restored.moduleTransfers.validateCustody(restored.moduleCustody);
+        restored.timeSkip = saved.timeSkip();
         restored.productTransfers = new com.spacesim.economy.FinishedProductTransferWorkQueue(
                 com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), saved.productTransfers());
         restored.productTransfers.bindReservations(restored::productStorage);
@@ -252,6 +255,7 @@ public final class Stage228CampaignAuthority {
         reconcileModuleLosses();
         if (playerState != null) playerState = com.spacesim.player.PlayerRuntime.reconcileAuthorityReferences(
                 coordinator.runtime().world(), playerState);
+        observeTimeSkip();
         var accepted = coordinator.captureState();
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
@@ -261,7 +265,7 @@ public final class Stage228CampaignAuthority {
                 Stage228FlightDeckPersistenceMapper.capture(flightDeck),
                 Stage228OperationsPersistenceMapper.capture(
                         missions, logistics, carrierWings),
-                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture());
+                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip);
     }
 
     /** @return immutable personal committed history, independent of the selected knowledge viewer */
@@ -1627,14 +1631,131 @@ public final class Stage228CampaignAuthority {
         carrierWings = checked;
     }
 
+    /** @return durable outstanding time control request */
+    public com.spacesim.simulation.CampaignTimeSkipState timeSkip() { return timeSkip; }
+
+    /** @return explanation of the last completed or interrupted skip */
+    public String lastTimeSkipMessage() { return lastTimeSkipMessage; }
+
     /**
-     * Advances only the accepted ordinary campaign authority.
-     *
-     * <p>This compatibility overload is appropriate while no live flight-deck profiles are bound.
-     * Production carrier operation should use the overload with a per-tick bay projection.</p>
-     *
+     * Starts an exact skip measured in whole game minutes.
+     * @param minutes game minutes
+     */
+    public void startTimeSkipMinutes(int minutes) { startTimeSkip(minutes, false); }
+
+    /** Starts progression until the next personal journal event or jump phase boundary. */
+    public void startTimeSkipUntilEvent() { startTimeSkip(0, true); }
+
+    private void startTimeSkip(int minutes, boolean event) {
+        if (playerState == null) throw new IllegalStateException("Сначала начните игру за пилота.");
+        if (timeSkip.active()) throw new IllegalStateException("Сначала отмените текущий пропуск.");
+        if (thrustAxisX != 0 || thrustAxisY != 0 || braking) throw new IllegalStateException("Отпустите ручное управление перед пропуском.");
+        if (!event && (minutes < 1 || minutes > com.spacesim.simulation.CampaignTimeSkipState.MAX_MINUTES))
+            throw new IllegalArgumentException("Введите от 1 до 1000000 игровых минут.");
+        long tick = coordinator.runtime().world().getAuthoritativeWorldTick();
+        long target = event ? Long.MAX_VALUE : Math.addExact(tick,
+                (long) Math.ceil(minutes * 60d / coordinator.session().fixedStepSeconds()));
+        var request = new com.spacesim.simulation.CampaignTimeSkipState(event
+                ? com.spacesim.simulation.CampaignTimeSkipState.Mode.EVENT : com.spacesim.simulation.CampaignTimeSkipState.Mode.MINUTES,
+                tick, target, minutes, playerJournal.nextSequence(),
+                playerState.activeFleetId() == null ? 0 : playerState.activeFleetId().value(), timeSkipJumpPhase(),
+                coordinator.timeScale(), 1, timeSkipDamage(), playerState.threatIntel().hashCode());
+        recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                event ? "TIME_SKIP_EVENT_STARTED" : "TIME_SKIP_MINUTES_STARTED", "", "", minutes, 0, playerState.activeFleetId());
+        timeSkip = request;
+        lastTimeSkipMessage = "Пропуск времени выполняется.";
+        coordinator.setTimeScale(1); coordinator.setPaused(false);
+    }
+
+    /** Cancels progression without rewinding completed world ticks. */
+    public void cancelTimeSkip() { if (timeSkip.active()) finishTimeSkip("Пропуск отменён."); }
+
+    /**
+     * Advances bounded work on the owning UI thread, yielding between exact ticks.
+     * @param budgetNanos soft wall time budget; one indivisible tick can exceed it
+     * @param maxTicks hard per-frame iteration limit
+     * @return number of completed authoritative ticks
+     */
+    public long advanceTimeSkipBudget(long budgetNanos, int maxTicks) {
+        if (budgetNanos <= 0 || maxTicks < 1 || maxTicks > 10000) throw new IllegalArgumentException("Invalid skip budget");
+        long begin = coordinator.runtime().world().getAuthoritativeWorldTick();
+        if (timeSkip.active() && !coordinator.isPaused()) coordinator.setTimeScale(1);
+        long started = System.nanoTime();
+        for (int i = 0; i < maxTicks && timeSkip.active() && !coordinator.isPaused(); i++) {
+            if (i > 0 && System.nanoTime() - started >= budgetNanos) break;
+            advanceFrame(coordinator.session().fixedStepSeconds());
+        }
+        return coordinator.runtime().world().getAuthoritativeWorldTick() - begin;
+    }
+
+    private String timeSkipJumpPhase() {
+        return playerState == null || playerState.activeFleetId() == null ? "NONE"
+                : coordinator.runtime().world().findFleetJump(playerState.activeFleetId())
+                    .map(j -> j.phase().name()).orElse("NONE");
+    }
+
+    private java.util.Map<String, Double> timeSkipDamage() {
+        var result = new java.util.TreeMap<String, Double>();
+        if (playerState == null || playerState.activeFleetId() == null) return result;
+        var placement = coordinator.runtime().world().findFleet(playerState.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return result;
+        var entity = coordinator.runtime().world().findSession(placement.systemId()).orElseThrow()
+                .getEntityRegistry().require(placement.localEntityId());
+        if (entity == null) return result;
+        var engineering = entity.getComponent(com.spacesim.components.EngineeringComponent.class);
+        if (engineering == null) return result;
+        var damage = engineering.instanceState.damage();
+        damage.compartmentIntegrityById().forEach((k, v) -> result.put("hull:" + k, v));
+        damage.moduleDamage().moduleIntegrityByMount().forEach((k, v) -> result.put("mount:" + k, v));
+        return result;
+    }
+
+    private void observeTimeSkip() {
+        if (!timeSkip.active()) return;
+        long fleet = playerState == null || playerState.activeFleetId() == null ? 0 : playerState.activeFleetId().value();
+        if (fleet != timeSkip.fleetId()) { finishTimeSkip("Изменился управляемый корабль."); return; }
+        if (fleet != 0 && coordinator.runtime().world().findFleet(playerState.activeFleetId()).isEmpty()) {
+            finishTimeSkip("Управляемый корабль потерян."); return;
+        }
+        var damage = timeSkipDamage();
+        for (var entry : damage.entrySet())
+            if (entry.getValue() < timeSkip.moduleIntegrity().getOrDefault(entry.getKey(), 1d)) {
+                finishTimeSkip("Корабль получил повреждение."); return;
+            }
+        if (!timeSkipJumpPhase().equals("IN_TRANSIT") && !damage.equals(timeSkip.moduleIntegrity())) timeSkip = new com.spacesim.simulation.CampaignTimeSkipState(
+                timeSkip.mode(), timeSkip.startedTick(), timeSkip.targetTick(), timeSkip.requestedMinutes(), timeSkip.journalSequence(),
+                timeSkip.fleetId(), timeSkip.jumpPhase(), timeSkip.resumeScale(), timeSkip.hullIntegrity(), damage, timeSkip.threatSignature());
+        if (playerState.threatIntel().hashCode() != timeSkip.threatSignature()) {
+            finishTimeSkip("Получены новые сведения об угрозе."); return;
+        }
+        if (coordinator.runtime().world().getAuthoritativeWorldTick() >= timeSkip.targetTick()) {
+            finishTimeSkip("Заданный интервал завершён."); return;
+        }
+        if (timeSkip.mode() == com.spacesim.simulation.CampaignTimeSkipState.Mode.EVENT) {
+            if (playerJournal.nextSequence() - 1 > timeSkip.journalSequence()) {
+                finishTimeSkip("Произошло новое личное событие."); return;
+            }
+            String phase = timeSkipJumpPhase();
+            if (!phase.equals(timeSkip.jumpPhase())) {
+                if (timeSkip.jumpPhase().equals("NONE") && !phase.equals("NONE")) timeSkip = timeSkip.withJumpPhase(phase);
+                else finishTimeSkip("Завершился этап перелёта.");
+            }
+        }
+    }
+
+    private void finishTimeSkip(String message) {
+        double scale = timeSkip.resumeScale();
+        timeSkip = com.spacesim.simulation.CampaignTimeSkipState.idle();
+        coordinator.setPaused(true); coordinator.setTimeScale(scale);
+        lastTimeSkipMessage = message;
+        recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                "TIME_SKIP_STOPPED", "", message, 0, 0, playerState == null ? null : playerState.activeFleetId());
+    }
+
+    /**
+     * Advances exact campaign ticks when no flight-deck work requires a bay projection.
      * @param realDeltaSeconds finite non-negative presentation delta
-     * @return ordinary campaign advance diagnostics
+     * @return exact progression diagnostics
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
         if (!flightDeck.queued().isEmpty() || !flightDeck.active().isEmpty()) {
@@ -1652,6 +1773,7 @@ public final class Stage228CampaignAuthority {
             advanceModuleTransfersAtTick(tick, handlingBudgets);
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
+            observeTimeSkip();
         });
     }
 
@@ -1686,6 +1808,7 @@ public final class Stage228CampaignAuthority {
             advanceModuleTransfersAtTick(tick, handlingBudgets);
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
+            observeTimeSkip();
         });
     }
 

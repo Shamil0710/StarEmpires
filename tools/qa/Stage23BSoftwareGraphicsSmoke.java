@@ -419,6 +419,56 @@ public class Stage23BSoftwareGraphicsSmoke {
   if(GL11.glGetError()!=0)throw new AssertionError("Product purchase GL error");
   System.out.println("Product purchase keyboard preview/escrow/native resume/refund/finite handling/settlement passed; berth, stock and funding are explicit fixtures");
  }
+ static void timeSkip(com.spacesim.GeneratedWorldCommandGame game)throws Exception{
+  var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+  var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+  var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+  var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+  String actual=System.getProperty("stage23b.timeSkipCheckpoint");
+  game.render();
+  if(actual==null){keyboardAction(renderer,game,"pilot.preview");keyboardAction(renderer,game,"pilot.confirm");}
+  else{
+   var sf=game.getClass().getDeclaredField("savePath");sf.setAccessible(true);
+   var baseline=com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(java.nio.file.Path.of(actual));
+   com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write((java.nio.file.Path)sf.get(game),baseline);
+   processor.keyDown(Input.Keys.F9);game.render();
+   if(!baseline.equals(campaign(game).captureState()))throw new AssertionError("Actual source checkpoint changed on load");
+  }
+  processor.keyDown(Input.Keys.F7);game.render();selectRow(workspace,game,"time-control");
+  keyboardAction(renderer,game,"time.skip.edit");processor.keyTyped('6');processor.keyTyped('0');processor.keyDown(Input.Keys.ENTER);game.render();
+  keyboardAction(renderer,game,"time.skip.minutes");
+  var c=campaign(game);long tick=c.coordinator().runtime().world().getAuthoritativeWorldTick();
+  if(!c.timeSkip().active()||c.timeSkip().requestedMinutes()!=60)throw new AssertionError("Typed minutes not accepted");
+  double longestFrameMillis=0;
+  for(int key:new int[]{Input.Keys.F2,Input.Keys.F6,Input.Keys.F5,Input.Keys.F7}){
+   long started=System.nanoTime();processor.keyDown(key);game.render();
+   longestFrameMillis=Math.max(longestFrameMillis,(System.nanoTime()-started)/1e6);
+  }
+  if(c.coordinator().runtime().world().getAuthoritativeWorldTick()<=tick||workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SETTINGS)
+   throw new AssertionError("Menus blocked during time progression");
+  selectRow(workspace,game,"time-control");screenshot("stage23b-time-skip-running");
+  processor.keyDown(Input.Keys.SPACE);game.render();var paused=c.captureState();long pausedTick=c.coordinator().runtime().world().getAuthoritativeWorldTick();
+  if(!paused.timeSkip().active()||!c.coordinator().isPaused())throw new AssertionError("Skip pause failed");
+  processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();c=campaign(game);
+  if(!paused.equals(c.captureState()))throw new AssertionError("Pending skip native reload changed state");
+  processor.keyDown(Input.Keys.F7);game.render();selectRow(workspace,game,"time-control");
+  processor.keyDown(Input.Keys.SPACE);game.render();
+  if(c.coordinator().runtime().world().getAuthoritativeWorldTick()<=pausedTick)
+   throw new AssertionError("Restored skip did not resume");
+  keyboardAction(renderer,game,"time.skip.cancel");
+  if(c.timeSkip().active()||!c.coordinator().isPaused())throw new AssertionError("Skip cancel failed");
+  keyboardAction(renderer,game,"time.skip.event");
+  if(c.timeSkip().mode()!=com.spacesim.simulation.CampaignTimeSkipState.Mode.EVENT)throw new AssertionError("Event button failed");
+  keyboardAction(renderer,game,"time.skip.cancel");
+  keyboardAction(renderer,game,"time.skip.edit");processor.keyTyped('1');processor.keyDown(Input.Keys.ENTER);game.render();
+  keyboardAction(renderer,game,"time.skip.minutes");long target=c.timeSkip().targetTick();
+  int frames=0;while(c.timeSkip().active()){game.render();if(++frames>20000)throw new AssertionError("One minute skip did not complete");}
+  if(c.coordinator().runtime().world().getAuthoritativeWorldTick()!=target||!c.coordinator().isPaused())throw new AssertionError("Minute boundary overrun");
+  screenshot("stage23b-time-skip-completed");
+  if(GL11.glGetError()!=0)throw new AssertionError("Time skip GL error");
+  System.out.println("Time skip keyboard minutes/event/cancel, responsive menu navigation, pause and exact F8/F9 resume passed; "
+   +(actual==null?"fresh ordinary pilot":"actual ordinary checkpoint")+", no asset or location fixtures; sampled menu frame max ms="+longestFrameMillis);
+ }
  static void run(String[] args) throws Exception {
   GL.createCapabilities(); System.out.println("Renderer: "+GL11.glGetString(GL11.GL_RENDERER));
   GdxNativesLoader.load();Gdx.files=new Lwjgl3Files();var glCtor=Class.forName("com.badlogic.gdx.backends.lwjgl3.Lwjgl3GL20").getDeclaredConstructor();glCtor.setAccessible(true);Gdx.gl20=(com.badlogic.gdx.graphics.GL20)glCtor.newInstance();Gdx.gl=Gdx.gl20;
@@ -431,6 +481,9 @@ public class Stage23BSoftwareGraphicsSmoke {
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
   var pendingSave=(java.nio.file.Path)save.get(game);
+  if(Boolean.getBoolean("stage23b.timeSkipOnly")){
+   timeSkip(game);game.dispose();System.out.println("Time skip graphical probe passed");return;
+  }
   if(Boolean.getBoolean("stage23b.productPurchaseOnly")){
    productPurchase(game,pendingSave);game.dispose();System.out.println("Product purchase graphical probe passed");return;
   }
