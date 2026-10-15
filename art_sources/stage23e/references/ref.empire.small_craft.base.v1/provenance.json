@@ -1,0 +1,26 @@
+{
+  "reference_id": "ref.empire.small_craft.base.v1",
+  "asset_id": "empire.small_craft.base",
+  "batch": "001",
+  "status": "SELECTED",
+  "source_type": "five_separate_model_generated_images",
+  "candidate_generation_ids": {
+    "candidate_01": "d86df650-f5dd-4f48-a2da-beb12e6b8a56",
+    "candidate_02": "41d6ce43-de5b-4359-b460-b8da0d2c1486",
+    "candidate_03": "6335f255-e31b-4512-8683-c2104336035e",
+    "candidate_04": "08cd0efc-8ce5-4879-9104-fae8ac0f74a6",
+    "candidate_05": "eddf5a14-18b3-421e-bf8f-f431865cb8ca"
+  },
+  "selected_candidate": "candidate_03",
+  "selected_score": 91,
+  "physical_dimensions_m": [28, 12, 6],
+  "mass_t": 180,
+  "normalized_canvas": [512, 256],
+  "normalized_visible_bounds": [480, 223],
+  "visual_aspect_ratio": 2.1524663677,
+  "physical_aspect_ratio": 2.3333333333,
+  "relative_aspect_error": 0.0775144138,
+  "geometry_frozen": false,
+  "review": "docs/art/reference_freeze/reviews/ref.empire.small_craft.base.v1_batch_001.md",
+  "notes": "Local grayscale/downscale/silhouette/anchor QA passed. Repository persistence of canonical normalized reference_master.png is required before FROZEN and before fit overlays are authored."
+}

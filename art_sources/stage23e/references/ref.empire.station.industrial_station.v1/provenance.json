@@ -1,0 +1,21 @@
+{
+  "reference_id": "ref.empire.station.industrial_station.v1",
+  "asset_id": "empire.station.industrial_station",
+  "mode": "PROMOTE_EXISTING",
+  "status": "FROZEN",
+  "canonical_source": "src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png",
+  "canonical_source_git_blob_sha": "60c924e58ad2628f034b67a333eff5b18c3cc008",
+  "runtime_visual_role": "INDUSTRIAL_STATION",
+  "source_canvas": [
+    768,
+    512
+  ],
+  "geometry_frozen": true,
+  "review_artifacts": {
+    "silhouette": "art_sources/stage23e/references/ref.empire.station.industrial_station.v1/selected/reference_silhouette.svg",
+    "anchors": "art_sources/stage23e/references/ref.empire.station.industrial_station.v1/selected/reference_anchor_review.svg",
+    "qa": "art_sources/stage23e/references/ref.empire.station.industrial_station.v1/selected/reference_qa_sheet.svg"
+  },
+  "freeze_ci_commit": "81edf75c66f1976c326f9dc4be880a202e5bf1b1",
+  "freeze_ci_run_id": 37112721779
+}

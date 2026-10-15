@@ -1,0 +1,69 @@
+{
+  "reference_id": "ref.industrial_union.station.industrial_station.v1",
+  "asset_id": "industrial_union.station.industrial_station",
+  "batch": "001",
+  "status": "CLEAN_MASTER_ACCEPTED_PENDING_REPOSITORY_PERSISTENCE",
+  "source_type": "model_generated_presentation_board_normalized_for_review",
+  "source_generation_id": "47c6c305-f2f3-4ae3-981b-bdc12212ad15",
+  "rejected_clean_master_generation_id": "dee4b31f-9980-42b1-a5b4-3ae0d2974a20",
+  "prompt_authority": [
+    "docs/stage23e_visual_reference_freeze.md#1414-union-industrial-station-reference-prompt",
+    "docs/stage23e_generation_prompt_catalog.md#104-industrial_unionstationindustrial_station",
+    "docs/factions/industrial_union_visual_bible.md"
+  ],
+  "candidate_count": 5,
+  "selected_candidate": "candidate_01",
+  "selected_score": 92,
+  "geometry_frozen": false,
+  "review": "docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_batch_001.md",
+  "notes": "Candidate 01 clean master accepted by geometry-preservation review. No further generation/reselection required; exact PNG persistence + committed-byte QA + exact-head CI still block FROZEN.",
+  "accepted_clean_master": {
+    "intended_path": "art_sources/stage23e/references/ref.industrial_union.station.industrial_station.v1/selected/reference_master.png",
+    "filename": "union_industrial_station_candidate01_clean_master_1024.png",
+    "byte_size": 828751,
+    "sha256": "1980e0faedc652f2ed8a243c02b1b2f7638a83c61165de8692be57b4673b0163",
+    "canvas": [
+      1024,
+      1024
+    ],
+    "visible_bounds_alpha_gt_16": [
+      106,
+      96,
+      917,
+      934
+    ],
+    "selected_preview_alpha_iou_at_512": 0.9813522617901829,
+    "repository_persisted": false
+  },
+  "required_mechanism_anchors": {
+    "service_core": [
+      512,
+      512
+    ],
+    "stowed_gantry": [
+      315,
+      450
+    ],
+    "stowed_assembly_rig": [
+      730,
+      580
+    ],
+    "production_upper_left": [
+      260,
+      350
+    ],
+    "production_upper_right": [
+      765,
+      350
+    ],
+    "production_lower_left": [
+      260,
+      650
+    ],
+    "production_lower_right": [
+      765,
+      650
+    ]
+  },
+  "clean_master_review": "docs/art/reference_freeze/reviews/ref.industrial_union.station.industrial_station.v1_clean_master_acceptance.md"
+}

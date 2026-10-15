@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+<defs><filter id="g"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1024" height="768" fill="#20242a"/>
+<text x="32" y="42" font-family="sans-serif" font-size="24" fill="#fff">Empire trade/logistics hub QA</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png" x="32" y="80" width="320" height="320"/><image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png" x="544" y="80" width="320" height="320" filter="url(#g)"/>
+<text x="32" y="430" font-family="sans-serif" font-size="16" fill="#fff">native</text><text x="544" y="430" font-family="sans-serif" font-size="16" fill="#fff">grayscale</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png" x="64" y="500" width="160" height="160"/><text x="64" y="690" font-family="sans-serif" font-size="16" fill="#fff">25%</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_trade_hub_v1.png" x="576" y="500" width="80" height="80"/><text x="576" y="610" font-family="sans-serif" font-size="16" fill="#fff">12.5%</text></svg>

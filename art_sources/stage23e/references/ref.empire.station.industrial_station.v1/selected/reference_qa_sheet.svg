@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+<defs><filter id="g"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1024" height="768" fill="#20242a"/>
+<text x="32" y="42" font-family="sans-serif" font-size="24" fill="#fff">Empire industrial station QA</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png" x="32" y="80" width="448" height="300" preserveAspectRatio="xMidYMid meet"/>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png" x="544" y="80" width="448" height="300" preserveAspectRatio="xMidYMid meet" filter="url(#g)"/>
+<text x="32" y="410" font-family="sans-serif" font-size="16" fill="#fff">native</text><text x="544" y="410" font-family="sans-serif" font-size="16" fill="#fff">grayscale</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png" x="64" y="500" width="192" height="128"/><text x="64" y="650" font-family="sans-serif" font-size="16" fill="#fff">25%</text>
+<image href="../../../../../src/main/resources/assets/stage20_5/stations/imperial_industrial_station_v1.png" x="576" y="500" width="96" height="64"/><text x="576" y="590" font-family="sans-serif" font-size="16" fill="#fff">12.5%</text></svg>

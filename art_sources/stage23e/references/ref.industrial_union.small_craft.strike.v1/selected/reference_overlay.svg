@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="256" viewBox="0 0 512 256"><g id="kinetic-strike-cassette" stroke="#171b1f" stroke-width="2">
+  <path d="M370 117 L423 117 L452 128 L423 139 L370 139 L359 128 Z" fill="#424a4f"/>
+  <rect x="375" y="121" width="45" height="14" rx="2" fill="#6d746f"/>
+  <path d="M420 121 L441 128 L420 135 Z" fill="#9b6f27"/>
+  <rect x="365" y="122" width="8" height="12" fill="#2b3034"/>
+  <path d="M381 117 L389 111 L416 111 L423 117 Z" fill="#31383d"/>
+  <path d="M381 139 L389 145 L416 145 L423 139 Z" fill="#31383d"/>
+</g></svg>

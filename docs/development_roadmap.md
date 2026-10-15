@@ -713,7 +713,7 @@ Mandatory closure chain:
 - **23B — NEXT** — production information architecture, navigation, search, inspectors and validated actions;
 - **23C** — resolution/aspect matrix, accessibility, input rebinding and RU/EN localization;
 - **23D** — onboarding/tutorial over ordinary authoritative state;
-- **23E** — final art, VFX, animation and audio replacement;
+- **23E** — final art, VFX, animation and audio replacement; canonical execution contract: [Stage 23E — Final Presentation Production Plan](stage23e_final_presentation_plan.md);
 - **23F** — profiler-driven performance, memory and long-session hardening;
 - **23G** — atomic saves, migration, recovery and diagnostics;
 - **23H** — distributable Windows package and clean-machine launcher without Maven/JDK;

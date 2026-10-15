@@ -1,0 +1,19 @@
+{
+  "reference_id": "ref.empire.station.naval_ordnance_depot.v1",
+  "asset_id": "empire.station.naval_ordnance_depot",
+  "batch": "001",
+  "status": "SELECTED_FOR_REFINEMENT",
+  "source_type": "model_generated_image",
+  "source_generation_id": "d6bd5925-7292-4c7f-ac3a-e25918131148",
+  "prompt_authority": [
+    "docs/stage23e_visual_reference_freeze.md#149-empire-naval-ordnance-depot-reference-prompt",
+    "docs/stage23e_generation_prompt_catalog.md#97-empirestationnaval_ordnance_depot",
+    "docs/factions/empire_visual_bible.md"
+  ],
+  "candidate_count": 5,
+  "selected_candidate": "candidate_02",
+  "selected_score": 83,
+  "geometry_frozen": false,
+  "review": "docs/art/reference_freeze/reviews/ref.empire.station.naval_ordnance_depot.v1_batch_001.md",
+  "notes": "Source generator returned a transparent five-object source canvas. Non-overlapping objects were deterministically extracted for review. Repository PNGs are 192x192 review previews only. Selected candidate requires explicit loading-arm and armored-magazine-door refinement before freeze."
+}
