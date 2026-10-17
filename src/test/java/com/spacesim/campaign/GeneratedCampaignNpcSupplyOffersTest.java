@@ -12,9 +12,30 @@ class GeneratedCampaignNpcSupplyOffersTest {
         var campaign = Stage228CampaignAuthority.create(1);
         campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());
         var coordinator = campaign.coordinator(); var runtime = coordinator.runtime();
-        String faction = runtime.freight().findFreighter(campaign.playerState().orElseThrow().activeFleetId()).orElseThrow().stableFactionId();
+        // The issuer is the operator of the industrial station offered for sale, not the starting ship's seller.
+        String faction = runtime.industry().industrial().stations().stream()
+                .filter(s -> GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0)
+                .findFirst().orElseThrow().stableFactionId();
+        // New games start every treasury at zero and the starter ship is now bought from the Union, so the
+        // issuer is funded the ordinary way: the pilot buys one of its idle reserve ships at its hub.
+        var issuerReserve = runtime.freight().capture().freighters().stream()
+                .filter(f -> f.stableFactionId().equals(faction)
+                        && f.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                        && f.cargoMassKg() == 0d && runtime.world().findFleet(f.fleetId()).isPresent())
+                .findFirst().orElseThrow();
+        dockWithExplicitTravelGeometry(campaign, "hub." + runtime.world().findFleet(issuerReserve.fleetId()).orElseThrow().systemId().value());
+        long issuerTreasury = runtime.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits();
+        var knowledgeBefore = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
+        int journalBefore = campaign.playerJournal().entries().size();
+        campaign.submitPilotAction(campaign.previewPilotAction("PURCHASE", Long.toString(issuerReserve.fleetId().value()), "", 0));
+        assertTrue(runtime.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits() > issuerTreasury);
+        // The new-game sale listing already disclosed the seller's station: the purchase briefing adds nothing.
+        assertEquals(knowledgeBefore, runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID));
+        assertTrue(campaign.playerJournal().entries().subList(journalBefore, campaign.playerJournal().entries().size()).stream()
+                .noneMatch(e -> e.action().equals("SELLER_STATION_BRIEFING")), "an empty seller briefing is not journalled");
         var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.factionContentId().equals(faction)).findFirst().orElseThrow();
-        var initial = GeneratedCampaignFactionObservationPublisher.publish(runtime.captureState(), faction, 0);
+        var initial = GeneratedCampaignFactionObservationPublisher.publish(runtime.captureState(), faction,
+                runtime.world().getAuthoritativeWorldTick());
         GeneratedCampaignNpcSupplyOffers.offer(coordinator, npc.npcId(), initial);
         assertTrue(coordinator.npcMissions().missions().isEmpty(), "Normal route exposure is not an invented shortage");
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
@@ -36,7 +57,8 @@ class GeneratedCampaignNpcSupplyOffersTest {
         long treasury = runtime.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits();
         var freight = runtime.freight().capture();
         var warehouses = runtime.captureState().campaign().industrialState();
-        var observations = GeneratedCampaignFactionObservationPublisher.publish(runtime.captureState(), faction, 0);
+        var observations = GeneratedCampaignFactionObservationPublisher.publish(runtime.captureState(), faction,
+                runtime.world().getAuthoritativeWorldTick());
         GeneratedCampaignNpcSupplyOffers.offer(coordinator, npc.npcId(), observations);
         assertEquals(1, coordinator.npcMissions().missions().size());
         var mission = coordinator.npcMissions().missions().get(0);
@@ -62,7 +84,8 @@ class GeneratedCampaignNpcSupplyOffersTest {
         assertEquals(refunded, campaign.captureState());
         var restored = Stage228CampaignAuthority.restore(refunded);
         GeneratedCampaignNpcSupplyOffers.offer(restored.coordinator(), npc.npcId(),
-                GeneratedCampaignFactionObservationPublisher.publish(restored.coordinator().runtime().captureState(), faction, 0));
+                GeneratedCampaignFactionObservationPublisher.publish(restored.coordinator().runtime().captureState(), faction,
+                        restored.coordinator().runtime().world().getAuthoritativeWorldTick()));
         assertEquals(refunded, restored.captureState());
     }
 

@@ -49,11 +49,15 @@ class GeneratedCampaignPhysicalMarketTest {
     @Test void actualNeighborTradeMovesOneExistingKilogramAndMakesConservedProfitAcrossTransitReload() {
         var c = started(); var r = c.coordinator().runtime(); var p = r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
         var source = r.infrastructure().endpoint("hub." + p.systemId().value());
-        var destination = r.world().getTopology().neighbors(p.systemId()).stream().filter(system -> r.infrastructure().endpoints().stream()
-                .anyMatch(e -> e.systemId().equals(system) && e.stationArchetypeId().equals("station.infrastructure.refinery_complex"))).findFirst().orElseThrow();
-        var target = r.infrastructure().endpoints().stream().filter(e -> e.systemId().equals(destination)
-                && e.stationArchetypeId().equals("station.infrastructure.refinery_complex")).findFirst().orElseThrow();
         long ask = c.pilotCommodityPrice(source.stationId(), WATER, true);
+        // Any neighbouring market that bids above the local ask makes the trade; the start need not border a refinery.
+        var neighbors = r.world().getTopology().neighbors(p.systemId());
+        var waterClass = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault().findCommodity(WATER).storageClassId();
+        var quoting = c;
+        var target = r.infrastructure().endpoints().stream().filter(e -> neighbors.contains(e.systemId())
+                && e.handlingCapability().supportedStorageClassIds().contains(waterClass)
+                && quoting.pilotCommodityPrice(e.stationId(), WATER, false) > ask).findFirst().orElseThrow();
+        var destination = target.systemId();
         assertEquals(2500L, ask); assertTrue(c.pilotCommodityPrice(target.stationId(), WATER, false) > ask);
         long initialPersonal = c.playerState().orElseThrow().walletMilliCredits();
         long sourceMoney = wallet(c, source.stationId()).getBalanceMilliCredits(); long targetMoney = wallet(c, target.stationId()).getBalanceMilliCredits();

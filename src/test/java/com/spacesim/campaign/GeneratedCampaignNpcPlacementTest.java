@@ -18,7 +18,9 @@ class GeneratedCampaignNpcPlacementTest {
         var endpoint = r.infrastructure().endpoint(posting.subjectId());
         var fleet = r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
         // Explicit berth fixture verifies the logistics contact boundary, not ordinary travel.
-        r.world().beginFleetTransfer(fleet.id(), endpoint.systemId()); r.world().completeFleetTransfer(fleet.id(), 0, 0);
+        if (!fleet.systemId().equals(endpoint.systemId())) {
+            r.world().beginFleetTransfer(fleet.id(), endpoint.systemId()); r.world().completeFleetTransfer(fleet.id(), 0, 0);
+        }
         fleet = r.world().findFleet(fleet.id()).orElseThrow();
         var local = r.arrival().materialization(fleet.systemId());
         if (local.physicalState(fleet.localEntityId()).isEmpty()) local.registerPhysicalState(fleet.localEntityId(),

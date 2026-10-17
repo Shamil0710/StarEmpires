@@ -144,6 +144,7 @@ public final class GeneratedCampaignJournalUi {
             case "ALLOCATE_YARD_RESOURCES" -> "Существующие ресурсы верфей станции перераспределены";
             case "ALLOCATE_YARD_RESOURCES_AVAILABLE" -> "Верфи выделена доступная доля существующих ресурсов станции";
             case "SELLER_STATION_BRIEFING" -> "Получены координаты гражданских станций из архива продавца корабля";
+            case "STATION_SALE_LISTING" -> "Получены координаты станций, выставленных на продажу";
             case "BUY_RESOURCE_MAP" -> "Карта ресурсного участка куплена у местного оператора";
             case "BUY_STATION_MAP" -> "Навигационная карта станции куплена у местного оператора";
             case "BUY_ROUTE_MAP" -> "Архив пройденного маршрута куплен у местного оператора";

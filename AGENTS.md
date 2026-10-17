@@ -68,8 +68,9 @@ researcher and reviewer are Codex agents (.codex/agents/*.toml).
 In Claude Code, call them through Codex CLI, not through Claude subagents:
 
 - Research: `codex exec -s read-only -c 'windows.sandbox="unelevated"' "<researcher instructions from .codex/agents/researcher.toml>\n\nTask: ..."`
-- Review of a branch: `codex review -c 'windows.sandbox="unelevated"' --base main "<reviewer instructions>"`
-- Review of uncommitted work: `codex review -c 'windows.sandbox="unelevated"' --uncommitted "<reviewer instructions>"`
+- Review with reviewer instructions: `codex exec -s read-only -c 'windows.sandbox="unelevated"' "<reviewer instructions from .codex/agents/reviewer.toml>\n\nReview: git diff main...HEAD (or the uncommitted git diff and new files). Context: ..."`
+- Plain built-in review: `codex review -c 'windows.sandbox="unelevated"' --uncommitted` or `--base main`
+  (these flags cannot be combined with custom instructions).
 
 The `windows.sandbox="unelevated"` override is required when Codex is launched from
 Claude Code: the user's default `elevated` sandbox fails there with

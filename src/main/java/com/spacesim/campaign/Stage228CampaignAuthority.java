@@ -403,10 +403,23 @@ public final class Stage228CampaignAuthority {
     public PilotStartPreview previewIndependentPilotStart() {
         var baseline = captureState();
         if (!canStartIndependentPilot()) return new PilotStartPreview(this, baseline, null, null);
-        var reserve = coordinator.runtime().freight().capture().freighters().stream()
+        var world = coordinator.runtime().world();
+        var idle = coordinator.runtime().freight().capture().freighters().stream()
                 .filter(f -> f.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
-                .filter(f -> f.cargoMassKg() == 0d && coordinator.runtime().world().findFleet(f.fleetId()).isPresent())
-                .findFirst().orElse(null);
+                .filter(f -> f.cargoMassKg() == 0d && world.findFleet(f.fleetId()).isPresent())
+                .toList();
+        // The pilot starts beside the existing mining ship offered for sale, so the first job needs no jump.
+        var miner = idle.stream()
+                .filter(f -> f.fitId().equals(
+                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT))
+                .findFirst();
+        var reserve = miner.flatMap(m -> idle.stream()
+                        .filter(f -> !f.fleetId().equals(m.fleetId()))
+                        .filter(f -> world.findFleet(f.fleetId()).orElseThrow().systemId()
+                                .equals(world.findFleet(m.fleetId()).orElseThrow().systemId()))
+                        .findFirst())
+                .or(() -> idle.stream().filter(f -> miner.isEmpty() || !f.fleetId().equals(miner.orElseThrow().fleetId())).findFirst())
+                .orElse(null);
         if (reserve == null) return new PilotStartPreview(this, baseline, null, null);
         var candidate = restore(baseline);
         try {
@@ -432,7 +445,7 @@ public final class Stage228CampaignAuthority {
         recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "PILOT_START", checked.seller,
                 "", 1, PILOT_SAVINGS_MILLI_CREDITS - PILOT_SHIP_PRICE_MILLI_CREDITS, checked.fleet);
         if (briefingCount > 0) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
-                "SELLER_STATION_BRIEFING", checked.seller, "paid-ship-sale", briefingCount, 0, checked.fleet);
+                "STATION_SALE_LISTING", checked.seller, "new-game-station-sale-listing", briefingCount, 0, checked.fleet);
         return playerState;
     }
 
@@ -455,7 +468,17 @@ public final class Stage228CampaignAuthority {
             throw new IllegalStateException("Reserve purchase cannot settle");
         playerState = adapter.player();
         initializePilotMarkets(stationCapital);
-        return receiveSellerStationBriefing(fleetId, seller);
+        return receiveStationSaleListing();
+    }
+
+    /** New-game listing of every station offered for sale, whichever faction sold the starting ship. */
+    private int receiveStationSaleListing() {
+        var runtime = coordinator.runtime();
+        var permitted = runtime.industry().industrial().stations().stream()
+                .filter(s -> GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0)
+                .map(s -> new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(s.systemId(),
+                        com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE, s.stationId())).toList();
+        return adoptReceivedStations(runtime.receiveStationSaleListing(playerState, permitted));
     }
 
     private int receiveSellerStationBriefing(FleetId fleetId, String seller) {
@@ -465,7 +488,10 @@ public final class Stage228CampaignAuthority {
                         && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0)
                 .map(s -> new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(s.systemId(),
                         com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE, s.stationId())).toList();
-        var received = runtime.receiveSellerStationBriefing(playerState, fleetId, seller, permitted);
+        return adoptReceivedStations(runtime.receiveSellerStationBriefing(playerState, fleetId, seller, permitted));
+    }
+
+    private int adoptReceivedStations(List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> received) {
         var references = new java.util.ArrayList<>(playerState.discoveredObjects());
         for (var ref : received) pilotMarketReference(ref.objectId()).ifPresent(reference -> {
             if (!references.contains(reference)) references.add(reference);

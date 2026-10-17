@@ -801,7 +801,35 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     || world.findFactionEconomicState(seller).isEmpty()
                     || !freight.findFreighter(purchasedFleet).orElseThrow().stableFactionId().equals(seller))
                 throw new IllegalArgumentException("Station briefing requires its actual purchased ship and faction seller");
-            var archive = discovery.knowledgeFor(seller);
+            return discloseStations(permitted, seller,
+                    (stationOwner, stationId) -> "paid-ship-briefing:" + seller + ':' + purchasedFleet.value() + ':' + stationId);
+        }
+
+        /**
+         * Receives the public sale listing of stations offered for sale, each from its own owner's
+         * existing archive. The campaign calls this once at the new-game pilot start, so the pilot
+         * learns where a station can be bought whichever faction sold the starting ship.
+         * @param player actual new pilot with its active purchased ship
+         * @param permitted civilian station references the sale policy offers for sale
+         * @return exact received references, without stock, estimates or ownership grants
+         */
+        public List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> receiveStationSaleListing(
+                com.spacesim.player.PlayerState player,
+                List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> permitted) {
+            Objects.requireNonNull(player);
+            if (!player.ownedFleetIds().contains(player.activeFleetId()) || world.findFleet(player.activeFleetId()).isEmpty())
+                throw new IllegalArgumentException("Station sale listing requires the pilot's actual ship");
+            return discloseStations(permitted, null,
+                    (stationOwner, stationId) -> "station-sale-listing:" + stationOwner + ':' + stationId);
+        }
+
+        /**
+         * Copies known static locations of permitted stations from each station owner's archive.
+         * @param requiredOwner owner every disclosed station must have, or {@code null} for any owner
+         */
+        private List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> discloseStations(
+                List<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef> permitted, String requiredOwner,
+                java.util.function.BiFunction<String, String, String> provenance) {
             String owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
             var personal = discovery.knowledgeFor(owner);
             var received = new ArrayList<com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef>();
@@ -810,9 +838,13 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 if (ref.kind() != com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE)
                     throw new IllegalArgumentException("Sale briefing is limited to permitted stations");
                 var station = industry.industrial().stations().stream().filter(s -> s.stationId().equals(ref.objectId())
-                        && s.systemId().equals(ref.systemId()) && s.stableFactionId().equals(seller)).findFirst();
-                var known = archive.entries().stream().filter(e -> e.object().equals(ref) && e.knownLocation().isPresent()).findFirst();
-                if (station.isEmpty() || known.isEmpty()
+                        && s.systemId().equals(ref.systemId())
+                        && (requiredOwner == null || s.stableFactionId().equals(requiredOwner))).findFirst();
+                if (station.isEmpty()) continue;
+                String stationOwner = station.orElseThrow().stableFactionId();
+                var known = discovery.knowledgeFor(stationOwner).entries().stream()
+                        .filter(e -> e.object().equals(ref) && e.knownLocation().isPresent()).findFirst();
+                if (known.isEmpty()
                         || !known.orElseThrow().classificationId().equals(java.util.Optional.of(station.orElseThrow().stationArchetypeId()))) continue;
                 if (personal.knowledge(ref).filter(k -> k.knownLocation().isPresent()).isPresent()) continue;
                 personal = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(personal,
@@ -822,7 +854,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                 com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(),
                                 new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
                                         com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE,
-                                        "paid-ship-briefing:" + seller + ':' + purchasedFleet.value() + ':' + ref.objectId(), seconds, java.util.OptionalDouble.empty())));
+                                        provenance.apply(stationOwner, ref.objectId()), seconds, java.util.OptionalDouble.empty())));
                 received.add(ref);
             }
             if (!received.isEmpty()) {

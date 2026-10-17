@@ -2,6 +2,11 @@
 
 Status: IMPLEMENTED SLICE / 23B ACTIVE/PARTIAL. Exact-head verification belongs to PR #413.
 
+**Start ship rule, 2026-10-17.** When the new game has the sellable Union mining ship, the pilot buys
+the first idle empty freighter in the same system (seller `faction.beta`), not the first idle freighter
+anywhere; without a mining reserve the old rule applies. Price, savings and markets are unchanged.
+The market corpora below were recorded with the previous rule. Checked by `MinerLoopScenarioTest`.
+
 Profile: `se-pilot-start-2`; release generator alias: `se-gen-3`. Canonical SHA-256:
 `c90330307a1d1f5750ab18c05ddbd872203dcf414b6ae3c1f2560ade1e3a9f71`. Canonical policy input:
 

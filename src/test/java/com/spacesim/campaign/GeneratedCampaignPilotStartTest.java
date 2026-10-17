@@ -41,7 +41,7 @@ class GeneratedCampaignPilotStartTest {
         assertEquals(paused, campaign.captureState());
     }
 
-    @Test void paidSaleCopiesOnlyArchivedSellerCivilianStationCoordinatesAndPersistsItsReceipt() {
+    @Test void newGameSaleListingCopiesOnlyArchivedCoordinatesOfStationsForSaleAndPersistsItsReceipt() {
         var campaign = Stage228CampaignAuthority.create(1);
         var runtime = campaign.coordinator().runtime();
         var baseline = campaign.captureState();
@@ -49,22 +49,26 @@ class GeneratedCampaignPilotStartTest {
         assertTrue(offer.allowed(), "Real archive transfer must leave the conserved starter purchase available");
         assertEquals(baseline, campaign.captureState(), "Preview must not deliver intelligence");
         var seller = runtime.freight().findFreighter(offer.fleetId()).orElseThrow().stableFactionId();
-        var archive = runtime.discoveryState().knowledgeFor(seller);
+        var forSale = runtime.industry().industrial().stations().stream()
+                .filter(s -> GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0).toList();
+        var archives = forSale.stream().map(s -> s.stableFactionId()).distinct()
+                .collect(java.util.stream.Collectors.toMap(f -> f, f -> runtime.discoveryState().knowledgeFor(f)));
         var industrial = runtime.captureState().campaign().industrialState();
-        var expected = archive.entries().stream().filter(e -> e.knownLocation().isPresent()
-                && runtime.industry().industrial().stations().stream().anyMatch(s ->
-                    s.stationId().equals(e.object().objectId()) && s.systemId().equals(e.object().systemId())
-                    && s.stableFactionId().equals(seller)
-                    && GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0))
+        // Each station is listed from its own owner's archive, whichever faction sold the starting ship.
+        var expected = forSale.stream().flatMap(s -> archives.get(s.stableFactionId()).entries().stream()
+                .filter(e -> e.knownLocation().isPresent()
+                        && e.object().objectId().equals(s.stationId()) && e.object().systemId().equals(s.systemId())))
                 .toList();
-        assertFalse(expected.isEmpty(), "Ordinary start must have a real seller archive to disclose");
+        assertFalse(expected.isEmpty(), "Ordinary start must have a real station sale listing to disclose");
+        assertTrue(forSale.stream().noneMatch(s -> s.stableFactionId().equals(seller)),
+                "Seed 1 starts beside the Union miner, so the listing is not limited to the ship seller's stations");
         campaign.submitIndependentPilotStart(offer);
-        assertEquals(archive, runtime.discoveryState().knowledgeFor(seller));
+        archives.forEach((faction, archive) -> assertEquals(archive, runtime.discoveryState().knowledgeFor(faction)));
         assertEquals(industrial, runtime.captureState().campaign().industrialState(), "Briefing cannot issue stock, facilities or work");
         var received = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
         var briefing = received.entries().stream().filter(e -> e.evidence().stream().anyMatch(v ->
                 v.source() == com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE
-                && v.provenanceId().startsWith("paid-ship-briefing:"))).toList();
+                && v.provenanceId().startsWith("station-sale-listing:"))).toList();
         assertEquals(expected.size(), briefing.size());
         assertEquals(expected.size(), received.entries().size(), "No other faction or resource knowledge may be copied");
         for (var entry : briefing) {
@@ -76,7 +80,7 @@ class GeneratedCampaignPilotStartTest {
         }
         assertEquals("PILOT_START", campaign.playerJournal().entries().get(0).action());
         var receipt = campaign.playerJournal().entries().get(1);
-        assertEquals("SELLER_STATION_BRIEFING", receipt.action());
+        assertEquals("STATION_SALE_LISTING", receipt.action());
         assertEquals(expected.size(), receipt.quantity());
         var model = new GeneratedWorldUiModel(1, runtime, campaign.coordinator().content());
         var rows = new ProductionUiProjector("faction.beta").capture(campaign, model.capture()).rows(Tab.INTELLIGENCE);

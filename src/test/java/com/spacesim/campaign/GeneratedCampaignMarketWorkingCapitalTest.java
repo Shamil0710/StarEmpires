@@ -50,9 +50,13 @@ class GeneratedCampaignMarketWorkingCapitalTest {
         String seller = world.findFactionStableId(entity.getComponent(FactionComponent.class).factionId).orElseThrow();
         assertTrue(world.transferToFactionTreasury(seller, wallet, entity.getComponent(IdentityComponent.class).name, 4_000_000L, "fixture.market-remittance"));
         var economy = world.findFactionEconomicState(seller).orElseThrow();
-        var other = runtime.industry().industrial().stations().stream().filter(s -> s.stableFactionId().equals(seller)).findFirst().orElseThrow();
-        var otherRef = c.pilotMarketReference(other.stationId()).orElseThrow();
-        var otherEntity = world.findSession(otherRef.systemId()).orElseThrow().getEntityRegistry().require(otherRef.entityId());
+        // Any other market of the same operator can hold the drained treasury; the operator need not own industry.
+        var otherEntity = runtime.infrastructure().endpoints().stream().filter(e -> !e.stationId().equals(station))
+                .flatMap(e -> c.pilotMarketReference(e.stationId()).stream())
+                .map(r -> world.findSession(r.systemId()).orElseThrow().getEntityRegistry().require(r.entityId()))
+                .filter(e -> e.getComponent(FactionComponent.class) != null
+                        && world.findFactionStableId(e.getComponent(FactionComponent.class).factionId).orElseThrow().equals(seller))
+                .findFirst().orElseThrow();
         assertTrue(world.transferFromFactionTreasury(seller, otherEntity.getComponent(WalletComponent.class),
                 otherEntity.getComponent(IdentityComponent.class).name, economy.treasuryMilliCredits() - economy.treasuryReserveFloorMilliCredits(), "fixture.operator-reserve"));
         var before = c.captureState(); GeneratedCampaignMarketWorkingCapital.review(c);
