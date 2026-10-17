@@ -56,7 +56,7 @@ public final class Stage23StationStorageCatalog {
                     Set.of("capability.fabrication.heavy", "capability.fabrication.assembly"), .16));
             var bindings = new ArrayList<>(base.getFacilities());
             bindings.add(new Stage18FacilityConstructionCatalog.FacilityConstructionDefinition(FACILITY_ID, profile, INSTALLED_MASS_KG));
-            return new Stage18FacilityConstructionCatalog(base.getSchemaVersion(), profiles, bindings);
+            return PlayerConstructionScale.scale(new Stage18FacilityConstructionCatalog(base.getSchemaVersion(), profiles, bindings));
         }
     }
 }

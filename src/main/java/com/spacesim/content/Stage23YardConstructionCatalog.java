@@ -49,7 +49,7 @@ public final class Stage23YardConstructionCatalog {
                 if (input == null) throw new IllegalStateException("Missing yard construction specifications");
                 byte[] bytes = input.readNBytes(MAX_BYTES + 1);
                 if (bytes.length > MAX_BYTES) throw new IllegalArgumentException("Yard construction document exceeds bounds");
-                return parse(new String(bytes, StandardCharsets.UTF_8));
+                return parse(new String(bytes, StandardCharsets.UTF_8), PlayerConstructionScale.FACTOR);
             } catch (IOException failure) { throw new IllegalStateException("Cannot read yard construction specifications", failure); }
         }
     }
@@ -59,7 +59,16 @@ public final class Stage23YardConstructionCatalog {
      * @param json bounded specification document
      * @return immutable deterministic catalog
      */
-    public static Stage23YardConstructionCatalog parse(String json) {
+    public static Stage23YardConstructionCatalog parse(String json) { return parse(json, 1d); }
+
+    /**
+     * Validates authored bindings, scaling each installed mass before its bill and work are derived.
+     * @param json bounded specification document
+     * @param massFactor positive fraction of the authored installed mass
+     * @return immutable deterministic catalog
+     */
+    public static Stage23YardConstructionCatalog parse(String json, double massFactor) {
+        if (!Double.isFinite(massFactor) || massFactor <= 0) throw new IllegalArgumentException("Construction scale must be positive");
         Objects.requireNonNull(json);
         if (json.isBlank() || json.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES)
             throw new IllegalArgumentException("Yard construction document outside bounds");
@@ -81,7 +90,7 @@ public final class Stage23YardConstructionCatalog {
             if (yardValue == null || !yardValue.isString() || profileValue == null || !profileValue.isString()
                     || massValue == null || !massValue.isNumber()) throw new IllegalArgumentException("Invalid yard construction field type");
             String yardId = row.getString("yardDefinitionId"); String profileId = row.getString("profileId");
-            double mass = row.getDouble("installedMassKg");
+            double mass = row.getDouble("installedMassKg") * massFactor;
             if (yards.findYard(yardId) == null || values.containsKey(yardId))
                 throw new IllegalArgumentException("Unknown or duplicate yard construction target");
             var profile = construction.findProfile(profileId);

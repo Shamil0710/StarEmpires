@@ -219,7 +219,7 @@ class GeneratedCampaignPersonalRepairTest {
                     d.requiredLaborUnitsAtFullRate(), d.maintenanceWorkRate(), f.state().locationTag(), true));
         }).toList());
         var constructionOrders = new ArrayList<>(old.constructionOrders());
-        var construction = new Stage18FacilityConstructionRuntime(Stage18FacilityConstructionCatalogLoader.loadDefault(),
+        var construction = new Stage18FacilityConstructionRuntime(com.spacesim.content.Stage23StationStorageCatalog.construction(),
                 Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault());
         String location = station.facilities().get(0).locationTag();
         for (String support : design.requiredSupportFacilityDefinitionIds()) {
