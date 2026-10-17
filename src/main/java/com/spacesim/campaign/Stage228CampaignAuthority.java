@@ -2669,7 +2669,9 @@ public final class Stage228CampaignAuthority {
         // Existing physical services need not emit a mission-specific event for every change.
         // A bounded, stateless campaign-tick sweep closes that seam without inventing outcomes.
         if (tick % 60L == 0L && due.size() < 8) {
-            var active = service.snapshot().missions().stream().filter(MissionContract::active)
+            // Only accepted contracts need the sweep; open offers expire through their own scheduled wakeups.
+            var active = service.snapshot().missions().stream()
+                    .filter(m -> m.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.ACCEPTED)
                     .sorted(java.util.Comparator.comparing(MissionContract::missionId)).toList();
             if (!active.isEmpty()) {
                 long batches = (active.size() + 7L) / 8L;
