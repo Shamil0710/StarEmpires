@@ -22,7 +22,6 @@ import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1120,8 +1119,18 @@ public final class GeneratedWorldCommandUiRenderer {
             Point point = points.get(object.stableId());
             float physicalLength = (float) (object.physicalLengthM() * pixelsPerMetre);
             float physicalWidth = (float) (object.physicalWidthM() * pixelsPerMetre);
-            float halfX = Math.max(markerSize(object.kind()), physicalLength) / 2f;
-            float halfY = Math.max(markerSize(object.kind()), physicalWidth) / 2f;
+            // Screen bounds of the rotated hull, shared by culling and the click area.
+            float hullHalfX = physicalLength / 2f;
+            float hullHalfY = physicalWidth / 2f;
+            if (point != null && physicalLength > 0f && physicalWidth > 0f
+                    && Float.isFinite(physicalLength) && Float.isFinite(physicalWidth)) {
+                SelectionBrackets.Frame hull = SelectionBrackets.around(point.x(), point.y(), physicalLength,
+                        physicalWidth, MovementAlignedHeading.degrees(object.headingRad()), 0f, 0f);
+                hullHalfX = (hull.right() - hull.left()) / 2f;
+                hullHalfY = (hull.top() - hull.bottom()) / 2f;
+            }
+            float halfX = Math.max(markerSize(object.kind()) / 2f, hullHalfX);
+            float halfY = Math.max(markerSize(object.kind()) / 2f, hullHalfY);
             if (point == null || point.x() + halfX < layout.map().x()
                     || point.x() - halfX > layout.map().right()
                     || point.y() + halfY < layout.map().y()
@@ -1150,10 +1159,10 @@ public final class GeneratedWorldCommandUiRenderer {
                     HitKind.LOCAL_OBJECT,
                     object.stableId(),
                     null,
-                    new Rect(point.x() - Math.max(metrics.hitRadius(), physicalLength / 2f),
-                            point.y() - Math.max(metrics.hitRadius(), physicalWidth / 2f),
-                            Math.max(metrics.hitRadius() * 2f, physicalLength),
-                            Math.max(metrics.hitRadius() * 2f, physicalWidth))));
+                    new Rect(point.x() - Math.max(metrics.hitRadius(), hullHalfX),
+                            point.y() - Math.max(metrics.hitRadius(), hullHalfY),
+                            Math.max(metrics.hitRadius(), hullHalfX) * 2f,
+                            Math.max(metrics.hitRadius(), hullHalfY) * 2f)));
         }
         shapes.end();
 
@@ -1173,17 +1182,15 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(selectedSprite.headingRad()));
         }
 
-        drawMapLabels(snapshot.localObjects(), points, selection, layout.map());
+        drawMapLabels(snapshot.localObjects(), points, selection, layout.map(), pixelsPerMetre,
+                snapshot.activeSystemName(), systemMapSubtitle(snapshot));
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
         fonts.title().draw(batch, snapshot.activeSystemName(), layout.map().x() + 18f * metrics.scale(),
                 layout.map().top() - 16f * metrics.scale());
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-        fonts.small().draw(batch,
-                snapshot.localObjects().size()
-                        + " объектов  •  единый масштаб в метрах  •  двойной клик: сопровождение"
-                        + "  •  СКМ/Home: отмена",
+        fonts.small().draw(batch, systemMapSubtitle(snapshot),
                 layout.map().x() + 18f * metrics.scale(), layout.map().top() - 46f * metrics.scale());
         batch.end();
         drawScaleBar(layout.map(), pixelsPerMetre);
@@ -1818,6 +1825,28 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.end();
     }
 
+    private static String systemMapSubtitle(GeneratedWorldUiSnapshot snapshot) {
+        return snapshot.localObjects().size()
+                + " объектов  •  единый масштаб в метрах  •  двойной клик: сопровождение"
+                + "  •  СКМ/Home: отмена";
+    }
+
+    /** Map title block and scale bar, which name plates must not cover. */
+    private List<MapLabelLayout.Box> systemMapOverlays(Rect map, String title, String subtitle) {
+        float scale = metrics.scale();
+        glyph.setText(fonts.title(), title);
+        float titleWidth = glyph.width;
+        glyph.setText(fonts.small(), subtitle);
+        float textWidth = Math.max(titleWidth, glyph.width);
+        float titleHeight = 58f * scale;
+        MapLabelLayout.Box titleBox = new MapLabelLayout.Box(map.x(), map.top() - titleHeight,
+                Math.min(map.width(), textWidth + 30f * scale), titleHeight);
+        // Scale bar: drawn 18 px in from the corner, up to 22 % of the map wide, with its label above.
+        MapLabelLayout.Box scaleBarBox = new MapLabelLayout.Box(map.x(), map.y(),
+                26f * scale + map.width() * 0.22f, 18f * scale + 8f * scale + 16f * scale + 6f * scale);
+        return List.of(titleBox, scaleBarBox);
+    }
+
     /** Draws corner brackets around the rotated hull of the selected marker-sized sprite. */
     private void drawSelectionBrackets(Point center, float length, float hullWidth, float headingDegrees) {
         if (center == null || !(length > 0f) || !(hullWidth > 0f) || !Float.isFinite(length)
@@ -1905,34 +1934,94 @@ public final class GeneratedWorldCommandUiRenderer {
             List<LocalObjectView> objects,
             Map<String, Point> points,
             UiSelection selection,
-            Rect map) {
-        var ordered = new ArrayList<>(objects);
-        ordered.sort(Comparator.comparingInt(object -> selection.kind() == SelectionKind.LOCAL_OBJECT
-                && selection.stableId().equals(object.stableId()) ? 0 : 1));
-        var labels = new ArrayList<Rect>();
-        batch.begin();
-        for (LocalObjectView object : ordered) {
-            boolean selected = selection.kind() == SelectionKind.LOCAL_OBJECT
-                    && selection.stableId().equals(object.stableId());
+            Rect map,
+            double pixelsPerMetre,
+            String title,
+            String subtitle) {
+        float scale = metrics.scale();
+        float padX = 4f * scale;
+        float padY = 2f * scale;
+        float lineHeight = fonts.small().getLineHeight();
+        String selectedId = selection.kind() == SelectionKind.LOCAL_OBJECT ? selection.stableId() : "";
+        Map<String, String> names = new HashMap<>();
+        List<MapLabelLayout.Request> requests = new ArrayList<>();
+        List<MapLabelLayout.Marker> markers = new ArrayList<>();
+        for (LocalObjectView object : objects) {
+            Point point = points.get(object.stableId());
+            if (point == null) {
+                continue;
+            }
+            float marker = markerSize(object.kind());
+            float markerRadius = marker * 0.58f;
+            // Every visible marker is protected, labelled or not, even when its centre is off the map.
+            if (point.x() + markerRadius > map.x() && point.x() - markerRadius < map.right()
+                    && point.y() + markerRadius > map.y() && point.y() - markerRadius < map.top()) {
+                markers.add(new MapLabelLayout.Marker(object.stableId(), point.x(), point.y(), markerRadius));
+            }
+            if (!map.contains(point.x(), point.y())) {
+                continue;
+            }
+            boolean selected = object.stableId().equals(selectedId);
             boolean important = selected || object.kind() == ObjectKind.STATION
                     || object.kind() == ObjectKind.FLEET || objects.size() <= 24;
             if (!important) {
                 continue;
             }
-            Point point = points.get(object.stableId());
-            if (point == null || !map.contains(point.x(), point.y())) {
-                continue;
+            float length = (float) (object.physicalLengthM() * pixelsPerMetre);
+            float hullWidth = (float) (object.physicalWidthM() * pixelsPerMetre);
+            // A marker-sized sprite replaces the circle: keep the plate off the hull at any heading.
+            boolean hullShown = object.sprite() != null && length >= marker && hullWidth > 0f
+                    && Float.isFinite(length) && Float.isFinite(hullWidth);
+            float clearance = markerRadius;
+            if (hullShown) {
+                clearance = Math.max(markerRadius, MapLabelLayout.hullClearance(length, hullWidth));
+                if (selected) {
+                    // ...and off the selection brackets, which frame the rotated hull with padding.
+                    SelectionBrackets.Frame frame = SelectionBrackets.around(point.x(), point.y(), length, hullWidth,
+                            MovementAlignedHeading.degrees(object.headingRad()), 6f * scale, 0f);
+                    clearance = Math.max(clearance, (float) Math.hypot(
+                            (frame.right() - frame.left()) / 2f, (frame.top() - frame.bottom()) / 2f));
+                }
             }
-            float labelX = point.x() + markerSize(object.kind()) * 0.65f;
-            float labelY = point.y() + fonts.small().getLineHeight() * 0.35f;
             glyph.setText(fonts.small(), object.name());
-            var bounds = new Rect(labelX, labelY - fonts.small().getLineHeight(),
-                    glyph.width + 4f * metrics.scale(), fonts.small().getLineHeight());
-            if (labels.stream().anyMatch(prior -> bounds.x() < prior.right() && bounds.right() > prior.x()
-                    && bounds.y() < prior.top() && bounds.top() > prior.y())) continue;
-            labels.add(bounds);
-            fonts.small().setColor(selected ? ImperialUiPalette.BRASS : ImperialUiPalette.IVORY);
-            fonts.small().draw(batch, object.name(), labelX, labelY);
+            names.put(object.stableId(), object.name());
+            int priority = selected ? 0 : object.kind() == ObjectKind.STATION ? 1
+                    : object.kind() == ObjectKind.FLEET ? 2 : 3;
+            requests.add(new MapLabelLayout.Request(object.stableId(), point.x(), point.y(), clearance,
+                    glyph.width + 2f * padX, lineHeight + 2f * padY, priority, selected));
+        }
+        List<MapLabelLayout.Placement> placements = MapLabelLayout.place(requests, markers,
+                new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()),
+                systemMapOverlays(map, title, subtitle), 4f * scale, 8f * scale);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.MAP_LABEL_PLATE);
+        for (MapLabelLayout.Placement placement : placements) {
+            MapLabelLayout.Box plate = placement.plate();
+            shapes.rect(plate.x(), plate.y(), plate.width(), plate.height());
+        }
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        for (MapLabelLayout.Placement placement : placements) {
+            MapLabelLayout.Leader leader = placement.leader();
+            if (leader != null) {
+                shapes.setColor(ImperialUiPalette.MAP_LABEL_LEADER);
+                shapes.line(leader.x1(), leader.y1(), leader.x2(), leader.y2());
+            }
+            if (placement.id().equals(selectedId)) {
+                MapLabelLayout.Box plate = placement.plate();
+                shapes.setColor(ImperialUiPalette.BRASS);
+                shapes.rect(plate.x(), plate.y(), plate.width(), plate.height());
+            }
+        }
+        shapes.end();
+        batch.begin();
+        for (MapLabelLayout.Placement placement : placements) {
+            MapLabelLayout.Box plate = placement.plate();
+            fonts.small().setColor(placement.id().equals(selectedId) ? ImperialUiPalette.BRASS : ImperialUiPalette.IVORY);
+            fonts.small().draw(batch, names.get(placement.id()), plate.x() + padX, plate.top() - padY);
         }
         batch.end();
     }
