@@ -109,11 +109,13 @@ UX requirements:
 - double-click focus, wheel zoom, middle-button pan, return-to-active-object и camera presets;
 - безопасные confirmation flows только для действительно необратимых действий;
 - tooltip/glossary для единиц, derived metrics и причин отказа;
-- information density presets без удаления authoritative information.
+- information density presets без удаления authoritative information;
+- вкладка «Система»: метрическая сетка и линейка, иерархия действий, выделение, подписи, линия захода, таблицы и миникарта в инспекторе — пункты SV-1…SV-10 в `docs/ui/system_view_polish_plan.md`.
 
 Exit criteria:
 
 - все core loops выполняются из production UI;
+- SV-1…SV-10 закрыты (`docs/ui/system_view_polish_plan.md`);
 - UI не требует raw IDs как основной идентификатор;
 - любой displayed strategic number имеет provenance/explanation;
 - keyboard-only smoke path покрывает главное меню, карты, списки и dialog actions.
@@ -213,7 +215,8 @@ VFX closure:
 - shield interaction, armor hit, penetration, subsystem failure and destruction cues;
 - engine state tied to actual thrust, not decorative constant exhaust;
 - bounded particles/lights and declutter priority under saturation;
-- reduced-intensity accessibility variants.
+- reduced-intensity accessibility variants;
+- вкладка «Система»: портрет объекта, параллакс фона, VFX добычи по событиям, свечение, арт причалов — пункты SV-11…SV-15 в `docs/ui/system_view_polish_plan.md`.
 
 Audio closure:
 
