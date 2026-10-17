@@ -1114,6 +1114,7 @@ public final class GeneratedWorldCommandUiRenderer {
         Gdx.gl.glScissor((int) (layout.map().x() * sx), (int) (layout.map().y() * sy),
                 (int) (layout.map().width() * sx), (int) (layout.map().height() * sy));
         ArrayList<LocalObjectView> spriteObjects = new ArrayList<>();
+        LocalObjectView selectedSprite = null;
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (LocalObjectView object : snapshot.localObjects()) {
             Point point = points.get(object.stableId());
@@ -1130,7 +1131,10 @@ public final class GeneratedWorldCommandUiRenderer {
             boolean selected = selection.kind() == SelectionKind.LOCAL_OBJECT
                     && selection.stableId().equals(object.stableId());
             float marker = markerSize(object.kind());
-            if (object.sprite() == null || physicalLength < marker || selected) {
+            boolean bracketed = selected && physicalWidth > 0f
+                    && SelectionBrackets.useBrackets(object.sprite() != null, physicalLength, marker);
+            if (bracketed) selectedSprite = object;
+            if (object.sprite() == null || physicalLength < marker || selected && !bracketed) {
                 shapes.setColor(selected ? ImperialUiPalette.BRASS : factionColor(object.factionId()));
                 shapes.circle(point.x(), point.y(), marker * 0.58f, 24);
                 shapes.setColor(ImperialUiPalette.GRAPHITE);
@@ -1162,6 +1166,12 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(object.headingRad()));
         }
         batch.end();
+        if (selectedSprite != null) {
+            drawSelectionBrackets(points.get(selectedSprite.stableId()),
+                    (float) (selectedSprite.physicalLengthM() * pixelsPerMetre),
+                    (float) (selectedSprite.physicalWidthM() * pixelsPerMetre),
+                    MovementAlignedHeading.degrees(selectedSprite.headingRad()));
+        }
 
         drawMapLabels(snapshot.localObjects(), points, selection, layout.map());
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
@@ -1804,6 +1814,22 @@ public final class GeneratedWorldCommandUiRenderer {
         for (MetricMapGrid.Line line : horizontal) {
             shapes.setColor(line.major() ? ImperialUiPalette.MAP_GRID_MAJOR : ImperialUiPalette.MAP_GRID_MINOR);
             shapes.line(map.x(), line.screen(), map.right(), line.screen());
+        }
+        shapes.end();
+    }
+
+    /** Draws corner brackets around the rotated hull of the selected marker-sized sprite. */
+    private void drawSelectionBrackets(Point center, float length, float hullWidth, float headingDegrees) {
+        if (center == null || !(length > 0f) || !(hullWidth > 0f) || !Float.isFinite(length)
+                || !Float.isFinite(hullWidth)) return;
+        float scale = metrics.scale();
+        SelectionBrackets.Frame frame = SelectionBrackets.around(center.x(), center.y(), length, hullWidth,
+                headingDegrees, 6f * scale, 8f * scale);
+        float thickness = Math.max(1.5f, 2f * scale);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.BRASS);
+        for (SelectionBrackets.Segment segment : frame.segments()) {
+            shapes.rectLine(segment.x1(), segment.y1(), segment.x2(), segment.y2(), thickness);
         }
         shapes.end();
     }
