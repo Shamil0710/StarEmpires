@@ -1371,7 +1371,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 }
             }
             if (!preparation.ready()) {
-                throw new IllegalStateException(
+                throw new FreightPropellantUnavailableException(
                         "freighter cannot start remaining route without a safe finite-propellant plan: "
                                 + fleetId + " reason=" + preparation.reason()
                                 + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()

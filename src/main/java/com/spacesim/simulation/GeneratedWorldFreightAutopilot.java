@@ -133,8 +133,12 @@ public final class GeneratedWorldFreightAutopilot {
                             case COOLDOWN_ACTIVE, STORED_ENERGY_UNAVAILABLE, THERMAL_LIMIT -> true;
                             default -> false;
                         }) continue;
-                        runtime.requestNextRouteHop(fleet.fleetId());
-                        jumpsRequested++;
+                        try {
+                            runtime.requestNextRouteHop(fleet.fleetId());
+                            jumpsRequested++;
+                        } catch (com.spacesim.persistence.FreightPropellantUnavailableException waitForPropellant) {
+                            // No safe propellant plan yet: the freighter waits in place and retries on a later tick.
+                        }
                     }
                 }
                 case AT_DESTINATION -> {
