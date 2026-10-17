@@ -172,7 +172,7 @@ class Stage20IndustrialEntityMaterializerTest {
         var target = registry.stations().stream()
                 .filter(station -> station.stationNode().locationTag().equals("location.orbital_station"))
                 .findFirst().orElseThrow();
-        var construction = new Stage18FacilityConstructionRuntime(Stage18FacilityConstructionCatalogLoader.loadDefault(),
+        var construction = new Stage18FacilityConstructionRuntime(com.spacesim.content.Stage23StationStorageCatalog.construction(),
                 Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault());
         var order = construction.createOrder("m22.6.completed_support", "m22.6.support_instance",
                 "facility.fabrication.precision", target.stationId(), target.stationNode().locationTag());
