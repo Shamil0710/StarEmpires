@@ -2000,10 +2000,11 @@ public final class Stage228CampaignAuthority {
      */
     public static long pilotCommodityPrice(String commodityId, boolean buying) {
         long base = switch (commodityId) {
-            case "commodity.material.purified_water" -> 5000L;
+            // Reaction-mass water is priced as cheap fuel: a mining round trip must cost well below its ore.
+            case "commodity.material.purified_water" -> 50L;
             case "commodity.material.structural_alloy" -> 50000L;
             case "commodity.ore.metallic", "commodity.feedstock.metallic_ore" -> 10000L;
-            case "commodity.feedstock.water_ice" -> 2500L;
+            case "commodity.feedstock.water_ice" -> 25L;
             case "commodity.feedstock.volatile_feedstock", "commodity.feedstock.carbonaceous_feedstock",
                     "commodity.feedstock.silicate_minerals" -> 4000L;
             case "commodity.feedstock.light_metal_minerals" -> 12000L;
