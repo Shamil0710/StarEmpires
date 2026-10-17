@@ -54,6 +54,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
 
     private static final String JUMP_EDGE_DOMAIN = "JUMP_EDGE";
     private static final String LOCAL_CONNECTION_DOMAIN = "LOCAL_CONNECTION";
+    private static final String INFRASTRUCTURE_PLACEMENT_DOMAIN = "INFRASTRUCTURE_PLACEMENT";
     private static final int MINIMUM_JUMP_EDGE_VALUE_COUNT = 26;
     private static final int MINIMUM_LOCAL_CONNECTION_VALUE_COUNT = 17;
 
@@ -110,8 +111,15 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         }
         TreeMap<EdgeKey, PersistedEdge> edges = new TreeMap<>();
         TreeMap<ApproachKey, LocalApproachCalibration> approaches = new TreeMap<>();
+        TreeMap<String, LocalPhysicalPosition> infrastructure = new TreeMap<>();
         for (CanonicalRow row : state.materializedWorld().worldRows()) {
-            if (JUMP_EDGE_DOMAIN.equals(row.domain())) {
+            if (INFRASTRUCTURE_PLACEMENT_DOMAIN.equals(row.domain()) && row.values().size() >= 7) {
+                infrastructure.put(row.stableId(), new LocalPhysicalPosition(
+                        parseLong(row.values().get(3), row, "cellX"),
+                        parseLong(row.values().get(4), row, "cellY"),
+                        parseDouble(row.values().get(5), row, "offsetXM"),
+                        parseDouble(row.values().get(6), row, "offsetYM")));
+            } else if (JUMP_EDGE_DOMAIN.equals(row.domain())) {
                 PersistedEdge edge = parseEdge(row);
                 if (edges.putIfAbsent(edge.key(), edge) != null) {
                     throw malformed(row, "duplicate ordinary edge endpoints");
@@ -124,13 +132,44 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 }
             }
         }
+        TreeMap<EdgeKey, PersistedEdge> operational = new TreeMap<>();
+        for (var edge : edges.values()) {
+            operational.put(edge.key(), new PersistedEdge(edge.key(),
+                    operationalEndpoint(edge.firstEndpoint(), approaches, infrastructure),
+                    operationalEndpoint(edge.secondEndpoint(), approaches, infrastructure)));
+        }
         return new Stage20LiveArrivalAuthorityIntegration(
                 state.generationIdentity().worldSeed(),
                 state.generationIdentity().generatorVersion(),
                 state.materializedWorld().worldFingerprint(),
-                edges,
+                operational,
                 approaches,
                 Objects.requireNonNull(materializationBySystem, "materializationBySystem"));
+    }
+
+    /**
+     * Distance from the major hub at which ships actually jump out and arrive. Generated jump anchors
+     * lie 40,000–200,000 km from the hub, which made every departure approach last up to ~46 game
+     * hours; the operational point on the same hub-to-anchor line keeps the physics and direction
+     * while a jump approach takes about one game hour. Canonical rows and fingerprints are unchanged.
+     */
+    public static final double JUMP_OPERATIONAL_DISTANCE_M = 1_500_000d;
+
+    private static PersistedEndpoint operationalEndpoint(
+            PersistedEndpoint anchor,
+            Map<ApproachKey, LocalApproachCalibration> approaches,
+            Map<String, LocalPhysicalPosition> infrastructure) {
+        var calibration = approaches.get(new ApproachKey(anchor.systemId(), anchor.anchorId()));
+        if (calibration == null) return anchor;
+        var hub = infrastructure.get(anchor.systemId().value() + ":" + calibration.hubId());
+        if (hub == null) return anchor;
+        var displacement = hub.displacementTo(anchor.position());
+        double distance = Math.hypot(displacement.deltaXM(), displacement.deltaYM());
+        if (distance <= JUMP_OPERATIONAL_DISTANCE_M) return anchor;
+        double fraction = JUMP_OPERATIONAL_DISTANCE_M / distance;
+        return new PersistedEndpoint(anchor.systemId(), anchor.anchorId(),
+                hub.translated(displacement.deltaXM() * fraction, displacement.deltaYM() * fraction),
+                anchor.arrivalVelocityMps(), anchor.localInfrastructureVersion(), anchor.jumpArrivalCalibrationVersion());
     }
 
     /**
@@ -703,6 +742,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
         }
         StarSystemId systemId = new StarSystemId(parsePositiveLong(values.get(0), row, "systemId"));
         String anchorId = requireText(values.get(1), "fromId");
+        String hubId = requireText(values.get(2), "toId");
         double referenceDistanceM = parsePositiveDouble(values.get(4), row, "distanceM");
         double civilianRoutineTravelTimeMaxS = parsePositiveDouble(
                 values.get(9), row, "civilianRoutineTravelTimeMaxS");
@@ -710,6 +750,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
                 values.get(11), row, "militaryResponseTimeMaxS");
         return new LocalApproachCalibration(
                 new ApproachKey(systemId, anchorId),
+                hubId,
                 referenceDistanceM,
                 civilianRoutineTravelTimeMaxS,
                 militaryResponseTimeMaxS,
@@ -747,6 +788,7 @@ public final class Stage20LiveArrivalAuthorityIntegration implements FleetArriva
 
     private record LocalApproachCalibration(
             ApproachKey key,
+            String hubId,
             double referenceDistanceM,
             double civilianRoutineTravelTimeMaxS,
             double militaryResponseTimeMaxS,
