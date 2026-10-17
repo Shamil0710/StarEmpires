@@ -292,7 +292,7 @@ public final class ContentBoundSaveCodec {
                 compartments, modules, List.copyOf(shields), serviceAge, List.copyOf(feeds), cooldowns);
     }
 
-    private static void writeSensorKnowledge(
+    static void writeSensorKnowledge(
             DataOutputStream output, EntityState.SensorKnowledgeState state) throws IOException {
         List<EntityState.SensorTrackState> tracks = requireList(state.tracks(), "sensor tracks");
         writeCount(output, tracks.size(), MAX_EXTENSION_ROWS, "sensor tracks");
@@ -325,7 +325,7 @@ public final class ContentBoundSaveCodec {
         }
     }
 
-    private static EntityState.SensorKnowledgeState readSensorKnowledge(DataInputStream input) throws IOException {
+    static EntityState.SensorKnowledgeState readSensorKnowledge(DataInputStream input) throws IOException {
         int trackCount = readCount(input, MAX_EXTENSION_ROWS, "sensor tracks");
         List<EntityState.SensorTrackState> tracks = new ArrayList<>(trackCount);
         for (int index = 0; index < trackCount; index++) {

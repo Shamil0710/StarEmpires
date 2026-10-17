@@ -6,7 +6,7 @@ import com.spacesim.content.ship.ShipEngineeringCatalog.InstalledModuleDefinitio
 import com.spacesim.content.ship.ShipEngineeringCatalog.ModuleFamily;
 import com.spacesim.content.ship.ShipEngineeringCatalogLoader;
 import com.spacesim.content.ship.Stage175ICombatTestContentPack;
-import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
+import com.spacesim.content.ship.Stage23RuntimeEngineeringCatalogLoader;
 import com.spacesim.ship.ShipEngineeringRuntime.JumpPlan;
 import com.spacesim.ship.ShipEngineeringRuntime.OperatingCommand;
 import com.spacesim.ship.ShipEngineeringRuntime.RuntimeState;
@@ -39,10 +39,16 @@ public final class ProductionEngineeringRuntimeResolver {
      * Creates the production resolver over every currently admitted fitted-ship catalog.
      */
     public ProductionEngineeringRuntimeResolver() {
-        this(List.of(
+        this(DefaultCatalogs.CATALOGS);
+    }
+
+    // Content is immutable for one running application. Runtime calculators remain per resolver;
+    // only catalog loading/projection/fingerprinting is shared, never ship state or interval budgets.
+    private static final class DefaultCatalogs {
+        private static final List<ShipEngineeringCatalog> CATALOGS = List.of(
                 ShipEngineeringCatalogLoader.loadDefault(),
                 Stage175ICombatTestContentPack.loadStage21StrategicDoctrines(),
-                Stage22FreightStrategicEngineeringCatalogLoader.loadDefault()));
+                Stage23RuntimeEngineeringCatalogLoader.loadDefault());
     }
 
     /**
@@ -284,6 +290,15 @@ public final class ProductionEngineeringRuntimeResolver {
             throw new IllegalStateException("cannot commit an infeasible maneuver");
         }
         checked.setRuntimeState(accepted.resultingState());
+    }
+
+    /**
+     * Resolves incremental operation grants through the fitted ship's admitted catalog.
+     * @param component actual installed ship
+     * @return common power and thermal grant service
+     */
+    public ShipEngineeringGrantService incrementalOperations(EngineeringComponent component) {
+        return new ShipEngineeringGrantService(resolve(requireComplete(component).fit).catalog());
     }
 
     private CatalogRuntime resolve(InstalledFit fit) {

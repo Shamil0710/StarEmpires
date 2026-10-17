@@ -182,6 +182,32 @@ public final class Stage18ManufacturingRuntime {
             consume(energyJ, 0d, 0d); return true;
         }
 
+        /**
+         * Allocates a fraction of a reserved physical process from this shared line interval.
+         * @param tags authored required capabilities
+         * @param energy whole-batch energy in joules
+         * @param work whole-batch engineering work seconds
+         * @param maintenance whole-batch maintenance work seconds
+         * @param remaining uncompleted batch fraction
+         * @return fraction paid from the remaining interval
+         */
+        public double allocateProcessWork(Set<String> tags, double energy, double work,
+                double maintenance, double remaining) {
+            Objects.requireNonNull(tags);
+            requireNonNegative(energy, "batch energy");
+            requireNonNegative(work, "batch work");
+            requireNonNegative(maintenance, "batch maintenance");
+            if (!Double.isFinite(remaining) || remaining <= 0 || remaining > 1)
+                throw new IllegalArgumentException("Invalid remaining process fraction");
+            if (!capabilityTags.containsAll(tags)) return 0;
+            double fraction = remaining;
+            if (energy > 0) fraction = Math.min(fraction, remainingEnergyJ / energy);
+            if (work > 0) fraction = Math.min(fraction, remainingWorkSeconds / work);
+            if (maintenance > 0) fraction = Math.min(fraction, remainingMaintenanceWorkSeconds / maintenance);
+            consume(energy * fraction, work * fraction, maintenance * fraction);
+            return fraction;
+        }
+
         private void consume(double energyJ, double workSeconds, double maintenanceWorkSeconds) {
             remainingEnergyJ = clampZero(remainingEnergyJ - energyJ);
             remainingWorkSeconds = clampZero(remainingWorkSeconds - workSeconds);

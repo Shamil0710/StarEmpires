@@ -185,6 +185,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
     public static LiveRuntime restore(
             Stage20GeneratedWorldRuntimePersistentState checkpoint,
             Stage18ManufacturingProductRegistry products) {
+        return restore(checkpoint, products, Map.of());
+    }
+
+    /**
+     * @param checkpoint exact existing world
+     * @param products physical product vocabulary
+     * @param admissions explicitly admitted existing station operators
+     * @return independent composed runtime
+     */
+    public static LiveRuntime restore(Stage20GeneratedWorldRuntimePersistentState checkpoint,
+            Stage18ManufacturingProductRegistry products, Map<String, String> admissions) {
         Stage20GeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(
                 checkpoint, "checkpoint");
         Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
@@ -195,7 +206,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 saved.strategicStepTicks(),
                 saved.remoteUpdateBudgetPerFrame());
         MaterializedGeneratedIndustrialRuntime industry =
-                Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry);
+                  Stage20GeneratedIndustrialRuntimeBridge.restore(saved.campaign(), productRegistry, Map.copyOf(admissions));
         InfrastructureRegistry infrastructure = InfrastructureRegistry.materialize(
                 saved.campaign(), industry, productRegistry, false);
         Stage20FreightRuntime freight = Stage20FreightRuntime.restore(
@@ -492,6 +503,25 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         private final Stage20FreightRuntime freight;
         private final Stage20LiveArrivalAuthorityIntegration arrival;
         private final Stage18LogisticsRuntime logistics;
+        private final Stage18ManufacturingProductRegistry products;
+        /**
+         * Registers authored structures at an existing endpoint without replacing its physical storage.
+         * @param stationId existing unregistered civilian endpoint
+         * @param legalOperator actual legal operator, checked by the campaign command
+         */
+        public void admitExistingIndustrialStation(String stationId, String legalOperator) {
+            if (world.findFactionRuntimeId(legalOperator).isEmpty()) throw new IllegalArgumentException("Unknown station operator");
+            var endpoint = infrastructure.endpoint(stationId);
+            var station = Stage20IndustrialEntityMaterializer.admitExistingStation(campaignAuthority, endpoint, legalOperator, products);
+            var updated = industry.industrial().admitExistingStation(station);
+            var promoted = new RuntimeEndpoint(endpoint.systemId(), endpoint.stationId(), endpoint.stationArchetypeId(),
+                    endpoint.position(), endpoint.storage(), endpoint.handlingCapability(), true);
+            var endpoints = new TreeMap<>(infrastructure.endpoints);
+            endpoints.put(stationId, promoted);
+            var frozen = Map.copyOf(endpoints);
+            industry = new MaterializedGeneratedIndustrialRuntime(updated, industry.sourceOutposts());
+            infrastructure.endpoints = frozen;
+        }
         private final com.spacesim.economy.Stage18ManufacturingWorkQueue manufacturingQueue;
         private final com.spacesim.economy.Stage18FacilityConstructionWorkQueue constructionQueue;
 
@@ -504,6 +534,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 Stage20LiveArrivalAuthorityIntegration arrival,
                 Stage18ManufacturingProductRegistry products) {
             this.campaignAuthority = Objects.requireNonNull(campaignAuthority, "campaignAuthority");
+            this.products = Objects.requireNonNull(products, "products");
             this.discovery = campaignAuthority.discoveryState();
             this.world = Objects.requireNonNull(world, "world");
             this.industry = Objects.requireNonNull(industry, "industry");
@@ -515,13 +546,13 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     Objects.requireNonNull(products, "products"));
             this.manufacturingQueue = new com.spacesim.economy.Stage18ManufacturingWorkQueue(
                     Stage18ResourceOntologyLoader.loadDefault(),
-                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadManufacturing(), products,
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.manufacturing(), products,
                     campaignAuthority.industrialState().processOrders(), campaignAuthority.industrialState().simulationTick());
             manufacturingQueue.restoreReservations(id -> infrastructure.endpoint(id).storage());
             this.constructionQueue = new com.spacesim.economy.Stage18FacilityConstructionWorkQueue(
                     new com.spacesim.economy.Stage18FacilityConstructionRuntime(
-                            com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
-                            com.spacesim.content.Stage18FacilityCatalogLoader.loadDefault(),
+                            com.spacesim.content.Stage23StationStorageCatalog.construction(),
+                            com.spacesim.content.Stage23StationStorageCatalog.facilities(),
                             Stage18ResourceOntologyLoader.loadDefault()), Stage18ResourceOntologyLoader.loadDefault(),
                     campaignAuthority.industrialState().constructionOrders(), campaignAuthority.industrialState().simulationTick());
             constructionQueue.bindReservations(id -> infrastructure.endpoint(id).storage());
@@ -559,10 +590,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             if (!retained.containsAll(completed))
                 throw new IllegalArgumentException("Installation must retain its paid construction evidence");
             var construction = new com.spacesim.economy.Stage18FacilityConstructionRuntime(
-                    com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
-                    com.spacesim.content.Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault());
+                    com.spacesim.content.Stage23StationStorageCatalog.construction(),
+                    com.spacesim.content.Stage23StationStorageCatalog.facilities(), Stage18ResourceOntologyLoader.loadDefault());
             var updated = industry.industrial().adoptCompletedConstruction(completed, construction);
             industry = new MaterializedGeneratedIndustrialRuntime(updated, industry.sourceOutposts());
+            var endpoints = new TreeMap<>(infrastructure.endpoints);
+            for (var station : updated.stations()) {
+                var original = infrastructure.endpoint(station.stationId());
+                endpoints.put(station.stationId(), new RuntimeEndpoint(original.systemId(), original.stationId(),
+                        original.stationArchetypeId(), original.position(), station.storage(), station.stationNode().handlingCapability(), true));
+            }
+            infrastructure.endpoints = Map.copyOf(endpoints);
         }
 
         /**
@@ -586,8 +624,18 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * @param targetId actual installed facility
          */
         public void allocateFacilityResources(String stationId, String targetId) {
+            allocateFacilityResources(stationId, targetId, false);
+        }
+
+        /**
+         * Conserves the same station allocations when choosing full or half-rated operation.
+         * @param stationId actual owner-authorized station
+         * @param targetId installed facility
+         * @param halfRated whether to request half-rated resources
+         */
+        public void allocateFacilityResources(String stationId, String targetId, boolean halfRated) {
             industry = new MaterializedGeneratedIndustrialRuntime(
-                    industry.industrial().allocateFacilityResources(stationId, targetId), industry.sourceOutposts());
+                    industry.industrial().allocateFacilityResources(stationId, targetId, halfRated), industry.sourceOutposts());
         }
 
         /**
@@ -596,8 +644,18 @@ public final class Stage20GeneratedWorldRuntimeBridge {
          * @param targetId actual installed yard
          */
         public void allocateYardResources(String stationId, String targetId) {
+            allocateYardResources(stationId, targetId, false);
+        }
+
+        /**
+         * Reassigns existing station yard resources without increasing any total.
+         * @param stationId actual owner station
+         * @param targetId installed target yard
+         * @param available whether to allocate a balanced available fraction
+         */
+        public void allocateYardResources(String stationId, String targetId, boolean available) {
             industry = new MaterializedGeneratedIndustrialRuntime(
-                    industry.industrial().allocateYardResources(stationId, targetId), industry.sourceOutposts());
+                    industry.industrial().allocateYardResources(stationId, targetId, available), industry.sourceOutposts());
         }
 
         /**
@@ -688,17 +746,20 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             var source = industry.sourceOutposts().sources().source(sourceId);
             if (fleet.locationKind() != FleetLocationKind.IN_SYSTEM || !fleet.systemId().equals(source.systemId()))
                 throw new IllegalStateException("Extraction sample requires the actual local occurrence");
-            var sample = freight.capture().cargoLots().stream()
-                    .filter(l -> l.fleetId().equals(player.activeFleetId()) && l.sourceEndpointId().equals(sourceId)
-                            && l.orderId().equals(Stage20FreightPersistentState.personalExtractionOrderId(player.activeFleetId())))
-                    .min(java.util.Comparator.comparingDouble(Stage20FreightPersistentState.CargoLotState::loadedAtSimulationSeconds))
-                    .orElseThrow(() -> new IllegalStateException("No recovered physical sample"));
             String owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
             var prior = discovery.knowledgeFor(owner);
             var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
                     com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, sourceId);
-            if (prior.knowledge(object).stream().anyMatch(k -> k.resourceKnowledge().level().ordinal()
-                    >= com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION.ordinal())) return;
+            String sampleProvenance = "personal-extraction-sample:" + player.activeFleetId().value() + ':' + sourceId;
+            // An archived indication is not the pilot's own recovered sample. Deduplicate the
+            // actual receipt instead. Stronger survey estimates retain their original freshness.
+            if (prior.knowledge(object).stream().anyMatch(k -> k.resourceKnowledge().estimate().isPresent()
+                    || k.evidence().stream().anyMatch(e -> e.provenanceId().equals(sampleProvenance)))) return;
+            var sample = freight.cargoLots().stream()
+                    .filter(l -> l.fleetId().equals(player.activeFleetId()) && l.sourceEndpointId().equals(sourceId)
+                            && l.orderId().equals(Stage20FreightPersistentState.personalExtractionOrderId(player.activeFleetId())))
+                    .min(java.util.Comparator.comparingDouble(Stage20FreightPersistentState.CargoLotState::loadedAtSimulationSeconds))
+                    .orElseThrow(() -> new IllegalStateException("No recovered physical sample"));
             String classification = prior.knowledge(object).flatMap(k -> k.classificationId()).orElse(sample.commodityId());
             var observed = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
                     new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
@@ -709,7 +770,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                                     Optional.empty(), Optional.empty()),
                             new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
                                     com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.PHYSICAL_VISIT_OR_SURVEY,
-                                    "personal-extraction-sample:" + player.activeFleetId().value() + ':' + sourceId,
+                                    sampleProvenance,
                                     sample.loadedAtSimulationSeconds(), java.util.OptionalDouble.empty())));
             var states = new ArrayList<>(discovery.knowledgeStates());
             states.removeIf(state -> state.ownerId().equals(owner)); states.add(observed);
@@ -956,6 +1017,46 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 throw new IllegalStateException("Resource report is stale or belongs to another runtime");
             Objects.requireNonNull(settlement).run();
             transfer.used = true; discovery = transfer.candidate;
+        }
+
+        /**
+         * Authors owner-local records for explicitly assigned initial station capital.
+         * This fresh-world seam does not create stations, markets, territory or personal reports.
+         * @param assignments existing station IDs mapped to existing economic factions
+         * @param policyVersion explicit new-game authoring provenance
+         */
+        public void authorInitialStationOwnershipKnowledge(Map<String, String> assignments, String policyVersion) {
+            Objects.requireNonNull(assignments, "assignments");
+            if (world.getAuthoritativeWorldTick() != 0 || policyVersion == null || policyVersion.isBlank())
+                throw new IllegalStateException("Initial station archives require a named initial authoring policy");
+            for (var entry : assignments.entrySet()) {
+                var endpoint = infrastructure.endpoint(entry.getKey());
+                if (world.findFactionEconomicState(entry.getValue()).isEmpty()
+                        || world.findFactionRuntimeId(entry.getValue()).isEmpty()
+                        || endpoint.generatedIndustrial()
+                        || world.controllingFaction(endpoint.systemId()).isPresent()
+                        || !java.util.Set.of("station.infrastructure.refinery_complex",
+                                "station.infrastructure.frontier_multipurpose").contains(endpoint.stationArchetypeId()))
+                    throw new IllegalArgumentException("Initial civilian capital references an ineligible existing asset or faction");
+            }
+            for (var entry : new java.util.TreeMap<>(assignments).entrySet()) {
+                var endpoint = infrastructure.endpoint(entry.getKey());
+                var prior = discovery.knowledgeFor(entry.getValue());
+                String provenance = policyVersion + ":owned-station:" + entry.getValue() + ':' + entry.getKey();
+                if (prior.entries().stream().flatMap(k -> k.evidence().stream())
+                        .anyMatch(e -> e.provenanceId().equals(provenance))) continue;
+                var observed = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(prior,
+                        new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(
+                                new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(endpoint.systemId(),
+                                        com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE, endpoint.stationId()),
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                                Optional.of(endpoint.stationArchetypeId()), Optional.of(endpoint.position()),
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge.none(),
+                                new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                        com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE,
+                                        provenance, 0d, java.util.OptionalDouble.empty())));
+                replaceDiscoveryOwner(observed);
+            }
         }
 
         private void replaceDiscoveryOwner(com.spacesim.world.Stage20DiscoveryKnowledgeState observed) {
@@ -1276,13 +1377,29 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
 
         /**
-         * Captures a self-consistent campaign/world/freight checkpoint, rebinding only the freight
-         * envelope fingerprint after finite source reserve changes and refreshing the redundant
-         * local freight physical mirror from the exact Stage-20 physical sidecar.
-         *
-         * @return complete atomic current runtime checkpoint
+         * Captures the same synchronized freight state used by a full checkpoint, without copying
+         * unrelated local economic/event histories for a freight-only faction observation.
+         * @return current canonical freight outcomes and physical mirrors
          */
-        public Stage20GeneratedWorldRuntimePersistentState captureState() {
+        public Stage20FreightPersistentState captureFreightState() {
+            synchronizeCompletedHops();
+            var campaign = captureCampaignState();
+            return captureFreightState(captureLocalFleetPhysicalStates(), campaign.materializedWorld().worldFingerprint());
+        }
+
+        private Stage20FreightPersistentState captureFreightState(List<LocalFleetPhysicalState> localPhysical, String fingerprint) {
+            Stage20FreightPersistentState state = rebindFreightFingerprint(freight.capture(), fingerprint);
+            state = synchronizeFreightPhysicalMirrors(state, localPhysical);
+            for (var fleet : state.freighters()) validateFreightLegalFaction(world, fleet);
+            return state;
+        }
+
+        /**
+         * Captures current industry, queues and discovery with the canonical source fingerprint,
+         * without copying local world event and price histories.
+         * @return exact campaign portion of a complete runtime checkpoint
+         */
+        public Stage20GeneratedCampaignPersistentState captureCampaignState() {
             synchronizeCompletedHops();
             Stage20GeneratedCampaignPersistentState withInfrastructure =
                     infrastructure.captureInto(campaignAuthority);
@@ -1298,11 +1415,20 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                     new Stage20DiscoveryPersistentState(discovery.envelopeVersion(), discovery.rootSeed(),
                             discovery.worldGenerationVersion(), campaign.materializedWorld().worldFingerprint(), discovery.knowledgeStates()),
                     campaign.openRuntimeBoundaries());
+            return campaign;
+        }
+
+        /**
+         * Captures a self-consistent campaign/world/freight checkpoint, rebinding only the freight
+         * envelope fingerprint after finite source reserve changes and refreshing the redundant
+         * local freight physical mirror from the exact Stage-20 physical sidecar.
+         *
+         * @return complete atomic current runtime checkpoint
+         */
+        public Stage20GeneratedWorldRuntimePersistentState captureState() {
+            Stage20GeneratedCampaignPersistentState campaign = captureCampaignState();
             List<LocalFleetPhysicalState> localPhysical = captureLocalFleetPhysicalStates();
-            Stage20FreightPersistentState freightState = rebindFreightFingerprint(
-                    freight.capture(), campaign.materializedWorld().worldFingerprint());
-            freightState = synchronizeFreightPhysicalMirrors(freightState, localPhysical);
-            for (var fleet : freightState.freighters()) validateFreightLegalFaction(world, fleet);
+            Stage20FreightPersistentState freightState = captureFreightState(localPhysical, campaign.materializedWorld().worldFingerprint());
             return new Stage20GeneratedWorldRuntimePersistentState(
                     Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION,
                     CURRENT_VERSION,
@@ -1395,7 +1521,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
 
         private void synchronizeCompletedHops() {
-            for (FreighterState fleetState : freight.capture().freighters()) {
+            for (FreighterState fleetState : freight.freighterStates()) {
                 if (fleetState.phase() != FreightPhase.IDLE
                         && fleetState.phase() != FreightPhase.OUTBOUND
                         && fleetState.phase() != FreightPhase.RETURNING) {
@@ -1509,7 +1635,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
 
     /** Deterministic exact-ID registry for all freight loading and unloading endpoints. */
     public static final class InfrastructureRegistry {
-        private final Map<String, RuntimeEndpoint> endpoints;
+        private Map<String, RuntimeEndpoint> endpoints;
 
         private InfrastructureRegistry(Map<String, RuntimeEndpoint> endpoints) {
             this.endpoints = Map.copyOf(endpoints);

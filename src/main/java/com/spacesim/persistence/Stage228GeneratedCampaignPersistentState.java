@@ -24,6 +24,8 @@ import java.util.Objects;
  * Version 12 retains physical yard construction without supplying structures, materials or working resources during migration.
  * Version 13 retains held money for civilian foreign repair without fabricating old payments.
  * Version 14 retains paid refit obligations and actual equipment ownership independently of storage.
+ * Version 19 admits executable reserved refining batches in the existing industrial process sidecar.
+ * Version 23 retains explicit initial crew observations; version 24 retains retired group history.
  * Historical checkpoints receive empty non-granting journal and equipment sidecars where absent.</p>
  *
  * @param schemaVersion exact current M22.8 envelope schema
@@ -42,6 +44,11 @@ import java.util.Objects;
  * @param productTransfers exact pending handling of reserved fresh products
  * @param yardConstruction exact retained physical yard construction
  * @param timeSkip retained interactive clock request without elapsed-time grants
+ * @param crewManifest explicitly commissioned staffing observations, unknown for historical files
+ * @param smallCraftBuilds exact reserved small-craft builds
+ * @param industrialAdmissions explicit existing-station legal operators
+ * @param personalCraftOwnership explicit personal property independent of host and faction
+ * @param localFlights exact observed local physical craft deployments, empty for historical files
  */
 public record Stage228GeneratedCampaignPersistentState(
         int schemaVersion,
@@ -59,12 +66,221 @@ public record Stage228GeneratedCampaignPersistentState(
         com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
         com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
         com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
-        com.spacesim.simulation.CampaignTimeSkipState timeSkip) {
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip,
+        com.spacesim.world.Stage23FleetCrewManifest crewManifest,
+        com.spacesim.world.SmallCraftLocalFlightState localFlights,
+        java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership,
+        java.util.Map<String, String> industrialAdmissions, com.spacesim.economy.ShipyardSmallCraftBuildQueueState smallCraftBuilds) {
+
+    /** Source-compatible composition without inferred paid-build custody.
+     * @param schemaVersion existing retained owner
+     * @param runtimeVersion existing retained owner
+     * @param stage21Runtime existing retained owner
+     * @param smallCraft existing retained owner
+     * @param hangars existing retained owner
+     * @param flightDeck existing retained owner
+     * @param operations existing retained owner
+     * @param playerState existing retained owner
+     * @param playerJournal existing retained owner
+     * @param moduleCustody existing retained owner
+     * @param repairQueue existing retained owner
+     * @param refitQueue existing retained owner
+     * @param moduleTransfers existing retained owner
+     * @param productTransfers existing retained owner
+     * @param yardConstruction existing retained owner
+     * @param timeSkip existing retained owner
+     * @param crewManifest existing retained owner
+     * @param localFlights existing retained owner
+     * @param personalCraftOwnership existing retained owner
+     * @param industrialAdmissions existing retained owner
+     */
+    public Stage228GeneratedCampaignPersistentState(
+        int schemaVersion,
+        String runtimeVersion,
+        Stage21IGeneratedWorldRuntimePersistentState stage21Runtime,
+        Stage228SmallCraftPersistentState smallCraft,
+        Stage228HangarPersistentState hangars,
+        Stage228FlightDeckPersistentState flightDeck,
+        Stage228OperationsPersistentState operations,
+        PlayerState playerState,
+        PlayerJournalState playerJournal,
+        ShipyardModuleCustodyState moduleCustody,
+        ShipyardRepairQueueState repairQueue,
+        ShipyardRefitQueueState refitQueue,
+        com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+        com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip,
+        com.spacesim.world.Stage23FleetCrewManifest crewManifest,
+        com.spacesim.world.SmallCraftLocalFlightState localFlights,
+        java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership,
+        java.util.Map<String, String> industrialAdmissions) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations, playerState, playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers, yardConstruction, timeSkip, crewManifest, localFlights, personalCraftOwnership, industrialAdmissions, com.spacesim.economy.ShipyardSmallCraftBuildQueueState.empty());
+    }
 
     /** Current M22.8 campaign envelope schema. */
-    public static final int CURRENT_VERSION = 18;
+    public static final int CURRENT_VERSION = 29;
     /** Current M22.8 campaign runtime contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v18";
+    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v29";
+
+
+    /**
+     * Compatibility composition without inferred industrial admissions.
+     * @param schemaVersion current schema
+     * @param runtimeVersion current identity
+     * @param stage21Runtime actual world
+     * @param smallCraft actual craft
+     * @param hangars actual hangars
+     * @param flightDeck actual deck
+     * @param operations actual operations
+     * @param playerState actual player
+     * @param playerJournal actual journal
+     * @param moduleCustody actual custody
+     * @param repairQueue actual repairs
+     * @param refitQueue actual refits
+     * @param moduleTransfers actual transfers
+     * @param productTransfers actual products
+     * @param yardConstruction actual yards
+     * @param timeSkip actual clock
+     * @param crewManifest actual crew
+     * @param localFlights actual flights
+     * @param personalCraftOwnership actual craft property
+     */
+    public Stage228GeneratedCampaignPersistentState(
+        int schemaVersion,
+        String runtimeVersion,
+        Stage21IGeneratedWorldRuntimePersistentState stage21Runtime,
+        Stage228SmallCraftPersistentState smallCraft,
+        Stage228HangarPersistentState hangars,
+        Stage228FlightDeckPersistentState flightDeck,
+        Stage228OperationsPersistentState operations,
+        PlayerState playerState,
+        PlayerJournalState playerJournal,
+        ShipyardModuleCustodyState moduleCustody,
+        ShipyardRepairQueueState repairQueue,
+        ShipyardRefitQueueState refitQueue,
+        com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+        com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip,
+        com.spacesim.world.Stage23FleetCrewManifest crewManifest,
+        com.spacesim.world.SmallCraftLocalFlightState localFlights,
+        java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations, playerState,
+                playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers,
+                yardConstruction, timeSkip, crewManifest, localFlights, personalCraftOwnership, java.util.Map.of());
+    }
+
+    /**
+     * Compatibility composition without inferred personal craft property rights.
+     * @param schemaVersion current schema
+     * @param runtimeVersion current identity
+     * @param stage21Runtime actual world
+     * @param smallCraft actual individuals
+     * @param hangars actual occupancy
+     * @param flightDeck actual deck work
+     * @param operations actual missions and logistics
+     * @param playerState actual player
+     * @param playerJournal actual history
+     * @param moduleCustody actual equipment
+     * @param repairQueue actual repairs
+     * @param refitQueue actual refits
+     * @param moduleTransfers actual handling
+     * @param productTransfers actual products
+     * @param yardConstruction actual construction
+     * @param timeSkip actual clock request
+     * @param crewManifest actual crew observations
+     * @param localFlights actual deployments
+     */
+    public Stage228GeneratedCampaignPersistentState(
+        int schemaVersion,
+        String runtimeVersion,
+        Stage21IGeneratedWorldRuntimePersistentState stage21Runtime,
+        Stage228SmallCraftPersistentState smallCraft,
+        Stage228HangarPersistentState hangars,
+        Stage228FlightDeckPersistentState flightDeck,
+        Stage228OperationsPersistentState operations,
+        PlayerState playerState,
+        PlayerJournalState playerJournal,
+        ShipyardModuleCustodyState moduleCustody,
+        ShipyardRepairQueueState repairQueue,
+        ShipyardRefitQueueState refitQueue,
+        com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+        com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip,
+        com.spacesim.world.Stage23FleetCrewManifest crewManifest,
+        com.spacesim.world.SmallCraftLocalFlightState localFlights) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations, playerState,
+                playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers,
+                yardConstruction, timeSkip, crewManifest, localFlights, java.util.List.of());
+    }
+    /**
+     * Source-compatible composition without inferred local deployment positions.
+     * @param schemaVersion current schema
+     * @param runtimeVersion current identity
+     * @param stage21Runtime accepted world
+     * @param smallCraft actual craft
+     * @param hangars actual occupancy
+     * @param flightDeck actual deck
+     * @param operations actual missions and wings
+     * @param playerState actual player
+     * @param playerJournal actual history
+     * @param moduleCustody actual custody
+     * @param repairQueue actual repairs
+     * @param refitQueue actual refits
+     * @param moduleTransfers actual handling
+     * @param productTransfers actual product handling
+     * @param yardConstruction actual construction
+     * @param timeSkip actual clock request
+     * @param crewManifest actual crew observations
+     */
+    public Stage228GeneratedCampaignPersistentState(int schemaVersion, String runtimeVersion,
+            Stage21IGeneratedWorldRuntimePersistentState stage21Runtime, Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars, Stage228FlightDeckPersistentState flightDeck,
+            Stage228OperationsPersistentState operations, PlayerState playerState, PlayerJournalState playerJournal,
+            ShipyardModuleCustodyState moduleCustody, ShipyardRepairQueueState repairQueue, ShipyardRefitQueueState refitQueue,
+            com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+            com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+            com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+            com.spacesim.simulation.CampaignTimeSkipState timeSkip, com.spacesim.world.Stage23FleetCrewManifest crewManifest) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations, playerState,
+                playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers, yardConstruction,
+                timeSkip, crewManifest, com.spacesim.world.SmallCraftLocalFlightState.empty());
+    }
+
+    /**
+     * Source-compatible composition retaining unknown historical crew availability.
+     * @param schemaVersion current schema
+     * @param runtimeVersion current identity
+     * @param stage21Runtime accepted physical authorities
+     * @param smallCraft actual craft
+     * @param hangars actual occupancy
+     * @param flightDeck actual deck work
+     * @param operations actual operations
+     * @param playerState actual player
+     * @param playerJournal actual history
+     * @param moduleCustody actual equipment
+     * @param repairQueue actual repairs
+     * @param refitQueue actual refits
+     * @param moduleTransfers actual module handling
+     * @param productTransfers actual product handling
+     * @param yardConstruction actual construction
+     * @param timeSkip actual pending clock request
+     */
+    public Stage228GeneratedCampaignPersistentState(int schemaVersion, String runtimeVersion,
+            Stage21IGeneratedWorldRuntimePersistentState stage21Runtime, Stage228SmallCraftPersistentState smallCraft,
+            Stage228HangarPersistentState hangars, Stage228FlightDeckPersistentState flightDeck,
+            Stage228OperationsPersistentState operations, PlayerState playerState, PlayerJournalState playerJournal,
+            ShipyardModuleCustodyState moduleCustody, ShipyardRepairQueueState repairQueue, ShipyardRefitQueueState refitQueue,
+            com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+            com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+            com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+            com.spacesim.simulation.CampaignTimeSkipState timeSkip) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations,
+                playerState, playerJournal, moduleCustody, repairQueue, refitQueue, moduleTransfers,
+                productTransfers, yardConstruction, timeSkip, com.spacesim.world.Stage23FleetCrewManifest.unobserved());
+    }
 
     /**
      * Source-compatible envelope without an outstanding time skip.
@@ -328,6 +544,11 @@ public record Stage228GeneratedCampaignPersistentState(
      * @param productTransfers actual incomplete fresh-product handling
      * @param yardConstruction actual retained physical yard construction
      * @param timeSkip exact pending interactive clock request
+     * @param crewManifest actual declared commissioning observations
+     * @param localFlights exact local physical deployments without inferred legacy positions
+     * @param smallCraftBuilds exact reserved small-craft builds
+ * @param industrialAdmissions explicit existing-station legal operators
+     * @param personalCraftOwnership explicit personal property rights independent of current host
      */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -352,6 +573,47 @@ public record Stage228GeneratedCampaignPersistentState(
                 .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
         long tick = stage20.worldState().systems().stream().filter(s -> s.systemId().equals(stage20.activeSystemId()))
                 .findFirst().orElseThrow().simulationState().clock().tick();
+        industrialAdmissions = IndustrialStationAdmissionCodec.validate(Objects.requireNonNull(industrialAdmissions));
+        Objects.requireNonNull(crewManifest);
+        Objects.requireNonNull(localFlights);
+        if (new java.util.HashSet<>(Objects.requireNonNull(personalCraftOwnership)).size() != personalCraftOwnership.size())
+            throw new IllegalArgumentException("Duplicate personal craft property identity");
+        personalCraftOwnership = java.util.List.copyOf(new java.util.TreeSet<>(personalCraftOwnership));
+        for (var id : personalCraftOwnership) if (id.value() >= smallCraft.nextCraftId())
+            throw new IllegalArgumentException("Personal craft property must reference an allocated identity");
+        if (personalCraftOwnership.size() > 100_000 || playerState == null && !personalCraftOwnership.isEmpty())
+            throw new IllegalArgumentException("Personal craft property requires an initialized player and bounded register");
+        if (localFlights.lastProcessedTick() > tick || !localFlights.flights().isEmpty() && localFlights.lastProcessedTick() != tick)
+            throw new IllegalArgumentException("Local craft positions must match their actual world interval");
+        if (!localFlights.flights().isEmpty()) {
+            var individuals = smallCraft.craft().stream().collect(java.util.stream.Collectors.toMap(c -> c.id(), c -> c));
+            var missionHistory = operations.missions().stream().collect(java.util.stream.Collectors.toMap(m -> m.missionId(), m -> m));
+            var systems = stage20.worldState().systems().stream().map(s -> s.systemId()).collect(java.util.stream.Collectors.toSet());
+            var embarked = hangars.assignments().stream().map(a -> a.craftId()).collect(java.util.stream.Collectors.toSet());
+            var queuedRecovery = flightDeck.queued().stream()
+                    .filter(r -> r.kind() == com.spacesim.world.SmallCraftFlightDeckOperations.OperationKind.RECOVERY)
+                    .map(r -> r.craftId()).collect(java.util.stream.Collectors.toSet());
+            var active = operations.missions().stream().filter(m -> m.submittedTick() <= tick
+                    && (m.status() == com.spacesim.world.SmallCraftMissionState.MissionStatus.ACTIVE
+                        || m.status() == com.spacesim.world.SmallCraftMissionState.MissionStatus.RETURNING
+                        || m.status() == com.spacesim.world.SmallCraftMissionState.MissionStatus.RECOVERY_PENDING
+                            && queuedRecovery.contains(m.craftId())))
+                    .map(m -> m.craftId()).collect(java.util.stream.Collectors.toSet());
+            var wings = new java.util.HashMap<com.spacesim.world.SmallCraftId, Stage228OperationsPersistentState.CarrierWingState>();
+            for (var wing : operations.carrierWings()) for (var id : wing.craftIds())
+                if (wings.putIfAbsent(id, wing) != null) throw new IllegalArgumentException("Duplicate physical craft wing");
+            for (var flight : localFlights.flights()) {
+                var individual = individuals.get(flight.craftId()); var launch = missionHistory.get(flight.missionId());
+                var wing = wings.get(flight.craftId());
+                if (individual == null || launch == null || wing == null || !systems.contains(flight.systemId())
+                        || embarked.contains(flight.craftId()) || !launch.craftId().equals(flight.craftId())
+                        || launch.submittedTick() > flight.deployedTick() || !active.contains(flight.craftId())
+                        || !wing.hostStableId().equals(flight.hostStableId()) || !wing.stableFactionId().equals(individual.stableFactionId()))
+                    throw new IllegalArgumentException("Physical local craft lacks its system, deployment or carrier ownership");
+            }
+        }
+        for (var entry : crewManifest.entries()) if (entry.fleetId().value() >= stage20.worldState().nextFleetIdValue())
+            throw new IllegalArgumentException("Crew observation exceeds the existing fleet allocator");
         Objects.requireNonNull(timeSkip);
         if (timeSkip.active() && (playerState == null || timeSkip.startedTick() > tick || timeSkip.targetTick() <= tick
                 || timeSkip.journalSequence() >= playerJournal.nextSequence()
@@ -368,6 +630,7 @@ public record Stage228GeneratedCampaignPersistentState(
         ShipyardModuleCustodyCheckpointValidator.validate(moduleCustody, stage20, playerState, tick, repairQueue, refitQueue, moduleTransfers);
         FinishedProductTransferCheckpointValidator.validate(productTransfers, stage20, playerState, tick, repairQueue, refitQueue, moduleTransfers);
         YardConstructionCheckpointValidator.validate(yardConstruction, stage20, playerState, tick);
+        SmallCraftBuildCheckpointValidator.validate(smallCraftBuilds, stage20, playerState, tick, moduleCustody, repairQueue, refitQueue, yardConstruction, productTransfers);
     }
 
     /**
@@ -605,12 +868,26 @@ public record Stage228GeneratedCampaignPersistentState(
      */
     public static Stage228GeneratedCampaignPersistentState adoptStage21(
             Stage21IGeneratedWorldRuntimePersistentState stage21) {
+        if (containsSmallCraftProductionStock(Objects.requireNonNull(stage21, "stage21")))
+            throw new IllegalArgumentException("Small-craft production stock requires native campaign v29");
         return compose(
                 Objects.requireNonNull(stage21, "stage21"),
                 Stage228SmallCraftPersistentState.empty(),
                 Stage228HangarPersistentState.empty(),
                 Stage228FlightDeckPersistentState.empty(),
                 Stage228OperationsPersistentState.empty());
+    }
+
+    static boolean containsSmallCraftProductionStock(Stage21IGeneratedWorldRuntimePersistentState stage21) {
+        var stage20 = stage21.stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
+                .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
+        var ids = com.spacesim.content.Stage23SmallCraftProductionCatalogs.moduleIds();
+        return stage20.campaign().industrialState().stationStorages().stream()
+                .anyMatch(s -> s.productCountById().keySet().stream().anyMatch(ids::contains))
+                || stage20.freight().freighters().stream()
+                .anyMatch(f -> f.cargoStorage().productCountById().keySet().stream().anyMatch(ids::contains))
+                || stage20.campaign().industrialState().processOrders().stream()
+                .anyMatch(o -> ids.contains(o.operationId()) || o.reservedProductCountById().keySet().stream().anyMatch(ids::contains));
     }
 
     /**

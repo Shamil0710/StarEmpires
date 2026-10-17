@@ -16,6 +16,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** M22.6 executable foundation for canonical pairwise scenarios, mirroring and freeze discovery. */
 class Stage22CorePairBalanceFoundationTest {
     @Test
+    void sensorPersistenceFreezeRetainsEveryHistoricalContentAndBalancePin() throws Exception {
+        var previous = Stage22CorePairFreezeManifest.historicalV3();
+        var current = Stage22CorePairFreezeManifest.captureFrozen();
+        assertEquals("6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4", previous.freezeFingerprint());
+        assertEquals(4, previous.generatedRuntimeCheckpointFileFormatVersion());
+        assertEquals(5, current.generatedRuntimeCheckpointFileFormatVersion());
+        assertEquals(List.of(1, 2, 3, 4, 5), current.generatedRuntimeSupportedFileFormats());
+        var changed = java.util.Set.of("schemaVersion", "manifestVersion", "freezeFingerprint",
+                "generatedRuntimeCheckpointFileFormatVersion", "generatedRuntimeSupportedFileFormats");
+        for (var component : current.getClass().getRecordComponents()) {
+            if (!changed.contains(component.getName())) assertEquals(component.getAccessor().invoke(previous),
+                    component.getAccessor().invoke(current), component.getName());
+        }
+    }
+    @Test
     void canonicalSuiteCoversEveryB00ThroughB20AndTreatsProductionReadyB15ToB17AsRequired() {
         List<Stage22CorePairBalanceCatalog.ScenarioDefinition> scenarios = Stage22CorePairBalanceCatalog.scenarios();
         assertEquals(21, scenarios.size());

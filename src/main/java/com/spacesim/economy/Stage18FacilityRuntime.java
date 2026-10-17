@@ -45,7 +45,9 @@ public final class Stage18FacilityRuntime {
         /** Installed location is physically incompatible with the facility definition. */
         LOCATION_INCOMPATIBLE,
         /** Installed state references no known facility definition. */
-        DEFINITION_NOT_FOUND
+        DEFINITION_NOT_FOUND,
+        /** Passive structural storage exposes no production or service work. */
+        PASSIVE_STORAGE
     }
 
     /**
@@ -186,6 +188,12 @@ public final class Stage18FacilityRuntime {
         FacilityDefinition definition = catalog.findFacility(state.definitionId());
         if (definition == null) {
             return inactive(state, Status.DEFINITION_NOT_FOUND);
+        }
+        if (definition.family() == Stage18FacilityCatalog.FacilityFamily.STORAGE) {
+            if (state.allocatedProcessPowerW() != 0d || state.availableHeatRejectionW() != 0d
+                    || state.availableLaborUnits() != 0d || state.availableMaintenanceWorkRate() != 0d || state.enabled())
+                throw new IllegalArgumentException("Passive storage cannot hold operating allocations");
+            return inactive(state, Status.PASSIVE_STORAGE);
         }
         if (!state.enabled()) {
             return inactive(state, Status.DISABLED);

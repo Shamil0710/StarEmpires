@@ -89,6 +89,10 @@ class GeneratedCampaignResourceMapPurchaseTest {
         var offers = GeneratedCampaignResourceMapUi.rows(c);
         var row = offers.stream().filter(v -> v.selection().stableId().endsWith("|" + f.object.objectId())).findFirst().orElseThrow();
         assertNull(row.focusSystem()); assertEquals(0, row.focusFleet());
+        var advertised = r.discoveryState().knowledgeFor(f.seller).knowledge(f.object).orElseThrow();
+        var commodity = advertised.classificationId().map(com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault()::findCommodity).orElseThrow();
+        assertTrue(row.sections().stream().flatMap(section -> section.lines().stream()).anyMatch(line ->
+                line.label().equals("Вид сырья в предложении") && line.value().equals(commodity.displayName())));
         assertEquals(baseline, c.captureState());
         if (Boolean.getBoolean("stage23b.writeMapFixture")) {
             try { Stage228GeneratedCampaignPersistenceCodec.write(java.nio.file.Path.of("target/stage23b-resource-map-fixture.s25"), baseline); }

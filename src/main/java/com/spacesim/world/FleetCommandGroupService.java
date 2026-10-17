@@ -63,7 +63,7 @@ public final class FleetCommandGroupService {
                 throw new IllegalStateException("fleet is not owned by command-group faction: " + fleetId);
             }
             boolean assigned = checkedState.groups().stream()
-                    .anyMatch(group -> group.memberFleetIds().contains(fleetId));
+                    .anyMatch(group -> !group.retired() && group.memberFleetIds().contains(fleetId));
             if (assigned) {
                 throw new IllegalStateException("FleetId is already assigned to a command group: " + fleetId);
             }

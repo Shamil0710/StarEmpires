@@ -55,6 +55,7 @@ public final class GeneratedCampaignMiningUi {
                             "Рабочая дальность", String.format(Locale.ROOT, "%.0f м", capability.workingRangeM()),
                             "Допустимая скорость", String.format(Locale.ROOT, "%.1f м/с", capability.maximumDriftMps()),
                             "Производительность оборудования", String.format(Locale.ROOT, "%.2f кг сырья/с", capability.maximumSourceKgPerSecond()),
+                            "Выбор количества", String.format(Locale.ROOT, "Лимит сырья за %.2f с работы, а не общий объём заказа; производительность оборудования ограничивает подачу", campaign.coordinator().session().fixedStepSeconds()),
                             "Время", "Добыча идёт только при продолжении времени; запуск на паузе груза не создаёт",
                             "Запас и состав", "Точный запас не исследован; добытые материалы поступят в реальный трюм",
                             "Остановка", "Потеря контакта, нехватка возможностей или полный трюм прекращают работу")),

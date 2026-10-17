@@ -51,7 +51,7 @@ public record Stage20FreightPersistentState(
         List<PersonalMiningOrder> personalMiningOrders,
         List<ProductCargoLotState> productLots) {
     /** Current physical-freight persistence schema. */
-    public static final int CURRENT_VERSION = 7;
+    public static final int CURRENT_VERSION = 8;
     private static final double EPSILON = 1.0e-9d;
 
     /**
@@ -101,7 +101,7 @@ public record Stage20FreightPersistentState(
         public ProductCargoLotState {
             lotId = requireText(lotId, "product lot ID"); Objects.requireNonNull(fleetId);
             productId = requireText(productId, "product ID"); sourceEndpointId = requireText(sourceEndpointId, "source endpoint");
-            if (count <= 0 || com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts().findProduct(productId) == null)
+            if (count <= 0 || com.spacesim.content.Stage23SmallCraftProductionCatalogs.products().findProduct(productId) == null)
                 throw new IllegalArgumentException("Unknown or empty finished product lot");
             requireNonNegativeFinite(loadedAtSimulationSeconds, "product loading time");
             parseLotOrdinal(lotId);
@@ -333,6 +333,7 @@ public record Stage20FreightPersistentState(
      * @param sourceEndpointId physical loading endpoint
      * @param sourceProvenanceId upstream production/extraction provenance
      * @param loadedAtSimulationSeconds authoritative loading time
+     * @param receiptSeries optional exact consecutive extraction history; null for a legacy point lot
      */
     public record CargoLotState(
             String lotId,
@@ -342,7 +343,21 @@ public record Stage20FreightPersistentState(
             double massKg,
             String sourceEndpointId,
             String sourceProvenanceId,
-            double loadedAtSimulationSeconds) {
+            double loadedAtSimulationSeconds, ExtractionReceiptSeries receiptSeries) {
+        /** Preserves legacy point-lot construction.
+         * @param lotId stable lot identity
+         * @param fleetId carrying fleet
+         * @param orderId authorizing order
+         * @param commodityId actual commodity
+         * @param massKg actual remaining mass
+         * @param sourceEndpointId loading endpoint
+         * @param sourceProvenanceId loading provenance
+         * @param loadedAtSimulationSeconds original loading time
+         */
+        public CargoLotState(String lotId, FleetId fleetId, String orderId, String commodityId, double massKg,
+                String sourceEndpointId, String sourceProvenanceId, double loadedAtSimulationSeconds) {
+            this(lotId, fleetId, orderId, commodityId, massKg, sourceEndpointId, sourceProvenanceId, loadedAtSimulationSeconds, null);
+        }
         /**
          * Validates one persistent physical cargo lot.
          *
@@ -354,6 +369,7 @@ public record Stage20FreightPersistentState(
          * @param sourceEndpointId physical loading endpoint
          * @param sourceProvenanceId accepted upstream provenance
          * @param loadedAtSimulationSeconds authoritative loading time
+         * @param receiptSeries optional exact extraction sequence
          */
         public CargoLotState {
             lotId = requireText(lotId, "lotId");
@@ -364,6 +380,12 @@ public record Stage20FreightPersistentState(
             sourceEndpointId = requireText(sourceEndpointId, "sourceEndpointId");
             sourceProvenanceId = requireText(sourceProvenanceId, "sourceProvenanceId");
             requireNonNegativeFinite(loadedAtSimulationSeconds, "loadedAtSimulationSeconds");
+            if (receiptSeries != null && (!lotId.equals("freight-lot:" + receiptSeries.firstOrdinal())
+                    || !orderId.equals(personalExtractionOrderId(fleetId))
+                    || !sourceProvenanceId.equals("player-extraction:" + sourceEndpointId)
+                    || Double.doubleToLongBits(loadedAtSimulationSeconds) != Double.doubleToLongBits(receiptSeries.receipt(0).loadedAtSeconds())
+                    || Math.abs(massKg - receiptSeries.remainingMassKg()) > receiptSeries.massRoundoffBoundKg()))
+                throw new IllegalArgumentException("Extraction series differs from cargo identity, time or physical mass");
         }
     }
 
@@ -574,6 +596,9 @@ public record Stage20FreightPersistentState(
         }
 
         Map<FleetId, Map<String, Double>> lotMassByFleetCommodity = new HashMap<>();
+        Map<FleetId, Map<String, Double>> seriesRoundoffByFleetCommodity = new HashMap<>();
+        boolean hasReceiptSeries = lotCopy.stream().anyMatch(lot -> lot.receiptSeries() != null);
+        var canonicalOrdinalRanges = new java.util.TreeMap<Long, Long>();
         long maxLotOrdinal = 0L;
         for (CargoLotState lot : lotCopy) {
             FreighterState fleet = fleetsById.get(lot.fleetId());
@@ -592,14 +617,31 @@ public record Stage20FreightPersistentState(
             }
             lotMassByFleetCommodity.computeIfAbsent(lot.fleetId(), ignored -> new HashMap<>())
                     .merge(lot.commodityId(), lot.massKg(), Double::sum);
-            maxLotOrdinal = Math.max(maxLotOrdinal, parseLotOrdinal(lot.lotId()));
+            if (lot.receiptSeries() != null) {
+                // Hold additions round at the whole hold's magnitude, not this series' magnitude.
+                double holdRoundoff = lot.receiptSeries().producedReceiptCount()
+                        * Math.ulp(fleet.cargoCapacityKg());
+                seriesRoundoffByFleetCommodity.computeIfAbsent(lot.fleetId(), ignored -> new HashMap<>())
+                        .merge(lot.commodityId(), Math.max(holdRoundoff, lot.receiptSeries().massRoundoffBoundKg()), Double::sum);
+            }
+            long ordinal = parseLotOrdinal(lot.lotId());
+            long lastOrdinal = lot.receiptSeries() == null ? ordinal : lot.receiptSeries().lastOrdinal();
+            maxLotOrdinal = Math.max(maxLotOrdinal, lastOrdinal);
+            if (hasReceiptSeries && lot.lotId().equals("freight-lot:" + ordinal)) {
+                long firstOrdinal = lot.receiptSeries() == null ? ordinal : lot.receiptSeries().originalFirstOrdinal();
+                var before = canonicalOrdinalRanges.floorEntry(firstOrdinal);
+                var after = canonicalOrdinalRanges.ceilingEntry(firstOrdinal);
+                if (before != null && before.getValue() >= firstOrdinal || after != null && after.getKey() <= lastOrdinal)
+                    throw new IllegalArgumentException("Overlapping allocated extraction receipt identities");
+                canonicalOrdinalRanges.put(firstOrdinal, lastOrdinal);
+            }
         }
         if (!lotCopy.isEmpty() && nextCargoLotOrdinal <= maxLotOrdinal) {
             throw new IllegalArgumentException("nextCargoLotOrdinal must exceed every persisted lot ordinal");
         }
         for (FreighterState fleet : fleetCopy) {
             Map<String, Double> lotMass = lotMassByFleetCommodity.getOrDefault(fleet.fleetId(), Map.of());
-            if (!sameMassMap(lotMass, fleet.cargoStorage().commodityMassByIdKg())) {
+            if (!sameMassMap(lotMass, fleet.cargoStorage().commodityMassByIdKg(), seriesRoundoffByFleetCommodity.getOrDefault(fleet.fleetId(), Map.of()))) {
                 throw new IllegalArgumentException("cargo-lot provenance differs from physical hold inventory");
             }
         }
@@ -620,7 +662,7 @@ public record Stage20FreightPersistentState(
     }
 
     private static double productMassKg(Map<String, Integer> counts) {
-        var products = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts();
+        var products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
         double mass = 0d;
         for (var entry : counts.entrySet()) {
             var product = products.findProduct(entry.getKey());
@@ -645,13 +687,13 @@ public record Stage20FreightPersistentState(
      */
     public static String personalExtractionOrderId(FleetId fleetId) { return "player-extraction-cargo:" + fleetId.value(); }
 
-    private static boolean sameMassMap(Map<String, Double> left, Map<String, Double> right) {
+    private static boolean sameMassMap(Map<String, Double> left, Map<String, Double> right, Map<String, Double> certifiedRoundoff) {
         Set<String> keys = new HashSet<>(left.keySet());
         keys.addAll(right.keySet());
         for (String key : keys) {
             double a = left.getOrDefault(key, 0d);
             double b = right.getOrDefault(key, 0d);
-            double tolerance = Math.max(EPSILON, Math.max(Math.abs(a), Math.abs(b)) * 1.0e-12d);
+            double tolerance = Math.max(Math.max(EPSILON, Math.max(Math.abs(a), Math.abs(b)) * 1.0e-12d), certifiedRoundoff.getOrDefault(key, 0d));
             if (Math.abs(a - b) > tolerance) {
                 return false;
             }

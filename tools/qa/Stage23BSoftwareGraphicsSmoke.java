@@ -481,6 +481,472 @@ public class Stage23BSoftwareGraphicsSmoke {
   var save=game.getClass().getDeclaredField("savePath");save.setAccessible(true);
   save.set(game,java.nio.file.Files.createTempDirectory("stage23b-smoke-").resolve("campaign.s25"));
   var pendingSave=(java.nio.file.Path)save.get(game);
+  if(System.getProperty("stage23b.ammunitionManufacturingCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.ammunitionManufacturingCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+   String station=campaign(game).dockedAmmunitionStationId().orElseThrow();
+   String product=com.spacesim.content.Stage23AmmunitionProduction.EMPIRE;
+   String selection="pilot-manufacturing|"+station+'|'+product;
+   selectRow(workspace,game,selection);
+   var original=campaign(game).captureState();
+   keyboardAction(renderer,game,"pilot.more");keyboardAction(renderer,game,"pilot.more");
+   keyboardAction(renderer,game,"pilot.start-manufacturing");
+   if(!original.equals(campaign(game).captureState()))throw new AssertionError("Batch preview changed physical state");
+   // Changing the count must discard the previously authorized three-round preview.
+   keyboardAction(renderer,game,"pilot.more");
+   var pf=game.getClass().getDeclaredField("pendingPilotPhysical");pf.setAccessible(true);
+   if(pf.get(game)!=null)throw new AssertionError("Count change retained stale batch confirmation");
+   keyboardAction(renderer,game,"pilot.less");keyboardAction(renderer,game,"pilot.start-manufacturing");
+   screenshot("stage23b-ammunition-manufacturing-preview");
+   keyboardAction(renderer,game,"pilot.physical-confirm");
+   var order=campaign(game).coordinator().runtime().manufacturingQueue().capture().get(0);
+   if(order.requestedUnits()!=3)throw new AssertionError("UI must reserve three rounds rather than one section");
+   campaign(game).coordinator().setPaused(false);campaign(game).advanceFrame(campaign(game).coordinator().session().fixedStepSeconds());campaign(game).coordinator().setPaused(true);
+   order=campaign(game).coordinator().runtime().manufacturingQueue().capture().get(0);
+   if(order.completedFraction()<=0||order.completedFraction()>=1)throw new AssertionError("One tick must retain partial batch work");
+   var partial=campaign(game).captureState();
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!partial.equals(campaign(game).captureState()))throw new AssertionError("Partial manufacturing lost reserved custody on F8/F9");
+   hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,"pilot-manufacturing-cancel|"+station+'|'+order.orderId());
+   screenshot("stage23b-ammunition-manufacturing-partial");
+   keyboardAction(renderer,game,"pilot.cancel-manufacturing");keyboardAction(renderer,game,"pilot.physical-confirm");
+   if(!campaign(game).coordinator().runtime().manufacturingQueue().capture().isEmpty())throw new AssertionError("Cancelled ammunition order remains active");
+   if(campaign(game).coordinator().runtime().infrastructure().endpoint(station).storage().productCount(product)!=0)
+     throw new AssertionError("Partial cancellation created finished ammunition");
+   if(GL11.glGetError()!=0)throw new AssertionError("Ammo manufacturing GL error");
+   game.dispose();System.out.println("Ammunition manufacturing graphical probe passed: keyboard batch count, stale-preview clearing, three-round reserve, partial tick, exact F8/F9 and cancellation; explicit fixture");return;
+  }
+  if(System.getProperty("stage23b.ammunitionCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.ammunitionCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var original=campaign(game).captureState();
+   var row=com.spacesim.ui.GeneratedCampaignAmmunitionUi.rows(campaign(game)).get(0);
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SHIPS).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,row.selection().stableId());
+   keyboardAction(renderer,game,"pilot.more");keyboardAction(renderer,game,"pilot.less");
+   keyboardAction(renderer,game,"pilot.load-ammunition");screenshot("stage23b-ammunition-preview");
+   if(!original.equals(campaign(game).captureState()))throw new AssertionError("Ammunition preview mutated fixture");
+   keyboardAction(renderer,game,"pilot.physical-confirm");
+   var loaded=campaign(game).captureState();
+   if(loaded.playerJournal().entries().stream().filter(e->e.action().equals("LOAD_AMMUNITION")).count()!=1)
+     throw new AssertionError("Ammunition load must record exactly one completion");
+   if(loaded.playerState().walletMilliCredits()!=original.playerState().walletMilliCredits())throw new AssertionError("Own ammunition loading charged money");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!loaded.equals(campaign(game).captureState()))throw new AssertionError("Ammo/loadout/station stock changed on native UI reload");
+   hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SHIPS).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,row.selection().stableId());
+   screenshot("stage23b-ammunition-loaded");
+   if(GL11.glGetError()!=0)throw new AssertionError("Ammunition GL error");
+   game.dispose();System.out.println("Ammunition graphical probe passed: keyboard count/preview/confirm, single journal entry, exact native F8/F9; explicit fixture, no ordinary acquisition claim");return;
+  }
+  if(System.getProperty("stage23b.queuedCraftCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.queuedCraftCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var before=campaign(game).captureState();var id=before.smallCraft().craft().get(0).id();
+   ships(renderer,game);selectRow(workspace,game,"craft:"+id.value());
+   keyboardAction(renderer,game,"pilot.government-craft-cancel-launch");
+   if(!before.equals(campaign(game).captureState()))throw new AssertionError("Craft cancellation preview changed actual state");
+   screenshot("stage23b-personal-craft-cancel-preview");
+   keyboardAction(renderer,game,"pilot.government-confirm");
+   var after=campaign(game).captureState();
+   if(campaign(game).missions().requireMission(1).status()!=com.spacesim.world.SmallCraftMissionState.MissionStatus.CANCELLED
+     ||!before.smallCraft().equals(after.smallCraft())||!before.playerState().equals(after.playerState())
+     ||!before.stage21Runtime().equals(after.stage21Runtime())||!before.localFlights().equals(after.localFlights())
+     ||after.playerJournal().entries().stream().filter(e->e.action().equals("SMALL_CRAFT_LAUNCH_CANCELLED")).count()!=1)
+     throw new AssertionError("Keyboard craft cancellation did not conserve its owners");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!after.equals(campaign(game).captureState()))throw new AssertionError("Cancelled craft native F8/F9 changed state");
+   if(GL11.glGetError()!=0)throw new AssertionError("Queued craft cancellation GL error");
+   game.dispose();System.out.println("Personal craft graphical command PASS: keyboard preview/confirmation, exact F8/F9, no asset/consumable/time grant; explicit craft/bay/queue fixture, ordinary acquisition not claimed");return;
+  }
+  if(System.getProperty("stage23b.localFlightCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.localFlightCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var before=campaign(game).captureState();var flight=before.localFlights().flights().get(0);
+   ships(renderer,game);selectRow(workspace,game,"small-craft:"+flight.craftId().value());
+   processor.keyDown(Input.Keys.C);game.render();
+   var followed=renderer.getClass().getDeclaredField("followedLocalObjectId");followed.setAccessible(true);
+   if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+     ||!("small-craft:"+flight.craftId().value()).equals(followed.get(renderer)))throw new AssertionError("Owned physical craft keyboard focus unreachable");
+   if(!before.localFlights().equals(campaign(game).captureState().localFlights()))throw new AssertionError("Map focus moved the craft");
+   screenshot("stage23b-native25-local-flight-focus");
+   var focused=campaign(game).captureState();
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!focused.equals(campaign(game).captureState()))throw new AssertionError("Local flight changed on graphical native save/load: "+difference(focused,campaign(game).captureState(),"campaign"));
+   var current=campaign(game);current.coordinator().setTimeScale(1);current.coordinator().setPaused(false);
+   current.advanceFrame(current.coordinator().session().fixedStepSeconds());current.coordinator().setPaused(true);game.render();
+   var moved=campaign(game).captureState();
+   if(moved.localFlights().lastProcessedTick()!=focused.localFlights().lastProcessedTick()+1
+     ||moved.localFlights().flights().get(0).physical().position().equals(flight.physical().position()))throw new AssertionError("Exact local flight did not advance with the world");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!moved.equals(campaign(game).captureState()))throw new AssertionError("Moved local flight changed on graphical native save/load");
+   if(GL11.glGetError()!=0)throw new AssertionError("Local flight GL error");
+   game.dispose();System.out.println("Local flight graphical probe passed: keyboard owned craft focus, exact current-native F8/F9, one real shared-world coasting interval; produced/deployed craft and geometry are explicit fixtures, ordinary acquisition/launch not claimed");return;
+  }
+  if(System.getProperty("stage23b.measuredContactCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.measuredContactCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var before=campaign(game).captureState();
+   long measuredContactTick=campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick();
+   var row=com.spacesim.ui.GeneratedCampaignSensorContactUi.rows(campaign(game)).stream()
+     .filter(r->r.focusSystem()!=null).findFirst().orElseThrow();
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,row.selection().stableId());
+   processor.keyDown(Input.Keys.C);game.render();
+   if(workspace.tab()!=com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SYSTEM
+     ||!workspace.view().selection().stableId().equals(row.selection().stableId()))throw new AssertionError("Measured contact keyboard focus unreachable");
+   var follow=renderer.getClass().getDeclaredField("followedLocalObjectId");follow.setAccessible(true);
+   if(!row.selection().stableId().equals(follow.get(renderer)))throw new AssertionError("Camera did not focus the measured marker");
+   screenshot("stage23b-actual-measured-contact-focus");
+   var focused=campaign(game).captureState();
+   if(measuredContactTick!=campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick()
+     ||!before.playerState().equals(focused.playerState())||!before.playerJournal().equals(focused.playerJournal()))
+    throw new AssertionError("Map focus changed physical time or personal state");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!focused.equals(campaign(game).captureState()))throw new AssertionError("Measured contact changed on native UI save/load");
+   if(GL11.glGetError()!=0)throw new AssertionError("Measured contact GL error");
+   game.dispose();System.out.println("Actual measured contact graphical probe passed: keyboard focus, anonymous measured map marker, exact F8/F9; no coordinate or equipment fixtures");return;
+  }
+  if(System.getProperty("stage23b.directSupplyCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.directSupplyCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var c=campaign(game);c.coordinator().setPaused(false);c.advanceFrame(c.coordinator().session().fixedStepSeconds());c.coordinator().setPaused(true);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   ships(renderer,game);
+   var r=c.coordinator().runtime();var p=c.playerState().orElseThrow();
+   var f=r.world().findFleet(p.activeFleetId()).orElseThrow();
+   var fitted=r.world().findSession(f.systemId()).orElseThrow().getEntityRegistry().require(f.localEntityId())
+    .getComponent(com.spacesim.components.EngineeringComponent.class);
+   var binding=com.spacesim.content.Stage22ShipConsumableCatalogLoader.loadDefault().getBindings().stream()
+    .filter(b->b.interfaceKind()==com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS)
+    .filter(b->fitted.fit.installedModules().stream().anyMatch(m->m.moduleId().equals(b.moduleId()))).findFirst().orElseThrow();
+   var mount=fitted.fit.installedModules().stream().filter(m->m.moduleId().equals(binding.moduleId())).findFirst().orElseThrow().mountId();
+   selectRow(workspace,game,"pilot-supply|"+binding.id()+"|"+mount);
+   var endpoint=r.infrastructure().endpoints().stream().filter(e->c.pilotMarketReference(e.stationId()).filter(p.dockedAt()::equals).isPresent()).findFirst().orElseThrow();
+   double stock=endpoint.storage().commodityMassKg(binding.commodityId());
+   double fuel=new com.spacesim.ship.ProductionEngineeringRuntimeResolver().derive(fitted).reactionMassKg();
+   var cargo=r.freight().cargoHoldSnapshot(f.id()).commodityMassByIdKg();
+   var before=c.captureState();
+   keyboardAction(renderer,game,"pilot.buy-consumable");screenshot("stage23b-actual-direct-supply-preview");
+   if(!before.equals(c.captureState()))throw new AssertionError("Direct supply graphical preview mutated campaign");
+   keyboardAction(renderer,game,"pilot.physical-confirm");
+   if(endpoint.storage().commodityMassKg(binding.commodityId())!=stock-1
+    ||Math.abs(new com.spacesim.ship.ProductionEngineeringRuntimeResolver().derive(fitted).reactionMassKg()-fuel-1)>1e-7
+    ||c.playerState().orElseThrow().walletMilliCredits()>=p.walletMilliCredits()
+    ||!cargo.equals(r.freight().cargoHoldSnapshot(f.id()).commodityMassByIdKg()))
+     throw new AssertionError("Direct supply graphical confirmation did not conserve paid stock/tank/cargo");
+   before=null;var complete=c.captureState();processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!complete.equals(campaign(game).captureState()))throw new AssertionError("Direct supply graphical F8/F9 differs");
+   screenshot("stage23b-actual-direct-supply-complete");
+   if(GL11.glGetError()!=0)throw new AssertionError("Direct supply GL error");
+   game.dispose();System.out.println("Actual direct supply graphical probe passed: real miner, keyboard paid station-to-tank service, unchanged cargo, finite stock/money and exact F8/F9");return;
+  }
+  if(System.getProperty("stage23b.commandGroupCheckpoint")!=null){
+   java.nio.file.Files.copy(java.nio.file.Path.of(System.getProperty("stage23b.commandGroupCheckpoint")),pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var p=campaign(game).playerState().orElseThrow();
+   var currentGroups=campaign(game).coordinator().commands().groups();
+   var member=p.ownedFleetIds().stream().filter(id->currentGroups.stream()
+    .noneMatch(g->g.memberFleetIds().contains(id))).findFirst().orElseThrow();
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+    &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.MILITARY).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,"player-fleet|group|"+member.value());
+   var before=campaign(game).captureState();int groups=campaign(game).coordinator().commands().groups().size();
+   keyboardAction(renderer,game,"pilot.government-group");screenshot("stage23b-actual-command-group-preview");
+   if(!before.equals(campaign(game).captureState()))throw new AssertionError("Graphical group preview mutated campaign");
+   keyboardAction(renderer,game,"pilot.government-confirm");
+   if(campaign(game).coordinator().commands().groups().size()!=groups+1
+    ||!p.equals(campaign(game).playerState().orElseThrow()))throw new AssertionError("Graphical group formation changed assets or finances");
+   before=null;
+   var complete=campaign(game).captureState();processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!complete.equals(campaign(game).captureState()))throw new AssertionError("Graphical group native round trip differs");
+   screenshot("stage23b-actual-command-group-complete");
+   if(GL11.glGetError()!=0)throw new AssertionError("Command group GL error");
+   game.dispose();System.out.println("Actual command group graphical probe passed: ordinary real input, keyboard preview/confirm, same assets/money and exact F8/F9; no crew/readiness fixtures");return;
+  }
+  if(System.getProperty("stage23b.ownedYardCheckpoint")!=null){
+   var source=java.nio.file.Path.of(System.getProperty("stage23b.ownedYardCheckpoint"));
+   java.nio.file.Files.copy(source,pendingSave,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   game.render();processor.keyDown(Input.Keys.F9);game.render();
+   String station=System.getProperty("stage23b.ownedYardStation","industry.2");
+   if(!campaign(game).ownsProductionStation(station)
+     ||!campaign(game).pilotMarketReference(station).orElseThrow().equals(campaign(game).playerState().orElseThrow().dockedAt()))
+      throw new AssertionError("Actual acquired station and berth required");
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+    if(Boolean.getBoolean("stage23b.actualFuelAccess")){
+      var before=campaign(game).captureState();
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.SHIPS).findFirst().orElseThrow());game.render();
+      var supply=com.spacesim.ui.GeneratedCampaignSupplyUi.rows(campaign(game)).get(0);
+      selectRow(workspace,game,supply.selection().stableId());
+      var kg=game.getClass().getDeclaredField("pilotKilograms");kg.setAccessible(true);int initial=kg.getInt(game);
+      held.add(Input.Keys.CONTROL_LEFT);keyboardAction(renderer,game,"pilot.more");held.clear();
+      if(kg.getInt(game)!=initial+10000)throw new AssertionError("Large tank loading increment failed");
+      held.add(Input.Keys.SHIFT_LEFT);keyboardAction(renderer,game,"pilot.more");held.clear();
+      if(kg.getInt(game)!=initial+10100)throw new AssertionError("Shift tank loading increment failed");
+      keyboardAction(renderer,game,"pilot.load-consumable");
+      if(!before.equals(campaign(game).captureState()))throw new AssertionError("Empty hold servicing preview mutated actual checkpoint");
+      click(((java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer)).stream()
+        .filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB&&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.GALAXY).findFirst().orElseThrow());game.render();
+      int moves=0;while(!workspace.view().selection().stableId().equals("3")){processor.keyDown(Input.Keys.DOWN);game.render();if(++moves>100)throw new AssertionError("Personally known system 3 unreachable");}
+      keyboardAction(renderer,game,"pilot.route-preview");
+      var field=game.getClass().getDeclaredField("pendingRoute");field.setAccessible(true);
+      var route=(com.spacesim.campaign.Stage228CampaignAuthority.PilotRoutePreview)field.get(game);
+      if(route==null||route.firstHopFuel().feasible()||route.departure().allowed())throw new AssertionError("Actual insufficient onboard fuel not diagnosed");
+      if(((java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer)).stream().anyMatch(h->h.id().equals("pilot.route-confirm")))throw new AssertionError("Unfueled departure enabled");
+      screenshot("stage23b-actual-fuel-route-preview");
+      if(!before.equals(campaign(game).captureState()))throw new AssertionError("Fuel route preview mutated actual checkpoint");
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!before.equals(campaign(game).captureState())||GL11.glGetError()!=0)throw new AssertionError("Fuel access F8/F9 or GPU error");
+      game.dispose();System.out.println("Actual fuel access graphical probe passed: Ctrl/Shift tank quantities, empty hold rejection, insufficient onboard first-hop fuel, disabled confirmation and exact F8/F9; no knowledge/stock/geometry fixtures");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualMaterialOffers")){
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).findFirst().orElseThrow());game.render();
+      var offers=com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(campaign(game));
+      var offer=offers.stream().filter(r->r.name().startsWith("Карта: ")).findFirst().orElseThrow();
+      if(offer.focusSystem()!=null||offer.focusFleet()!=0)throw new AssertionError("Unpaid material offer has navigation access");
+      selectRow(workspace,game,offer.selection().stableId());
+      var original=campaign(game).captureState();
+      keyboardAction(renderer,game,"pilot.buy-resource-map");screenshot("stage23b-actual-material-map-preview");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Material offer preview granted knowledge or changed money");
+      keyboardAction(renderer,game,"pilot.physical-confirm");
+      if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=original.playerState().walletMilliCredits()-100000)
+        throw new AssertionError("Material map price changed");
+      var purchased=campaign(game).captureState();
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!purchased.equals(campaign(game).captureState()))throw new AssertionError("Material chart changed on exact F8/F9");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual material-map GL error");
+      game.dispose();System.out.println("Actual material-map offer graphical probe passed: public archived commodity, no unpaid navigation, keyboard pure preview/paid confirmation and exact F8/F9; no knowledge/contact fixtures");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualBootstrapMaterials")){
+      String design=com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID;
+      selectRow(workspace,game,"pilot-construction|"+station+'|'+design);
+      var original=campaign(game).captureState();
+      if(!campaign(game).hasFacilityConstructionLine(station,design))throw new AssertionError("Actual assembly cannot build the bootstrap bill");
+      keyboardAction(renderer,game,"pilot.start-construction");screenshot("stage23b-actual-bootstrap-materials-preview");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Missing bootstrap bill preview changed the real campaign");
+      hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+      if(hits.stream().anyMatch(h->h.id().equals("pilot.physical-confirm")))throw new AssertionError("Missing bill exposed confirmation");
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Bootstrap UI native v21 save/load changed actual state");
+      if(campaign(game).coordinator().runtime().industry().industrial().stations().stream().flatMap(s->s.facilities().stream())
+        .anyMatch(f->f.definitionId().equals(design)))throw new AssertionError("Viewing or loading created the new plant");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual bootstrap materials GL error");
+      game.dispose();System.out.println("Actual bootstrap materials graphical probe passed: authored construction row, real assembly, keyboard blocked preview, exact native v21 F8/F9; no materials or facilities supplied");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualFacilityAllocation")){
+      String target=station+".facility.3";
+      selectRow(workspace,game,"pilot-facility-resources|"+station+'|'+target);
+      var original=campaign(game).captureState();
+      var facilities=campaign(game).coordinator().runtime().industry().industrial().station(station).facilities();
+      keyboardAction(renderer,game,"pilot.allocate-facility-resources-half");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Half operation preview changed actual state");
+      keyboardAction(renderer,game,"pilot.physical-confirm");screenshot("stage23b-actual-facility-half-operation");
+      var half=campaign(game).captureState();
+      var capability=campaign(game).coordinator().runtime().industry().industrial().station(station).facilityCapabilities().stream()
+        .filter(f->f.facilityInstanceId().equals(target)).findFirst().orElseThrow();
+      if(Math.abs(capability.effectiveThroughputFraction()-.5)>1e-12)throw new AssertionError("Keyboard half allocation did not change actual throughput");
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!half.equals(campaign(game).captureState()))throw new AssertionError("Half allocations changed on native F8/F9");
+      hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+      selectRow(workspace,game,"pilot-facility-resources|"+station+'|'+target);
+      keyboardAction(renderer,game,"pilot.allocate-facility-resources");keyboardAction(renderer,game,"pilot.physical-confirm");
+      if(!facilities.equals(campaign(game).coordinator().runtime().industry().industrial().station(station).facilities())
+        ||original.playerState().walletMilliCredits()!=campaign(game).playerState().orElseThrow().walletMilliCredits())
+        throw new AssertionError("Keyboard full operation did not restore actual resources and money");
+      screenshot("stage23b-actual-facility-full-operation");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual facility resources GL error");
+      game.dispose();System.out.println("Actual facility allocation graphical probe passed: original installation controls, keyboard half/full, pure preview, exact native F8/F9 and restored resources; no operating-resource fixtures");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualCommodityTransfer")){
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.LOGISTICS).findFirst().orElseThrow());game.render();
+      String commodity="commodity.feedstock.conductor_ore";
+      selectRow(workspace,game,"pilot-cargo|"+station+"|"+commodity);
+      var original=campaign(game).captureState();
+      var quantity=game.getClass().getDeclaredField("pilotKilograms");quantity.setAccessible(true);quantity.setInt(game,1);game.render();
+      keyboardAction(renderer,game,"pilot.load-commodity");screenshot("stage23b-actual-commodity-load-preview");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Own cargo preview changed actual state");
+      keyboardAction(renderer,game,"pilot.physical-confirm");
+      var loaded=campaign(game).captureState();
+      if(loaded.playerState().walletMilliCredits()!=original.playerState().walletMilliCredits())throw new AssertionError("Own load charged money");
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!loaded.equals(campaign(game).captureState()))throw new AssertionError("Own load changed on F8/F9");
+      if(campaign(game).previewPilotAction("UNLOAD_COMMODITY",station,commodity,1).allowed())throw new AssertionError("Loaded interval reused");
+      campaign(game).coordinator().setPaused(false);
+      campaign(game).advanceFrame(campaign(game).coordinator().session().fixedStepSeconds());
+      campaign(game).coordinator().setPaused(true);game.render();
+      hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.LOGISTICS).findFirst().orElseThrow());game.render();
+      selectRow(workspace,game,"pilot-cargo|"+station+"|"+commodity);
+      keyboardAction(renderer,game,"pilot.unload-commodity");keyboardAction(renderer,game,"pilot.physical-confirm");
+      screenshot("stage23b-actual-commodity-unloaded");
+      if(campaign(game).playerState().orElseThrow().walletMilliCredits()!=original.playerState().walletMilliCredits())throw new AssertionError("Own unload charged money");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual own commodity GL error");
+      game.dispose();System.out.println("Actual own commodity graphical probe passed: keyboard load/unload, pure preview, unchanged money, exact F8/F9 and finite interval; no acquisition fixtures");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualComponents")){
+      selectRow(workspace,game,"pilot-components|"+station+"|manufacturing.component.electrical");
+      var original=campaign(game).captureState();
+      if(campaign(game).previewPilotAction("START_COMPONENT_MANUFACTURING",station,"manufacturing.component.electrical",100).allowed())
+        throw new AssertionError("Actual component shortage should reject this batch");
+      held.add(Input.Keys.SHIFT_LEFT);keyboardAction(renderer,game,"pilot.more");held.remove(Input.Keys.SHIFT_LEFT);
+      keyboardAction(renderer,game,"pilot.start-components");screenshot("stage23b-actual-component-shortage-preview");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Component quantity/preview changed actual campaign");
+      var kg=game.getClass().getDeclaredField("componentKilograms");kg.setAccessible(true);
+      if(kg.getInt(game)!=200 || hits.stream().anyMatch(h->h.id().equals("pilot.physical-confirm")))
+        throw new AssertionError("Component quantity or unavailable confirmation mismatch");
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Actual component shortage changed on F8/F9");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual components GL error");
+      game.dispose();System.out.println("Actual component graphical probe passed: Shift quantity, blocked shortage preview, unchanged native F8/F9; production not claimed");return;
+    }
+    if(Boolean.getBoolean("stage23b.actualRefining")){
+      selectRow(workspace,game,"pilot-refining|"+station+"|refining.conductor_metal");
+      var original=campaign(game).captureState();
+      double ore=campaign(game).coordinator().runtime().industry().industrial().station(station).storage()
+        .commodityMassKg("commodity.feedstock.conductor_ore");
+      held.add(Input.Keys.SHIFT_LEFT);keyboardAction(renderer,game,"pilot.more");held.remove(Input.Keys.SHIFT_LEFT);
+      keyboardAction(renderer,game,"pilot.start-refining");screenshot("stage23b-actual-refining-preview");
+      if(!original.equals(campaign(game).captureState()))throw new AssertionError("Refining quantity/preview mutated campaign");
+      keyboardAction(renderer,game,"pilot.physical-confirm");
+      var order=campaign(game).coordinator().runtime().manufacturingQueue().capture().stream()
+        .filter(o->o.operationId().equals("refining.conductor_metal")&&o.stationId().equals(station)).findFirst().orElseThrow();
+      if(order.requestedAmount()!=200 || order.completedFraction()!=0
+        ||Math.abs(campaign(game).coordinator().runtime().industry().industrial().station(station).storage()
+          .commodityMassKg("commodity.feedstock.conductor_ore")-(ore-200))>1e-8)
+        throw new AssertionError("Keyboard quantity did not reserve the exact actual ore batch");
+      var pending=campaign(game).captureState();
+      processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+      if(!pending.equals(campaign(game).captureState()))throw new AssertionError("Non-exact actual refining F8/F9");
+      click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+        &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.INDUSTRY).findFirst().orElseThrow());game.render();
+      selectRow(workspace,game,"pilot-manufacturing-cancel|"+station+'|'+order.orderId());
+      keyboardAction(renderer,game,"pilot.cancel-manufacturing");keyboardAction(renderer,game,"pilot.physical-confirm");
+      if(campaign(game).coordinator().runtime().manufacturingQueue().capture().stream().anyMatch(o->o.orderId().equals(order.orderId()))
+        ||Math.abs(campaign(game).coordinator().runtime().industry().industrial().station(station).storage()
+          .commodityMassKg("commodity.feedstock.conductor_ore")-ore)>1e-8
+        ||original.playerState().walletMilliCredits()!=campaign(game).playerState().orElseThrow().walletMilliCredits())
+        throw new AssertionError("Actual graphical cancel lost ore, left custody or changed the wallet");
+      if(GL11.glGetError()!=0)throw new AssertionError("Actual refining GL error");
+      screenshot("stage23b-actual-refining-cancelled");
+      game.dispose();System.out.println("Actual refining graphical probe passed: Shift quantity, keyboard reserve, native F8/F9 and exact ore return; completion not claimed");return;
+    }
+   selectRow(workspace,game,"pilot-manufacturing|"+station+"|module.industrial_union_cargo_section_v1");
+   if(Boolean.getBoolean("stage23b.actualSectionSupply")){
+     var supplyRow=com.spacesim.ui.GeneratedCampaignManufacturingUi.rows(campaign(game)).stream()
+       .filter(r->r.selection().stableId().equals("pilot-manufacturing|"+station+"|module.industrial_union_cargo_section_v1")).findFirst().orElseThrow();
+     if(supplyRow.sections().stream().noneMatch(s->s.title().equals("Общее сырьё без повторного счёта")))
+       throw new AssertionError("Full own-station supply plan missing");
+     held.add(Input.Keys.CONTROL_LEFT);
+     for(int scroll=0;scroll<9;scroll++){processor.keyDown(Input.Keys.PAGE_DOWN);game.render();}
+     held.remove(Input.Keys.CONTROL_LEFT);
+     screenshot("stage23b-actual-section-supply-plan");
+     var pure=campaign(game).captureState();
+     held.add(Input.Keys.CONTROL_LEFT);held.add(Input.Keys.PAGE_UP);processor.keyDown(Input.Keys.PAGE_UP);
+     held.remove(Input.Keys.PAGE_UP);held.remove(Input.Keys.CONTROL_LEFT);game.render();
+     if(!pure.equals(campaign(game).captureState()))throw new AssertionError("Supply plan navigation changed state");
+     hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+     click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+       &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.LOGISTICS).findFirst().orElseThrow());game.render();
+     selectRow(workspace,game,"pilot-cargo|"+station+"|commodity.feedstock.conductor_ore");
+     held.add(Input.Keys.CONTROL_LEFT);keyboardAction(renderer,game,"pilot.more");held.remove(Input.Keys.CONTROL_LEFT);
+     var kg=game.getClass().getDeclaredField("pilotKilograms");kg.setAccessible(true);
+     if(kg.getInt(game)!=10001)throw new AssertionError("Bulk own-cargo Ctrl increment must be 10000 kg");
+     keyboardAction(renderer,game,"pilot.load-commodity");
+     if(!pure.equals(campaign(game).captureState()))throw new AssertionError("Bulk shortage preview changed actual state");
+     processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+     if(!pure.equals(campaign(game).captureState()))throw new AssertionError("Supply projection changed on F8/F9");
+     if(GL11.glGetError()!=0)throw new AssertionError("Section supply GL error");
+     game.dispose();System.out.println("Actual section supply graphical probe passed: full own-stock dependency plan, Ctrl 10000 kg, pure blocked preview, exact F8/F9; no materials supplied");return;
+   }
+   var original=campaign(game).captureState();keyboardAction(renderer,game,"pilot.start-manufacturing");
+   screenshot("stage23b-actual-owned-cargo-manufacturing-preview");
+   if(!original.equals(campaign(game).captureState()))throw new AssertionError("Manufacturing preview changed actual campaign");
+   processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!original.equals(campaign(game).captureState()))throw new AssertionError("Actual acquired station changed on native UI save/load");
+   if(GL11.glGetError()!=0)throw new AssertionError("Actual owned yard GL error");
+   game.dispose();System.out.println("Actual owned yard graphical probe passed: cargo manufacturing row, keyboard preview and exact native save/load; work completion not claimed");return;
+  }
+  if(Boolean.getBoolean("stage23b.activeScanOnly")){
+   game.render();
+   var rf=game.getClass().getDeclaredField("renderer");rf.setAccessible(true);
+   var wf=game.getClass().getDeclaredField("workspace");wf.setAccessible(true);
+   var renderer=(com.spacesim.ui.GeneratedWorldCommandUiRenderer)rf.get(game);
+   var workspace=(com.spacesim.ui.ProductionUiWorkspace)wf.get(game);
+   keyboardAction(renderer,game,"pilot.preview");keyboardAction(renderer,game,"pilot.confirm");
+   var hf=renderer.getClass().getDeclaredField("hitTargets");hf.setAccessible(true);
+   var hits=(java.util.List<com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitTarget>)hf.get(renderer);
+   click(hits.stream().filter(h->h.kind()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.HitKind.TAB
+     &&h.tab()==com.spacesim.ui.GeneratedWorldCommandUiRenderer.Tab.CONTACTS).findFirst().orElseThrow());game.render();
+   selectRow(workspace,game,"pilot-scan|"+campaign(game).playerState().orElseThrow().activeFleetId().value());
+   var baseline=campaign(game).captureState();long tick=campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick();
+   keyboardAction(renderer,game,"pilot.scan");screenshot("stage23b-active-scan-preview");
+   if(!baseline.equals(campaign(game).captureState()))throw new AssertionError("Radar preview changed live campaign");
+   keyboardAction(renderer,game,"pilot.physical-confirm");
+   if(campaign(game).coordinator().runtime().world().getAuthoritativeWorldTick()!=tick+1
+     ||campaign(game).playerJournal().entries().stream().noneMatch(e->e.action().equals("SCAN")))
+      throw new AssertionError("Confirmed keyboard radar pulse did not advance exactly one world tick");
+   var scanned=campaign(game).captureState();processor.keyDown(Input.Keys.F8);game.render();processor.keyDown(Input.Keys.F9);game.render();
+   if(!scanned.equals(campaign(game).captureState()))throw new AssertionError("Radar result changed on UI native save/load");
+   if(GL11.glGetError()!=0)throw new AssertionError("Radar GL error");
+   game.dispose();System.out.println("Active radar graphical probe passed: ordinary new pilot, keyboard preview/confirm and exact native save/load");return;
+  }
   if(Boolean.getBoolean("stage23b.timeSkipOnly")){
    timeSkip(game);game.dispose();System.out.println("Time skip graphical probe passed");return;
   }

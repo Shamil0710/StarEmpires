@@ -82,6 +82,7 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
                     throw new IllegalArgumentException(
                             "active Stage-21E operation references unknown command group: " + operation.id());
                 }
+                if (group.retired()) throw new IllegalArgumentException("Active operation cannot reference a retired command group");
                 if (order == null || order.commandGroupId() != operation.commandGroupId()) {
                     throw new IllegalArgumentException(
                             "active Stage-21E operation references incompatible source order: " + operation.id());
@@ -105,7 +106,8 @@ public record Stage21EGeneratedWorldRuntimePersistentState(
                     throw new IllegalArgumentException(
                             "active Stage-21E participant is absent from ordinary world: " + fleetId);
                 }
-                if (owner != null && owner != operation.factionId()) {
+                if (owner != null && owner != operation.factionId()
+                        && (operation.status().active() || group == null || !group.retired())) {
                     throw new IllegalArgumentException(
                             "Stage-21E participant current owner differs from operation: " + fleetId);
                 }

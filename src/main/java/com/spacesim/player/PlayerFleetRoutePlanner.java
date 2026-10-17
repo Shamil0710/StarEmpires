@@ -195,6 +195,36 @@ public final class PlayerFleetRoutePlanner {
         return Optional.empty();
     }
 
+    /**
+     * Evaluates an already selected neighboring route using only personal knowledge and actor state.
+     * The exposure and cost rules are identical to route search; no alternate path is substituted.
+     * @param fleetId personally owned actor whose real state determines vulnerability
+     * @param systems complete personally known neighboring path
+     * @return exact route diagnostics, or empty for an unknown, repeated or non-neighboring path
+     */
+    public Optional<PlayerRouteRiskView> evaluateKnownRoute(FleetId fleetId, List<StarSystemId> systems) {
+        var actor = Objects.requireNonNull(fleetId, "fleetId");
+        var path = List.copyOf(Objects.requireNonNull(systems, "systems"));
+        var player = playerState.get();
+        if (path.isEmpty() || !player.ownedFleetIds().contains(actor)
+                || !player.discoveredSystemIds().containsAll(path)
+                || new HashSet<>(path).size() != path.size()) return Optional.empty();
+        double vulnerability = vulnerability(actor);
+        long travel = 0;
+        double systemExposure = 0, linkExposure = 0, uncertainty = 0;
+        for (int index = 1; index < path.size(); index++) {
+            var from = path.get(index - 1); var to = path.get(index);
+            if (!world.getTopology().neighbors(from).contains(to)) return Optional.empty();
+            var edge = edgeCost(player, from, to, currentTick(), vulnerability);
+            travel = Math.addExact(travel, edge.travelTicks());
+            systemExposure += edge.systemExposure(); linkExposure += edge.linkExposure();
+            uncertainty += edge.uncertaintyExposure();
+        }
+        double riskCost = (systemExposure + linkExposure + uncertainty) * vulnerability * RISK_TO_TICKS;
+        return Optional.of(new PlayerRouteRiskView(path, travel, systemExposure, linkExposure,
+                uncertainty, vulnerability, riskCost, travel + riskCost));
+    }
+
     private EdgeCost edgeCost(
             PlayerState player,
             StarSystemId from,

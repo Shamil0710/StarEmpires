@@ -23,7 +23,7 @@ public final class GeneratedCampaignYardConstructionUi {
     public static List<ProductionUiSnapshot.Row> rows(Stage228CampaignAuthority campaign) {
         if (campaign.playerState().isEmpty()) return List.of();
         var catalog = Stage23YardConstructionCatalog.loadDefault();
-        var yards = Stage22CivilianMiningProductionPath.loadRuntimeShipyards();
+        var yards = com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards();
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         var result = new ArrayList<ProductionUiSnapshot.Row>();
         long tick = campaign.coordinator().runtime().world().getAuthoritativeWorldTick();
@@ -38,7 +38,8 @@ public final class GeneratedCampaignYardConstructionUi {
                                 "Работа", String.format(Locale.ROOT, "%.2f рабочих секунд / с", installed.availableIntegrationWorkRate()),
                                 "Персонал", Integer.toString(installed.availableLaborCapacity()),
                                 "Автоматизация", Integer.toString(installed.availableAutomationCapacity()),
-                                "Действие", "Перенести существующие ресурсы других верфей этой станции до штатного уровня",
+                                "Доступное распределение", availableAllocation(station.yards(), installed.yardInstanceId()),
+                                "Действие", "Штатные ресурсы: полная норма; доступные: сбалансированная доля нормы из существующих ресурсов станции",
                                 "Последствие", "Прежние верфи потеряют часть мощности; нехватка ресурсов или действующих опор отклоняет действие")),
                         "Фактические распределения собственной станции", station.systemId(), 0, tick));
             }
@@ -84,5 +85,17 @@ public final class GeneratedCampaignYardConstructionUi {
             }
         }
         return List.copyOf(result);
+    }
+
+    private static String availableAllocation(java.util.List<com.spacesim.economy.Stage18ShipyardRuntime.InstalledYardState> states, String target) {
+        try {
+            var result = new com.spacesim.economy.Stage18YardResourceAllocator(
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards()).allocateAvailable(states, target)
+                    .stream().filter(y -> y.yardInstanceId().equals(target)).findFirst().orElseThrow();
+            return String.format(Locale.ROOT, "%.0f Вт; %.3f рабочих секунд / с; персонал %d; автоматизация %d. Требуются действующие опоры",
+                    result.allocatedIntegrationPowerW(), result.availableIntegrationWorkRate(), result.availableLaborCapacity(), result.availableAutomationCapacity());
+        } catch (IllegalArgumentException | IllegalStateException unavailable) {
+            return "Недостаточно существующих ресурсов или пригодной структуры";
+        }
     }
 }

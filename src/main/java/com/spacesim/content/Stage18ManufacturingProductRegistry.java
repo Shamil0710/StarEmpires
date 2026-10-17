@@ -117,6 +117,28 @@ public final class Stage18ManufacturingProductRegistry {
     }
 
     /**
+     * Registers only explicitly selected modules from a larger engineering universe.
+     * Existing IDs, repeated selections and unknown modules fail before a registry is returned.
+     * @param engineering authoritative module definitions
+     * @param moduleIds exact module IDs to append
+     * @param provenance lifecycle provenance of the selected modules
+     * @return immutable extended registry; no inventory is created
+     */
+    public Stage18ManufacturingProductRegistry withEngineeringModules(
+            ShipEngineeringCatalog engineering, List<String> moduleIds, Provenance provenance) {
+        Objects.requireNonNull(engineering, "engineering");
+        Objects.requireNonNull(provenance, "provenance");
+        List<ProductDefinition> combined = new ArrayList<>(products);
+        for (String id : List.copyOf(moduleIds)) {
+            ModuleDefinition module = engineering.findModule(id);
+            if (module == null) throw new IllegalArgumentException("Unknown manufactured module: " + id);
+            combined.add(new ProductDefinition(module.id(), ProductKind.MODULE, module.massKg(),
+                    MODULE_STORAGE_CLASS, provenance));
+        }
+        return new Stage18ManufacturingProductRegistry(combined);
+    }
+
+    /**
      * Composes physical ammunition from one validated later-stage weapon catalog into the ordinary
      * Stage-18 manufacturing registry.
      *

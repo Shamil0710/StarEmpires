@@ -11,6 +11,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @org.junit.jupiter.api.Tag("slow")
 class GeneratedCampaignCausalBridgeTest {
     @Test
+    void freightOnlyObservationMatchesTheCompleteCheckpointAcrossRealTicks() {
+        var campaign = GeneratedCampaignCoordinator.create(Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);
+        campaign.setTimeScale(8d);
+        for (int frame = 0; frame < 30; frame++) {
+            campaign.advanceFrame(0.1f);
+            var complete = campaign.runtime().captureState();
+            var freight = campaign.runtime().captureFreightState();
+            assertEquals(complete.campaign(), campaign.runtime().captureCampaignState(),
+                    "Mission capture retains exact queues, finite sources and discovery fingerprint");
+            assertEquals(complete.freight(), freight, "Observation capture retains exact phase, legal identity and physical mirrors");
+            for (var faction : campaign.actors().capture()) {
+                long tick = campaign.runtime().world().getAuthoritativeWorldTick();
+                assertEquals(GeneratedCampaignFactionObservationPublisher.publish(complete, faction.factionContentId(), tick),
+                        GeneratedCampaignFactionObservationPublisher.publish(freight, faction.factionContentId(), tick));
+            }
+            assertEquals(complete, campaign.runtime().captureState(), "Publishing does not modify the current campaign");
+        }
+    }
+
+    @Test
     void stage20FreightOrderIdentityReachesActorObservationAndDecisionTrace() {
         GeneratedCampaignCoordinator campaign = GeneratedCampaignCoordinator.create(
                 Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED);

@@ -16,7 +16,7 @@ final class FinishedProductTransferCheckpointValidator {
         if (saved == null || saved.lastProcessedTick() > tick || !saved.orders().isEmpty() && saved.lastProcessedTick() != tick)
             throw new IllegalArgumentException("Product handling watermark must match actual completed time");
         if (saved.orders().isEmpty()) return;
-        var products = Stage22CivilianMiningProductionPath.loadProducts();
+        var products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
         var stores = new HashMap<String, Stage18StationStorage>();
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         for (var order : saved.orders()) {

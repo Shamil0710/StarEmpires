@@ -40,12 +40,14 @@ public record FleetCommandState(
         groups = canonicalGroups(groups);
         orders = canonicalOrders(orders);
         Set<Long> groupIds = new HashSet<>();
+        Set<Long> retiredGroupIds = new HashSet<>();
         Set<FleetId> assignedMembers = new HashSet<>();
         long maxGroupId = 0L;
         for (CommandGroupState group : groups) {
             if (!groupIds.add(group.id())) throw new IllegalArgumentException("duplicate command group id: " + group.id());
             maxGroupId = Math.max(maxGroupId, group.id());
-            for (FleetId fleetId : group.memberFleetIds()) {
+            if (group.retired()) retiredGroupIds.add(group.id());
+            for (FleetId fleetId : group.retired() ? List.<FleetId>of() : group.memberFleetIds()) {
                 if (!assignedMembers.add(fleetId)) {
                     throw new IllegalArgumentException("FleetId assigned to multiple command groups: " + fleetId);
                 }
@@ -63,6 +65,8 @@ public record FleetCommandState(
             if (!groupIds.contains(order.commandGroupId())) {
                 throw new IllegalArgumentException("order references unknown command group: " + order.commandGroupId());
             }
+            if (order.status().active() && retiredGroupIds.contains(order.commandGroupId()))
+                throw new IllegalArgumentException("retired command group cannot have an active order");
             if (order.status().active() && !activeGroupIds.add(order.commandGroupId())) {
                 throw new IllegalArgumentException("command group has multiple active orders: " + order.commandGroupId());
             }
@@ -158,6 +162,26 @@ public record FleetCommandState(
         return new FleetCommandState(nextCommandGroupId, nextOrderId, groups, next);
     }
 
+    /**
+     * Retains exact membership/order history while releasing survivors for a new command group.
+     * Existing physical jumps remain owned by the world; this changes command metadata only.
+     * @param groupId group to retire
+     * @param terminalStatus cancellation or failure of its unfinished orders
+     * @return immutable state retaining allocator watermarks and terminal history
+     */
+    public FleetCommandState retireGroup(long groupId, OrderStatus terminalStatus) {
+        if (terminalStatus != OrderStatus.CANCELLED && terminalStatus != OrderStatus.FAILED)
+            throw new IllegalArgumentException("retirement requires cancellation or failure");
+        var group = requireGroup(groupId);
+        if (group.retired()) return this;
+        var retained = new CommandGroupState(group.id(), group.factionId(), group.name(), group.memberFleetIds(),
+                group.homeSystemId(), group.reserve(), group.homeDefense(), group.maxStrategicRiskBps(), true);
+        return new FleetCommandState(nextCommandGroupId, nextOrderId,
+                groups.stream().map(g -> g.id() == groupId ? retained : g).toList(),
+                orders.stream().map(o -> o.commandGroupId() == groupId && o.status().active()
+                        ? o.withStatus(terminalStatus) : o).toList());
+    }
+
     private static List<CommandGroupState> canonicalGroups(List<CommandGroupState> source) {
         Objects.requireNonNull(source, "groups");
         ArrayList<CommandGroupState> copy = new ArrayList<>(source);
@@ -186,6 +210,7 @@ public record FleetCommandState(
      * @param reserve whether the group is reserved from ordinary forward commitments
      * @param homeDefense whether the group is constrained to home-defense commitments
      * @param maxStrategicRiskBps maximum accepted strategic route risk in basis points
+     * @param retired whether this group is retained as history rather than current membership
      */
     public record CommandGroupState(
             long id,
@@ -195,7 +220,23 @@ public record FleetCommandState(
             StarSystemId homeSystemId,
             boolean reserve,
             boolean homeDefense,
-            int maxStrategicRiskBps) {
+            int maxStrategicRiskBps,
+            boolean retired) {
+        /**
+         * Source-compatible current-membership constructor; no historical retirement is inferred.
+         * @param id positive group identity
+         * @param factionId actual faction identity
+         * @param name display name
+         * @param memberFleetIds existing member identities
+         * @param homeSystemId doctrine home
+         * @param reserve reserve commitment
+         * @param homeDefense home-defense commitment
+         * @param maxStrategicRiskBps bounded route doctrine
+         */
+        public CommandGroupState(long id, int factionId, String name, List<FleetId> memberFleetIds,
+                StarSystemId homeSystemId, boolean reserve, boolean homeDefense, int maxStrategicRiskBps) {
+            this(id, factionId, name, memberFleetIds, homeSystemId, reserve, homeDefense, maxStrategicRiskBps, false);
+        }
         /**
          * Validates and canonicalizes a strategic command group.
          *
@@ -207,6 +248,7 @@ public record FleetCommandState(
          * @param reserve reserve commitment flag
          * @param homeDefense home-defense commitment flag
          * @param maxStrategicRiskBps doctrine risk ceiling in basis points
+         * @param retired retained historical membership without command authority
          */
         public CommandGroupState {
             if (id <= 0L) throw new IllegalArgumentException("command group id must be positive");

@@ -195,6 +195,18 @@ public final class Stage20IndustrialEntityMaterializer {
     public static MaterializedIndustrialRegistry restore(
             Stage20GeneratedCampaignPersistentState saved,
             Stage18ManufacturingProductRegistry products) {
+        return restore(saved, products, Map.of());
+    }
+
+    /**
+     * Restores explicit existing-station admissions alongside frozen specializations.
+     * @param saved existing campaign
+     * @param products physical product vocabulary
+     * @param admissions canonical station IDs and legal operators
+     * @return exact live industrial registry
+     */
+    public static MaterializedIndustrialRegistry restore(Stage20GeneratedCampaignPersistentState saved,
+            Stage18ManufacturingProductRegistry products, Map<String, String> admissions) {
         Stage20GeneratedCampaignPersistentState state = requireBase(saved);
         Stage18ManufacturingProductRegistry productRegistry = Objects.requireNonNull(products, "products");
         Stage18IndustrialState industrial = state.industrialState();
@@ -202,7 +214,11 @@ public final class Stage20IndustrialEntityMaterializer {
             throw new IllegalArgumentException(
                     "saved industrial state has not passed initial Stage-20.5C materialization");
         }
-        Map<String, CanonicalStation> canonical = canonicalSpecializedStations(state);
+        Map<String, CanonicalStation> canonical = new TreeMap<>(canonicalSpecializedStations(state));
+        IndustrialStationAdmissionCodec.validate(admissions).forEach((id, owner) -> {
+            if (canonical.putIfAbsent(id, admittedCanonicalStation(state, id, owner)) != null)
+                throw new IllegalArgumentException("Admission conflicts with a canonical specialization");
+        });
         if (!canonical.keySet().equals(industrial.stationStorages().stream()
                 .map(StationStorageSnapshot::stationId)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet()))) {
@@ -244,6 +260,45 @@ public final class Stage20IndustrialEntityMaterializer {
             throw new IllegalStateException("unexpected unsupported industrial assignments");
         }
         return registry(state, stations);
+    }
+
+    /**
+     * Admits a physical endpoint without changing its stock or granting operating resources.
+     * @param saved immutable generation identity
+     * @param endpoint existing physical endpoint and storage owner
+     * @param owner actual legal operator
+     * @param products current physical product vocabulary
+     * @return existing station with disabled authored structures and the same storage object
+     */
+    public static MaterializedIndustrialStation admitExistingStation(Stage20GeneratedCampaignPersistentState saved,
+            Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint endpoint, String owner,
+            Stage18ManufacturingProductRegistry products) {
+        var canonical = admittedCanonicalStation(requireBase(saved), endpoint.stationId(), owner);
+        if (endpoint.generatedIndustrial() || !canonical.systemId().equals(endpoint.systemId())
+                || !canonical.archetypeId().equals(endpoint.stationArchetypeId()) || !canonical.position().equals(endpoint.position()))
+            throw new IllegalArgumentException("Admission differs from existing canonical infrastructure");
+        var node = Stage18StationIndustrialNode.instantiate(canonical.stationId(), GENERATED_LOCATION_TAG,
+                Stage18StationInfrastructureCatalogLoader.loadDefault().findArchetype(canonical.archetypeId()),
+                Stage18ResourceOntologyLoader.loadDefault(), products);
+        if (!node.handlingCapability().equals(endpoint.handlingCapability()))
+            throw new IllegalArgumentException("Admission cannot replace physical handling");
+        var facilities = node.installedFacilities().stream().map(f -> new InstalledFacilityState(
+                f.facilityInstanceId(), f.facilityDefinitionId(), 1d, 0d, 0d, 0d, 0d, GENERATED_LOCATION_TAG, false)).toList();
+        var restored = restoreStation(canonical, endpoint.storage().snapshot(), facilities, List.of(), owner, List.of(), products);
+        return new MaterializedIndustrialStation(restored.systemId(), restored.stationId(), restored.stableFactionId(),
+                restored.stationArchetypeId(), restored.position(), restored.stationNode().withCanonicalStorage(endpoint.storage()), endpoint.storage(),
+                restored.facilities(), restored.facilityCapabilities(), restored.yards(), restored.yardCapabilities());
+    }
+
+    private static CanonicalStation admittedCanonicalStation(Stage20GeneratedCampaignPersistentState saved, String id, String owner) {
+        var rows = saved.materializedWorld().worldRows().stream().filter(r -> r.domain().equals("INFRASTRUCTURE_PLACEMENT")
+                && r.values().size() >= 9 && r.stableId().equals(r.values().get(0) + ':' + id)
+                && (r.values().get(1).equals("MAJOR_HUB_STATION") || r.values().get(1).equals("INDEPENDENT_STATION"))).toList();
+        if (rows.size() != 1) throw new IllegalArgumentException("Admission requires a unique existing infrastructure placement");
+        var values = rows.get(0).values();
+        var canonical = canonicalStation(saved, new StationKey(new StarSystemId(Long.parseLong(values.get(0))), id), values.get(2));
+        return new CanonicalStation(canonical.systemId(), canonical.stationId(), requireText(owner, "operator"),
+                canonical.archetypeId(), canonical.position());
     }
 
     private static Stage20GeneratedCampaignPersistentState requireBase(
@@ -333,15 +388,21 @@ public final class Stage20IndustrialEntityMaterializer {
                 archetype,
                 Stage18ResourceOntologyLoader.loadDefault(),
                 productRegistry);
+        var tanks = constructionOrders.stream().filter(o -> o.facilityDefinitionId()
+                .equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)
+                && o.status() != com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus.CANCELLED).toList();
+        if (tanks.size() > 1 || !tanks.isEmpty() && (!com.spacesim.content.Stage23StationStorageCatalog.acceptsHost(canonical.archetypeId())
+                || tanks.stream().anyMatch(o -> !o.stationId().equals(canonical.stationId()) || !o.locationTag().equals(GENERATED_LOCATION_TAG))))
+            throw new IllegalArgumentException("Storage construction exceeds its authored host/location/slot");
         for (var order : constructionOrders) {
             if (order.status() == com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus.COMPLETE) {
                 node = node.withCompletedConstruction(order,
                         new com.spacesim.economy.Stage18FacilityConstructionRuntime(
-                                com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
-                                Stage18FacilityCatalogLoader.loadDefault(), Stage18ResourceOntologyLoader.loadDefault()));
+                                com.spacesim.content.Stage23StationStorageCatalog.construction(),
+                                com.spacesim.content.Stage23StationStorageCatalog.facilities(), Stage18ResourceOntologyLoader.loadDefault()));
             }
         }
-        if (!storageSnapshot.capacityByStorageClassKg().equals(archetype.storageCapacityByClassKg())) {
+        if (!storageSnapshot.capacityByStorageClassKg().equals(node.expectedStorageCapacity())) {
             throw new IllegalArgumentException("saved storage capacity differs from generated archetype");
         }
         Stage18StationStorage storage = Stage18StationStorage.restore(
@@ -355,6 +416,11 @@ public final class Stage20IndustrialEntityMaterializer {
                 throw new IllegalArgumentException("duplicate installed facility state");
             }
         });
+        for (var reference : node.installedFacilities())
+            if (reference.facilityDefinitionId().equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)
+                    && !stateById.containsKey(reference.facilityInstanceId()))
+                throw new IllegalArgumentException("Completed storage structure requires its exact installed state");
+        node = node.withCanonicalStorage(storage);
         Map<String, String> structuralDefinitions = node.installedFacilities().stream()
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(
                         Stage18StationIndustrialNode.InstalledFacilityReference::facilityInstanceId,
@@ -366,13 +432,13 @@ public final class Stage20IndustrialEntityMaterializer {
             }
         }
         Stage18FacilityRuntime facilityRuntime = new Stage18FacilityRuntime(
-                Stage18FacilityCatalogLoader.loadDefault());
+                com.spacesim.content.Stage23StationStorageCatalog.facilities());
         ArrayList<FacilityCapabilitySnapshot> facilityCapabilities = new ArrayList<>();
         stateById.values().forEach(value -> facilityCapabilities.add(facilityRuntime.project(value)));
         facilityCapabilities.sort(Comparator.comparing(FacilityCapabilitySnapshot::facilityInstanceId));
 
         Stage18ShipyardRuntime shipyardRuntime = new Stage18ShipyardRuntime(
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards(),
                 Stage18ResourceOntologyLoader.loadDefault(),
                 productRegistry);
         ArrayList<YardCapabilitySnapshot> yardCapabilities = new ArrayList<>();
@@ -623,6 +689,16 @@ public final class Stage20IndustrialEntityMaterializer {
             String worldFingerprint,
             List<MaterializedIndustrialStation> stations) {
         /**
+         * @param station validated existing physical station
+         * @return registry retaining generation provenance and adding exactly one station
+         */
+        public MaterializedIndustrialRegistry admitExistingStation(MaterializedIndustrialStation station) {
+            if (stations.stream().anyMatch(s -> s.stationId().equals(station.stationId())))
+                throw new IllegalArgumentException("Station is already industrially registered");
+            var next = new ArrayList<>(stations); next.add(Objects.requireNonNull(station));
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint, next);
+        }
+        /**
          * Validates and freezes one materialized industrial registry.
          *
          * @param version stable Stage-20.5C materialization contract version
@@ -702,7 +778,7 @@ public final class Stage20IndustrialEntityMaterializer {
                 com.spacesim.economy.Stage18FacilityConstructionRuntime construction) {
             var updated = new TreeMap<String, MaterializedIndustrialStation>();
             stations.forEach(station -> updated.put(station.stationId(), station));
-            var projector = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
+            var projector = new Stage18FacilityRuntime(com.spacesim.content.Stage23StationStorageCatalog.facilities());
             for (var order : List.copyOf(completed)) {
                 var reference = construction.completedFacility(order);
                 var station = updated.get(order.stationId());
@@ -724,8 +800,21 @@ public final class Stage20IndustrialEntityMaterializer {
                         station.stableFactionId(), station.stationArchetypeId(), station.position(), node, station.storage(),
                         facilities, capabilities, station.yards(), station.yardCapabilities()));
             }
-            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint,
-                    List.copyOf(updated.values()));
+            // Every proof/host/identity has been checked before mutating any shared store.
+            for (var station : updated.values()) {
+                var expected = station.stationNode().expectedStorageCapacity();
+                for (var entry : station.storage().snapshotCapacityByStorageClassKg().entrySet())
+                    if (expected.getOrDefault(entry.getKey(), 0d) < entry.getValue())
+                        throw new IllegalArgumentException("Construction cannot shrink or legitimize an unproved storage map");
+            }
+            var rebound = new ArrayList<MaterializedIndustrialStation>();
+            for (var station : updated.values()) {
+                station.storage().expandProvedCapacity(station.stationNode().expectedStorageCapacity());
+                rebound.add(new MaterializedIndustrialStation(station.systemId(), station.stationId(), station.stableFactionId(),
+                        station.stationArchetypeId(), station.position(), station.stationNode().withCanonicalStorage(station.storage()),
+                        station.storage(), station.facilities(), station.facilityCapabilities(), station.yards(), station.yardCapabilities()));
+            }
+            return new MaterializedIndustrialRegistry(version, rootSeed, generatorVersion, worldFingerprint, rebound);
         }
 
         /**
@@ -742,9 +831,9 @@ public final class Stage20IndustrialEntityMaterializer {
             var updated = new TreeMap<String, MaterializedIndustrialStation>();
             stations.forEach(station -> updated.put(station.stationId(), station));
             var projector = new Stage18ShipyardRuntime(
-                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards(),
                     Stage18ResourceOntologyLoader.loadDefault(),
-                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
             for (var order : List.copyOf(completed)) {
                 var installed = construction.completedYard(order);
                 var original = updated.get(order.stationId());
@@ -776,13 +865,25 @@ public final class Stage20IndustrialEntityMaterializer {
          * @return immutable registry conserving existing physical allocations
          */
         public MaterializedIndustrialRegistry allocateFacilityResources(String stationId, String targetId) {
+            return allocateFacilityResources(stationId, targetId, false);
+        }
+
+        /**
+         * Reprojects actual resources after a full or half-rated allocation.
+         * @param stationId canonical station
+         * @param targetId installed facility
+         * @param halfRated whether to set precisely half of rated resources
+         * @return registry conserving existing allocations
+         */
+        public MaterializedIndustrialRegistry allocateFacilityResources(String stationId, String targetId, boolean halfRated) {
             var original = station(stationId);
-            var facilities = new com.spacesim.economy.Stage18FacilityResourceAllocator(Stage18FacilityCatalogLoader.loadDefault())
-                    .allocateRated(original.facilities(), targetId);
-            var projector = new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault());
+            var allocator = new com.spacesim.economy.Stage18FacilityResourceAllocator(com.spacesim.content.Stage23StationStorageCatalog.facilities());
+            var facilities = halfRated ? allocator.allocateFraction(original.facilities(), targetId, .5)
+                    : allocator.allocateRated(original.facilities(), targetId);
+            var projector = new Stage18FacilityRuntime(com.spacesim.content.Stage23StationStorageCatalog.facilities());
             var capabilities = facilities.stream().map(projector::project).toList();
-            var shipyards = new Stage18ShipyardRuntime(com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards(),
-                    Stage18ResourceOntologyLoader.loadDefault(), com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+            var shipyards = new Stage18ShipyardRuntime(com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards(),
+                    Stage18ResourceOntologyLoader.loadDefault(), com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
             var yards = original.yards().stream().map(y -> shipyards.projectYard(y, original.stationNode(), capabilities)).toList();
             var updated = new MaterializedIndustrialStation(original.systemId(), original.stationId(), original.stableFactionId(),
                     original.stationArchetypeId(), original.position(), original.stationNode(), original.storage(),
@@ -798,11 +899,23 @@ public final class Stage20IndustrialEntityMaterializer {
          * @return immutable registry with conserved resources and reprojected capabilities
          */
         public MaterializedIndustrialRegistry allocateYardResources(String stationId, String targetId) {
+            return allocateYardResources(stationId, targetId, false);
+        }
+
+        /**
+         * Transfers existing resources using the chosen full or available rated fraction.
+         * @param stationId actual station identity
+         * @param targetId installed yard identity
+         * @param available whether to use the largest supported balanced fraction
+         * @return registry after atomic projection and resource conservation
+         */
+        public MaterializedIndustrialRegistry allocateYardResources(String stationId, String targetId, boolean available) {
             var original = station(stationId);
-            var catalog = com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards();
-            var states = new com.spacesim.economy.Stage18YardResourceAllocator(catalog).allocateRated(original.yards(), targetId);
+            var catalog = com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards();
+            var allocator = new com.spacesim.economy.Stage18YardResourceAllocator(catalog);
+            var states = available ? allocator.allocateAvailable(original.yards(), targetId) : allocator.allocateRated(original.yards(), targetId);
             var projector = new Stage18ShipyardRuntime(catalog, Stage18ResourceOntologyLoader.loadDefault(),
-                    com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
             var capabilities = states.stream().map(y -> projector.projectYard(y, original.stationNode(), original.facilityCapabilities())).toList();
             if (!capabilities.stream().filter(y -> y.yardInstanceId().equals(targetId)).findFirst().orElseThrow().active())
                 throw new IllegalStateException("Allocated yard lacks its actual support facilities or operating capability");

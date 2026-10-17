@@ -88,6 +88,7 @@ public final class FleetOrderSubmissionService {
         if (currentTick < 0L) throw new IllegalArgumentException("currentTick must be non-negative");
 
         CommandGroupState group = state.requireGroup(commandGroupId);
+        if (group.retired()) throw new IllegalStateException("retired group has no command authority");
         if (state.activeOrderFor(commandGroupId).isPresent()) {
             throw new IllegalStateException("command group already has an active order: " + commandGroupId);
         }
@@ -157,6 +158,16 @@ public final class FleetOrderSubmissionService {
                 currentTick, stagingDeadline,
                 route.hopCount() == 0 && type.serviceOrder() ? OrderStatus.SERVICE_PENDING : OrderStatus.STAGING);
         return new SubmissionResult(state.addOrder(order), order);
+    }
+
+    /**
+     * Rechecks the shared GUARD combat floors for stationary local duty without requiring travel fuel.
+     * Ownership, location and command authority remain the caller's responsibility.
+     * @param readiness actual derived physical and observed crew readiness
+     * @param fleetId existing participant identity
+     */
+    public static void validateLocalGuardReadiness(FleetReadinessState readiness, FleetId fleetId) {
+        validateReadiness(OrderType.GUARD, Objects.requireNonNull(readiness), Objects.requireNonNull(fleetId), false, true);
     }
 
     private static void validateReadiness(

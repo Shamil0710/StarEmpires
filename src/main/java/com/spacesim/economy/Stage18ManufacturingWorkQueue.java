@@ -10,8 +10,15 @@ import java.util.function.Function;
 
 /** Physical reserved-material assembly queue using the native Stage18 process checkpoint. */
 public final class Stage18ManufacturingWorkQueue {
+    // Same kilogram settlement precision as finite station storage and construction delivery.
+    private static final double MASS_EPSILON_KG = 1e-9;
     /** Explicit identity of executable personal manufacturing orders; older process rows are untouched. */
     public static final String PREFIX = "player-manufacturing:v1:";
+    /** Executable refining orders; historical unrelated process rows remain untouched. */
+    public static final String REFINING_PREFIX = "player-refining:v1:";
+    /** Executable component batches; requestedAmount is finished component mass. */
+    public static final String COMPONENT_PREFIX = "player-components:v1:";
+    private final com.spacesim.content.Stage18RefiningCatalog refining = com.spacesim.content.Stage18RefiningCatalogLoader.loadDefault();
     private final Stage18ManufacturingCatalog catalog;
     private final Stage18ResourceOntologyCatalog ontology;
     private final Stage18ManufacturingProductRegistry products;
@@ -63,7 +70,84 @@ public final class Stage18ManufacturingWorkQueue {
      * @param order native row
      * @return whether this queue executes it
      */
-    public static boolean managed(ProcessOrderSnapshot order) { return order.orderId().startsWith(PREFIX); }
+    public static boolean managed(ProcessOrderSnapshot order) {
+        return order.orderId().startsWith(PREFIX) || order.orderId().startsWith(REFINING_PREFIX)
+                || order.orderId().startsWith(COMPONENT_PREFIX);
+    }
+
+    /**
+     * Reserves the exact authored material bill for a bulk component batch.
+     * @param id unique component order
+     * @param recipeId existing component recipe
+     * @param kilograms requested finished mass
+     * @param storage real authorized station store
+     * @param capability installed compatible line
+     * @param tick current completed world tick
+     */
+    public void startComponents(String id, String recipeId, double kilograms, Stage18StationStorage storage,
+            Stage18ManufacturingRuntime.ManufacturingCapability capability, long tick) {
+        var recipe = catalog.findComponentRecipe(recipeId);
+        if (recipe == null || id == null || !id.startsWith(COMPONENT_PREFIX)
+                || orders.containsKey(id) || tick < lastProcessedTick)
+            throw new IllegalArgumentException("Invalid component batch");
+        var inputs = componentInputs(recipeId, kilograms);
+        if (tick != lastProcessedTick && orders.values().stream().anyMatch(Stage18ManufacturingWorkQueue::managed))
+            throw new IllegalStateException("Existing work must process the current tick first");
+        if (!capability.capabilityTags().containsAll(recipe.requiredCapabilityTags())
+                || capability.availablePowerW() <= 0 || capability.workRate() <= 0
+                || recipe.maintenanceWorkSecondsPerOutputKg() > 0 && capability.maintenanceWorkRate() <= 0)
+            throw new IllegalStateException("No operational component line");
+        var next = new TreeMap<>(storage.snapshotCommodityMassByIdKg());
+        inputs.forEach((commodity, mass) -> {
+            double available = next.getOrDefault(commodity, 0d);
+            if (mass - available > MASS_EPSILON_KG) throw new IllegalStateException("Insufficient physical component material");
+            next.put(commodity, Math.max(0d, available - mass));
+        });
+        var order = new ProcessOrderSnapshot(id, ProcessKind.COMPONENT_MANUFACTURING, recipeId, storage.stationId(),
+                "", kilograms, 0, 0, inputs, Map.of());
+        if (!commodityOutputFits(order, storage, recipe.outputCommodityId(), kilograms))
+            throw new IllegalStateException("No component output storage");
+        storage.replaceContentsWithProcessReservation(next, storage.snapshotProductCountById(),
+                reservationMass(storage.stationId(), null, inputs));
+        orders.put(id, order); lastProcessedTick = tick;
+    }
+
+    /**
+     * Reserves a gross feedstock batch for an authored refining recipe.
+     * @param id unique player refining order
+     * @param recipeId existing refining recipe
+     * @param kilograms gross input mass
+     * @param storage actual owner-authorized store
+     * @param capability installed process line
+     * @param tick current completed world tick
+     */
+    public void startRefining(String id, String recipeId, double kilograms, Stage18StationStorage storage,
+            Stage18ManufacturingRuntime.ManufacturingCapability capability, long tick) {
+        var recipe = refining.findRecipe(recipeId);
+        if (recipe == null || !Double.isFinite(kilograms) || kilograms <= 0
+                || id == null || !id.startsWith(REFINING_PREFIX) || orders.containsKey(id) || tick < lastProcessedTick)
+            throw new IllegalArgumentException("Invalid refining batch");
+        if (tick != lastProcessedTick && orders.values().stream().anyMatch(Stage18ManufacturingWorkQueue::managed))
+            throw new IllegalStateException("Existing work must process the current tick first");
+        if (!capability.capabilityTags().containsAll(recipe.requiredCapabilityTags())
+                || capability.availablePowerW() <= 0 || capability.workRate() <= 0
+                || recipe.maintenanceWorkSecondsPerInputKg() > 0 && capability.maintenanceWorkRate() <= 0)
+            throw new IllegalStateException("No operational refining line");
+        var inputs = refiningInputs(recipeId, kilograms);
+        var next = new TreeMap<>(storage.snapshotCommodityMassByIdKg());
+        inputs.forEach((commodity, mass) -> {
+            double available = next.getOrDefault(commodity, 0d);
+            if (mass - available > MASS_EPSILON_KG) throw new IllegalStateException("Insufficient physical refining feedstock");
+            next.put(commodity, Math.max(0d, available - mass));
+        });
+        var order = new ProcessOrderSnapshot(id, ProcessKind.REFINING, recipeId, storage.stationId(),
+                "", kilograms, 0, 0, inputs, Map.of());
+        if (!refiningOutputFits(order, storage)) throw new IllegalStateException("No refining output storage");
+        storage.replaceContentsWithProcessReservation(next, storage.snapshotProductCountById(),
+                reservationMass(storage.stationId(), null, inputs));
+        orders.put(id, order);
+        lastProcessedTick = tick;
+    }
 
     /**
      * Reserves actual station materials, without advancing time or granting finished products.
@@ -88,8 +172,8 @@ public final class Stage18ManufacturingWorkQueue {
         var next = new TreeMap<>(storage.snapshotCommodityMassByIdKg());
         for (var input : inputs.entrySet()) {
             double available = next.getOrDefault(input.getKey(), 0d);
-            if (available < input.getValue()) throw new IllegalStateException("Insufficient physical manufacturing material");
-            next.put(input.getKey(), available - input.getValue());
+            if (input.getValue() - available > MASS_EPSILON_KG) throw new IllegalStateException("Insufficient physical manufacturing material");
+            next.put(input.getKey(), Math.max(0d, available - input.getValue()));
         }
         if (!storage.canAddProduct(productId, units)) throw new IllegalStateException("No finished-product storage");
         var order = new ProcessOrderSnapshot(id, ProcessKind.PRODUCT_MANUFACTURING, productId, storage.stationId(),
@@ -119,6 +203,42 @@ public final class Stage18ManufacturingWorkQueue {
             if (store != null) store.replaceContentsWithProcessReservation(store.snapshotCommodityMassByIdKg(),
                     store.snapshotProductCountById(), reservationMass(order.stationId(), null, Map.of()));
             var budget = budgets.apply(order);
+            if (order.kind() == ProcessKind.COMPONENT_MANUFACTURING) {
+                var recipe = catalog.findComponentRecipe(order.operationId());
+                double mass = order.requestedAmount();
+                if (store == null || budget == null || !commodityOutputFits(order, store, recipe.outputCommodityId(), mass)) continue;
+                double fraction = order.completedFraction() + budget.allocateProcessWork(recipe.requiredCapabilityTags(),
+                        mass * recipe.energyJPerOutputKg(), mass * recipe.workSecondsPerOutputKg(),
+                        mass * recipe.maintenanceWorkSecondsPerOutputKg(), 1 - order.completedFraction());
+                if (fraction >= 1) {
+                    var next = new TreeMap<>(store.snapshotCommodityMassByIdKg());
+                    next.merge(recipe.outputCommodityId(), mass, Double::sum);
+                    store.replaceContentsWithProcessReservation(next, store.snapshotProductCountById(),
+                            reservationMass(order.stationId(), order.orderId(), Map.of()));
+                    orders.remove(order.orderId());
+                } else orders.put(order.orderId(), new ProcessOrderSnapshot(order.orderId(), order.kind(),
+                        order.operationId(), order.stationId(), "", mass, 0, fraction,
+                        order.reservedCommodityMassByIdKg(), Map.of()));
+                continue;
+            }
+            if (order.kind() == ProcessKind.REFINING) {
+                if (store == null || budget == null || !refiningOutputFits(order, store)) continue;
+                var recipe = refining.findRecipe(order.operationId());
+                double mass = order.requestedAmount();
+                double fraction = order.completedFraction() + budget.allocateProcessWork(recipe.requiredCapabilityTags(),
+                        mass * recipe.energyJPerInputKg(), mass * recipe.workSecondsPerInputKg(),
+                        mass * recipe.maintenanceWorkSecondsPerInputKg(), 1 - order.completedFraction());
+                if (fraction >= 1) {
+                    var next = new TreeMap<>(store.snapshotCommodityMassByIdKg());
+                    next.merge(recipe.outputCommodityId(), mass * recipe.outputMassFraction(), Double::sum);
+                    store.replaceContentsWithProcessReservation(next, store.snapshotProductCountById(),
+                            reservationMass(order.stationId(), order.orderId(), Map.of()));
+                    orders.remove(order.orderId());
+                } else orders.put(order.orderId(), new ProcessOrderSnapshot(order.orderId(), order.kind(),
+                        order.operationId(), order.stationId(), "", mass, 0, fraction,
+                        order.reservedCommodityMassByIdKg(), Map.of()));
+                continue;
+            }
             if (store == null || budget == null || (long) store.productCount(order.operationId()) + order.requestedUnits() > Integer.MAX_VALUE
                     || !store.canAddProduct(order.operationId(), order.requestedUnits())) continue;
             double fraction = order.completedFraction() + manufacturing.allocateProductWork(order.operationId(),
@@ -175,10 +295,65 @@ public final class Stage18ManufacturingWorkQueue {
     }
 
     private void validate(ProcessOrderSnapshot order) {
+        if (order.orderId().startsWith(COMPONENT_PREFIX)) {
+            if (order.kind() != ProcessKind.COMPONENT_MANUFACTURING || !order.sourceId().isEmpty()
+                    || order.requestedUnits() != 0 || order.completedFraction() >= 1
+                    || !order.reservedProductCountById().isEmpty()
+                    || !componentInputs(order.operationId(), order.requestedAmount()).equals(order.reservedCommodityMassByIdKg()))
+                throw new IllegalArgumentException("Invalid reserved component custody");
+            return;
+        }
+        if (order.orderId().startsWith(REFINING_PREFIX)) {
+            if (order.kind() != ProcessKind.REFINING || !order.sourceId().isEmpty()
+                    || order.requestedUnits() != 0 || order.completedFraction() >= 1
+                    || !order.reservedProductCountById().isEmpty()
+                    || !refiningInputs(order.operationId(), order.requestedAmount()).equals(order.reservedCommodityMassByIdKg()))
+                throw new IllegalArgumentException("Invalid reserved refining custody");
+            return;
+        }
         if (order.kind() != ProcessKind.PRODUCT_MANUFACTURING || !order.sourceId().isEmpty()
                 || order.requestedAmount() != 0 || order.completedFraction() >= 1
                 || !order.reservedProductCountById().isEmpty()
                 || !inputs(order.operationId(), order.requestedUnits()).equals(order.reservedCommodityMassByIdKg()))
             throw new IllegalArgumentException("Invalid reserved manufacturing custody");
+    }
+
+    private Map<String, Double> refiningInputs(String recipeId, double kilograms) {
+        var recipe = refining.findRecipe(recipeId);
+        if (recipe == null || !Double.isFinite(kilograms) || kilograms <= 0)
+            throw new IllegalArgumentException("Invalid refining recipe or amount");
+        if (!Double.isFinite(kilograms * recipe.energyJPerInputKg())
+                || !Double.isFinite(kilograms * recipe.workSecondsPerInputKg())
+                || !Double.isFinite(kilograms * recipe.maintenanceWorkSecondsPerInputKg()))
+            throw new IllegalArgumentException("Refining batch demand overflow");
+        var inputs = new TreeMap<String, Double>();
+        for (var input : recipe.inputs()) inputs.put(input.commodityId(), kilograms * input.fractionOfInputMass());
+        return Collections.unmodifiableMap(inputs);
+    }
+
+    private boolean refiningOutputFits(ProcessOrderSnapshot order, Stage18StationStorage storage) {
+        var recipe = refining.findRecipe(order.operationId());
+        return commodityOutputFits(order, storage, recipe.outputCommodityId(), order.requestedAmount() * recipe.outputMassFraction());
+    }
+
+    private boolean commodityOutputFits(ProcessOrderSnapshot order, Stage18StationStorage storage, String output, double mass) {
+        String storageClass = ontology.findCommodity(output).storageClassId();
+        double released = order.reservedCommodityMassByIdKg().entrySet().stream()
+                .filter(e -> ontology.findCommodity(e.getKey()).storageClassId().equals(storageClass))
+                .mapToDouble(Map.Entry::getValue).sum();
+        // Before reservation the input already occupies the same physical capacity.
+        return mass <= storage.remainingCapacityKg(storageClass) + released + MASS_EPSILON_KG;
+    }
+
+    private Map<String, Double> componentInputs(String recipeId, double kilograms) {
+        var recipe = catalog.findComponentRecipe(recipeId);
+        if (recipe == null || !Double.isFinite(kilograms) || kilograms <= 0
+                || !Double.isFinite(kilograms * recipe.energyJPerOutputKg())
+                || !Double.isFinite(kilograms * recipe.workSecondsPerOutputKg())
+                || !Double.isFinite(kilograms * recipe.maintenanceWorkSecondsPerOutputKg()))
+            throw new IllegalArgumentException("Invalid component recipe or batch demand");
+        var inputs = new TreeMap<String, Double>();
+        for (var input : recipe.inputs()) inputs.put(input.commodityId(), kilograms * input.fractionOfOutputMass());
+        return Collections.unmodifiableMap(inputs);
     }
 }

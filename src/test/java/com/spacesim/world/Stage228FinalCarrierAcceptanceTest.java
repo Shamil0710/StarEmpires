@@ -189,8 +189,7 @@ final class Stage228FinalCarrierAcceptanceTest {
                 "recovery intent cannot teleport the craft into its carrier");
 
         advanceOneCampaignStep(authority, CARRIER_BAY);
-        authority.commitMissionState(commands.completePhysicalRecovery(
-                authority.missions(), returning.mission().id()));
+        // The shared campaign tick now reconciles the completed physical deck cycle itself.
         assertEquals(OccupancyState.SERVICING,
                 authority.hangars().find(craftId).orElseThrow().state());
         assertEquals(MissionStatus.COMPLETE,

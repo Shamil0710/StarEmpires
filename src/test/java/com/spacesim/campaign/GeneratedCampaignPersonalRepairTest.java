@@ -185,6 +185,9 @@ class GeneratedCampaignPersonalRepairTest {
         return fixture(mount, integrity, c, false);
     }
     static Stage228CampaignAuthority fixture(String mount, double integrity, Stage228CampaignAuthority c, boolean civilian) {
+        return fixture(mount, integrity, c, civilian, null);
+    }
+    static Stage228CampaignAuthority fixture(String mount, double integrity, Stage228CampaignAuthority c, boolean civilian, String requiredYard) {
         var r = c.coordinator().runtime(); var world = r.world();
         c.coordinator().setPaused(true);
         var initialFleet = world.findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
@@ -201,7 +204,7 @@ class GeneratedCampaignPersonalRepairTest {
         ship.setInstanceState(new ShipInstanceRuntimeState(new ShipDamageRuntime.Snapshot(Map.of(), new DamageState(Map.of(mount, integrity))),
                 state.shieldStatesByMount(), new ShipyardEngineeringService.MaintenanceState(Map.of(mount, 920d)), state.weaponLoadout(), state.weaponMountRuntime()));
         var catalog = Stage22CivilianMiningProductionPath.loadRuntimeShipyards();
-        var design = catalog.getYards().stream().filter(d -> ShipyardRepairWorkQueue.plan(fleet.localEntityId(), ship, design(d)).feasibility().feasible()).findFirst().orElseThrow();
+        var design = catalog.getYards().stream().filter(d -> requiredYard == null || requiredYard.equals(d.id())).filter(d -> ShipyardRepairWorkQueue.plan(fleet.localEntityId(), ship, design(d)).feasibility().feasible()).findFirst().orElseThrow();
         var ref = c.pilotMarketReference(station.stationId()).orElseThrow();
         var materialization = r.arrival().materialization(fleet.systemId());
         if (!station.systemId().equals(initialFleet.systemId()))

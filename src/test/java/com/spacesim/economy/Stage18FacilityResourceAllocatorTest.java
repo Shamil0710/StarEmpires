@@ -45,4 +45,31 @@ class Stage18FacilityResourceAllocatorTest {
         assertThrows(IllegalArgumentException.class, () -> allocator.allocateRated(List.of(broken), "target"));
         assertEquals(List.of(target), before);
     }
+
+    @Test void halfRatedOperationCanStartBelowFullResourcesAndReturnsSurplusExactly() {
+        var d = Stage18FacilityCatalogLoader.loadDefault().findFacility("facility.fabrication.heavy");
+        var donor = new InstalledFacilityState("donor", d.id(), .7, .5 * d.ratedProcessPowerW(),
+                .5 * d.ratedProcessPowerW() * d.heatRejectionWPerProcessW(), .5 * d.requiredLaborUnitsAtFullRate(),
+                .5 * d.maintenanceWorkRate(), "location.orbital_station", true);
+        var target = new InstalledFacilityState("target", d.id(), 1, 0, 0, 0, 0, "location.orbital_station", false);
+        var before = List.of(target, donor);
+        assertThrows(IllegalStateException.class, () -> allocator.allocateRated(before, "target"));
+        var half = allocator.allocateFraction(before, "target", .5);
+        assertEquals(.5, new Stage18FacilityRuntime(Stage18FacilityCatalogLoader.loadDefault()).project(half.get(1)).effectiveThroughputFraction(), 1e-12);
+        assertEquals(.7, half.get(0).conditionFraction());
+        assertEquals(half, allocator.allocateFraction(half, "target", .5));
+        var quarter = allocator.allocateFraction(half, "target", .25);
+        assertEquals(.25 * d.ratedProcessPowerW(), quarter.get(0).allocatedProcessPowerW());
+        assertEquals(.25 * d.ratedProcessPowerW(), quarter.get(1).allocatedProcessPowerW());
+        assertEquals(half, allocator.allocateFraction(quarter, "target", .5));
+        assertThrows(IllegalArgumentException.class, () -> allocator.allocateFraction(before, "target", Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> allocator.allocateFraction(before, "target", 0));
+        assertThrows(IllegalStateException.class, () -> allocator.allocateFraction(before, "target", .75));
+        for (var result : List.of(half, quarter)) {
+            assertEquals(before.stream().mapToDouble(InstalledFacilityState::allocatedProcessPowerW).sum(), result.stream().mapToDouble(InstalledFacilityState::allocatedProcessPowerW).sum(), 1e-8);
+            assertEquals(before.stream().mapToDouble(InstalledFacilityState::availableHeatRejectionW).sum(), result.stream().mapToDouble(InstalledFacilityState::availableHeatRejectionW).sum(), 1e-8);
+            assertEquals(before.stream().mapToDouble(InstalledFacilityState::availableLaborUnits).sum(), result.stream().mapToDouble(InstalledFacilityState::availableLaborUnits).sum(), 1e-8);
+            assertEquals(before.stream().mapToDouble(InstalledFacilityState::availableMaintenanceWorkRate).sum(), result.stream().mapToDouble(InstalledFacilityState::availableMaintenanceWorkRate).sum(), 1e-8);
+        }
+    }
 }

@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Read-only physical interface supply from existing personally purchased cargo. */
+/** Read-only interface supply from personal cargo or a paid physical station service. */
 public final class GeneratedCampaignSupplyUi {
     private GeneratedCampaignSupplyUi() { }
 
@@ -46,20 +46,20 @@ public final class GeneratedCampaignSupplyUi {
                         .findFirst().orElse(null);
                 double amount = load == null ? 0d : load.amount();
                 String name = binding.interfaceKind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS
-                        ? "Реактивная масса из трюма" : "Расходники из трюма";
+                        ? "Реактивная масса" : "Расходники";
                 result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
                         "pilot-supply|" + binding.id() + "|" + installed.mountId()), name, "Снабжение личного корабля",
                         p.docked() ? "Можно проверить загрузку" : "Требуется физическая стыковка",
-                        List.of(InfoSection.of("Физическое снабжение", "Источник", "Ранее купленный груз в собственном трюме",
+                        List.of(InfoSection.of("Физическое снабжение", "Источник", "Собственный груз или оплаченный склад текущей станции",
                                 "Товар", binding.commodityId().equals("commodity.material.purified_water") ? "Очищенная вода" : binding.commodityId(),
                                 "В трюме", String.format(Locale.ROOT, "%.2f кг", freight.cargoStorage().commodityMassByIdKg().getOrDefault(binding.commodityId(), 0d)),
                                 "Преобразование", String.format(Locale.ROOT, "1 кг → %.2f единиц интерфейса", binding.amountPerKg()),
                                 "Загружено", String.format(Locale.ROOT, "%.2f единиц интерфейса", amount),
                                 "Свободная ёмкость", String.format(Locale.ROOT, "%.2f кг товара", Math.max(0d, port.capacity() - amount) / binding.amountPerKg()),
-                                "Оплата", "Покупка груза оплачена ранее; повторной покупки нет",
-                                "Условия", "Текущая стыковка: не далее 1 км, скорость ≤ 1 м/с; установленный совместимый модуль и свободный бак",
-                                "Результат", "Груз и его партии уменьшаются, расходник в установленном модуле увеличивается; деньги и тепло сохраняются")),
-                        "Обычный Stage18ShipConsumableService; авторское соответствие товара интерфейсу и реальные партии личного груза",
+                                "Оплата", "Из трюма — без повторной платы; со станции — по текущей рыночной цене",
+                                "Условия", "Текущая стыковка: не далее 1 км, скорость до 1 м/с; установленный совместимый модуль и свободный бак",
+                                "Результат", "Источник уменьшается, установленный модуль заполняется; покупка со станции оплачивается один раз")),
+                        "Фактический стыковочный контакт, совместимый установленный модуль и конечный запас источника. Для покупки прямо в бак жидкостный трюм не требуется.",
                         null, 0, runtime.world().getAuthoritativeWorldTick()));
             }
         }

@@ -72,7 +72,7 @@ public final class Stage23YardConstructionCatalog {
         var rows = root.get("yards");
         if (rows == null || !rows.isArray() || rows.size < 1 || rows.size > 64)
             throw new IllegalArgumentException("Yard construction bindings outside bounds");
-        var yards = Stage22CivilianMiningProductionPath.loadRuntimeShipyards();
+        var yards = com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards();
         var construction = Stage18FacilityConstructionCatalogLoader.loadDefault();
         var values = new TreeMap<String, Specification>();
         for (var row = rows.child; row != null; row = row.next) {

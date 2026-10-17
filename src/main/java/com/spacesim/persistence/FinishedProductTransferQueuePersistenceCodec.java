@@ -67,7 +67,7 @@ public final class FinishedProductTransferQueuePersistenceCodec {
             }
             if (input.read() != -1) throw new IllegalArgumentException("Trailing product handling checkpoint");
             var state = new State(tick, orders);
-            return new FinishedProductTransferWorkQueue(com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), state).capture();
+            return new FinishedProductTransferWorkQueue(com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), state).capture();
         } catch (IOException failure) { throw new IllegalArgumentException("Truncated product handling", failure); }
     }
 }

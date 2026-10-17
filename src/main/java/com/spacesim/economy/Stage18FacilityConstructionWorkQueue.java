@@ -42,6 +42,10 @@ public final class Stage18FacilityConstructionWorkQueue {
                 throw new IllegalArgumentException("Duplicate future facility identity");
             if (managed(order)) validate(order);
         }
+        var occupiedTanks = new java.util.HashSet<String>();
+        for (var order : orders.values()) if (order.facilityDefinitionId().equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)
+                && order.status() != OrderStatus.CANCELLED && !occupiedTanks.add(order.stationId()))
+            throw new IllegalArgumentException("Duplicate retained storage construction slot");
     }
 
     /** @return deterministic immutable snapshots, retaining completed installation evidence */
@@ -82,6 +86,10 @@ public final class Stage18FacilityConstructionWorkQueue {
             throw new IllegalArgumentException("Duplicate or foreign construction identity");
         if (tick < lastProcessedTick || (activeOrders() && tick != lastProcessedTick))
             throw new IllegalStateException("Process the current construction tick before starting another order");
+        if (definition.equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)
+                && orders.values().stream().anyMatch(o -> o.stationId().equals(storage.stationId())
+                        && o.facilityDefinitionId().equals(definition) && o.status() != OrderStatus.CANCELLED))
+            throw new IllegalStateException("The station's single storage installation slot is already reserved");
         var initial = construction.createOrder(id, facilityId, definition, storage.stationId(), location);
         // Scratch custody executes the shared delivery validator without touching the live station.
         var scratch = new Stage18StationStorage(ontology,

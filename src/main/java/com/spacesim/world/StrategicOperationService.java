@@ -26,6 +26,28 @@ import java.util.Objects;
  */
 public final class StrategicOperationService {
     /**
+     * Closes orchestration for a retired group using the same reference closure as supply failure.
+     * It creates no combat result, damage, movement or replacement forces in the Stage-19 owner.
+     * @param state retained operation history
+     * @param commands command state containing the actually retired group
+     * @param groupId retired group identity
+     * @param currentTick actual retirement tick
+     * @return immutable terminal operation metadata with all original identities and participants
+     */
+    public StrategicOperationState failRetiredGroup(StrategicOperationState state,
+            FleetCommandState commands, long groupId, long currentTick) {
+        Objects.requireNonNull(state, "state"); Objects.requireNonNull(commands, "commands");
+        requireTick(currentTick);
+        if (!commands.requireGroup(groupId).retired()) throw new IllegalStateException("Group remains operational");
+        var result = state;
+        for (var operation : state.operations()) {
+            if (operation.commandGroupId() == groupId && operation.status().active())
+                result = result.replace(operation.withLifecycle(OperationStatus.FAILED, currentTick,
+                        operation.unsupportedSinceTick(), operation.contact(), resolvedEncounter(operation.encounter(), currentTick)));
+        }
+        return result;
+    }
+    /**
      * Starts a Stage-21E operation from an already accepted active Stage-21D order.
      *
      * @param state current persistent operation state
@@ -87,6 +109,30 @@ public final class StrategicOperationService {
                 group.memberFleetIds(), stagingSystem, order.targetSystemId(),
                 "system:" + order.targetSystemId().value(), rulesOfEngagement, supplyPolicy,
                 withdrawalPolicy, initialStatus, currentTick, currentTick, -1L, null, null));
+    }
+
+    /**
+     * Ends explicitly cancelled local self-defense duty, retaining its operation history and no combat result.
+     * @param state current operation registry
+     * @param commands source GUARD command registry
+     * @param operationId current local defense identity
+     * @param currentTick actual completion tick
+     * @return terminal metadata without physical effects
+     */
+    public StrategicOperationState finishLocalDefense(StrategicOperationState state, FleetCommandState commands,
+            long operationId, long currentTick) {
+        var operation = Objects.requireNonNull(state).requireOperation(operationId);
+        var order = Objects.requireNonNull(commands).requireOrder(operation.sourceOrderId());
+        requireTick(currentTick);
+        if (operation.type() != OperationType.DEFENSE || operation.status() != OperationStatus.ACTIVE
+                || operation.rulesOfEngagement() != RulesOfEngagement.SELF_DEFENSE_ONLY
+                || !operation.stagingSystemId().equals(operation.objectiveSystemId())
+                || operation.contact() != null || operation.encounter() != null
+                || order.type() != OrderType.GUARD || order.source() != FleetCommandState.OrderSource.PLAYER
+                || !order.status().active() || order.commandGroupId() != operation.commandGroupId())
+            throw new IllegalStateException("Operation is not an active local personal guard");
+        return state.replace(operation.withLifecycle(OperationStatus.COMPLETED, currentTick,
+                operation.unsupportedSinceTick(), null, null));
     }
 
     /**

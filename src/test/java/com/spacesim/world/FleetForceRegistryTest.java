@@ -17,6 +17,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FleetForceRegistryTest {
 
     @Test
+    void liveProjectionMatchesPersistentProjectionWithoutChangingWorld() {
+        var world = DemoGalaxyFactory.create(0x21D5EEDL);
+        var before = world.snapshot();
+        var evaluator = new FleetReadinessEvaluator(ShipEngineeringCatalogLoader.loadDefault());
+        var observed = Map.of(before.fleets().get(0).id(), new FleetOperationalAvailability(1, 2500));
+        assertEquals(FleetForceRegistry.reconstruct(before, evaluator, observed).entries(),
+                FleetForceRegistry.reconstruct(world, evaluator, observed).entries());
+        assertEquals(before, world.snapshot());
+        var fleet = before.fleets().get(0);
+        assertEquals(List.of(FleetForceRegistry.reconstruct(before, evaluator, observed).find(fleet.id()).orElseThrow()),
+                FleetForceRegistry.reconstructSelected(world, evaluator, observed, List.of(fleet.id())).entries());
+        assertThrows(IllegalStateException.class, () -> FleetForceRegistry.reconstructSelected(world, evaluator,
+                observed, List.of(new FleetId(Long.MAX_VALUE))));
+        var destination = world.getTopology().neighbors(fleet.systemId()).get(0);
+        world.requestFleetJump(fleet.id(), destination, 0f, 0f);
+        world.advanceFrame(1f);
+        var after = world.snapshot();
+        assertEquals(FleetForceRegistry.reconstruct(after, evaluator, observed).entries(),
+                FleetForceRegistry.reconstruct(world, evaluator, observed).entries());
+        assertEquals(after, world.snapshot());
+    }
+
+    @Test
     void reconstructionUsesExactlyTheOrdinaryWorldFleetIdentitiesAndPlacements() {
         WorldState world = DemoGalaxyFactory.create(0x21D5EEDL).snapshot();
         FleetReadinessEvaluator evaluator = new FleetReadinessEvaluator(

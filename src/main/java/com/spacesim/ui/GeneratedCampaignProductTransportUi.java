@@ -22,7 +22,7 @@ public final class GeneratedCampaignProductTransportUi {
     public static List<ProductionUiSnapshot.Row> rows(Stage228CampaignAuthority campaign) {
         if (campaign.playerState().isEmpty()) return List.of();
         var result = new ArrayList<ProductionUiSnapshot.Row>();
-        var products = Stage22CivilianMiningProductionPath.loadProducts();
+        var products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
         var engineering = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
         var runtime = campaign.coordinator().runtime();
         var fleet = campaign.playerState().orElseThrow().activeFleetId();

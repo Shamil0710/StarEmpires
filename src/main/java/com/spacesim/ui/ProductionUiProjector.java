@@ -21,11 +21,30 @@ import java.util.Objects;
 public final class ProductionUiProjector {
     private static final com.spacesim.ship.ProductionEngineeringRuntimeResolver PERSONAL_ENGINEERING =
             new com.spacesim.ship.ProductionEngineeringRuntimeResolver();
+    private static final com.spacesim.content.Stage18ResourceOntologyCatalog PERSONAL_RESOURCE_ONTOLOGY =
+            com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
     private final String viewerFactionId;
     private final boolean personalClient;
     private final Stage21IFinalLivingWorldUiProjector living = new Stage21IFinalLivingWorldUiProjector();
     private Stage228CampaignAuthority boundPersonalCampaign;
     private GeneratedWorldUiModel personalWorld;
+    private int componentKilograms = 100;
+    private int ammunitionUnits = 1;
+
+    /** @param units positive whole-round manufacturing batch */
+    public void setAmmunitionUnits(int units) {
+        if (units <= 0) throw new IllegalArgumentException("Positive ammunition batch required");
+        ammunitionUnits = units;
+    }
+
+    /**
+     * Sets the selected component output mass for material deficit projection.
+     * @param kilograms positive output mass
+     */
+    public void setComponentKilograms(int kilograms) {
+        if (kilograms <= 0) throw new IllegalArgumentException("Positive component mass required");
+        componentKilograms = kilograms;
+    }
 
     /**
      * Binds a known actor as a knowledge viewer without transferring control.
@@ -76,7 +95,7 @@ public final class ProductionUiProjector {
             if (boundPersonalCampaign != campaign) {
                 boundPersonalCampaign = campaign;
                 personalWorld = new GeneratedWorldUiModel(campaign.coordinator().rootSeed(), campaign.coordinator().runtime(),
-                        campaign.coordinator().content(), GeneratedWorldUiModel.CarrierUiSource.none(),
+                        campaign.coordinator().content(), GeneratedCampaignCarrierUi.source(campaign),
                         () -> campaign.playerState().orElse(null));
             }
         }
@@ -100,6 +119,8 @@ public final class ProductionUiProjector {
                             "Источник средств", "Ограниченные личные сбережения при подтверждении новой игры",
                             "Рынки новой игры", "Существующие склады; каждому физическому рынку выдаётся 10 000 кредитов конечного оборотного капитала",
                             "Число рынков", Integer.toString(campaign.coordinator().runtime().infrastructure().endpoints().size()),
+                            "Гражданские станции NPC", campaign.initialCivilianStationAssociationCount()
+                                    + " существующих станций получают начального оператора; это чужие активы, требующие отдельной покупки",
                             "Оборотный капитал рынков", credits(Math.multiplyExact(Stage228CampaignAuthority.PILOT_MARKET_INITIAL_LIQUIDITY, campaign.coordinator().runtime().infrastructure().endpoints().size())))),
                     "Подтверждённая новая игра: раскрытые личные сбережения, существующий резерв и оплата в казну продавца",
                     null, 0, world.worldTick()));
@@ -137,7 +158,7 @@ public final class ProductionUiProjector {
             if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return;
             var runtime = campaign.coordinator().runtime();
             var physical = runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId()).orElseThrow();
-            var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+            var ontology = PERSONAL_RESOURCE_ONTOLOGY;
             var hold = runtime.freight().findFreighter(fleet.fleetId()).orElse(null);
             var stationKnowledge = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
             for (var endpoint : runtime.infrastructure().endpoints()) {
@@ -171,20 +192,21 @@ public final class ProductionUiProjector {
                     if (!hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
                             || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())
                             || !endpoint.storage().snapshot().capacityByStorageClassKg().containsKey(definition.storageClassId())) continue;
-                    logistics.add(row("pilot-market|" + endpoint.stationId() + "|" + commodity, switch (commodity) {
+                    logistics.add(row((ownStation ? "pilot-cargo|" : "pilot-market|") + endpoint.stationId() + "|" + commodity, switch (commodity) {
                         case "commodity.material.purified_water" -> "Очищенная вода";
                         case "commodity.material.structural_alloy" -> "Конструкционный сплав";
                         case "commodity.feedstock.metallic_ore" -> "Металлическая руда";
                         default -> definition.displayName();
-                    }, "Товары личного рынка", name,
-                            List.of(InfoSection.of("Физическая сделка", "Запас станции", ownStation ? endpoint.storage().commodityMassKg(commodity) + " кг" : "Доступность проверяется при сделке",
-                                    "В трюме", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d) + " кг",
-                                    "Свободно на складе", ownStation ? endpoint.storage().remainingCapacityKg(definition.storageClassId()) + " кг" : "Проверяется при сделке",
+                    }, ownStation ? "Собственный склад" : "Товары личного рынка", name,
+                            List.of(InfoSection.of(ownStation ? "Перемещение собственного груза" : "Физическая сделка", "Запас станции", ownStation ? String.format(Locale.ROOT, "%.3f кг", endpoint.storage().commodityMassKg(commodity)) : "Доступность проверяется при сделке",
+                                    "В трюме", String.format(Locale.ROOT, "%.3f кг", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d)),
+                                    "Свободно на складе", ownStation ? String.format(Locale.ROOT, "%.3f кг", endpoint.storage().remainingCapacityKg(definition.storageClassId())) : "Проверяется при сделке",
                                     "Кошелёк рынка", ownStation ? credits(marketMoney) : "Не раскрыт",
-                                    "Покупка за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true)),
-                                    "Продажа за 1 кг", credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false)),
+                                    ownStation ? "Погрузка" : "Покупка за 1 кг", ownStation ? "Из собственного склада в трюм без оплаты" : credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true)),
+                                    ownStation ? "Выгрузка" : "Продажа за 1 кг", ownStation ? "Из личного трюма на собственный склад без оплаты" : credits(campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false)),
                                     "Кошелёк", credits(player.walletMilliCredits()), "Стыковка", docked ? "Да" : "Нет",
                                     "Обработка за такт", String.format(Locale.ROOT, "%.2f кг", endpoint.handlingCapability().massRateKgPerSecond() * campaign.coordinator().session().fixedStepSeconds()),
+                                    "Выбор массы", "Кнопки -/+ кг: шаг 1; Shift — 100; Ctrl — 10 000. Партия должна помещаться в обработку одного такта.",
                                     "Лимит времени", "Одна физическая сделка корабля за завершённый такт; после сделки нужно продолжить время")),
                             ownStation ? "Фактический собственный склад и раскрытые условия текущей сделки"
                                     : "Раскрытые при стыковке котировки; чужие внутренние запасы, вместимость и кошелёк не раскрываются",
@@ -197,8 +219,9 @@ public final class ProductionUiProjector {
         campaign.playerState().ifPresent(player -> {
             var knowledge = campaign.coordinator().runtime().discoveryState()
                     .knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
-            personalIntel.addAll(PersonalResourceUiProjection.rows(knowledge,
-                    world.worldTick() * campaign.coordinator().session().fixedStepSeconds(), world.worldTick()));
+            personalIntel.addAll(PersonalExtractionSampleUi.rows(knowledge,
+                    world.worldTick() * campaign.coordinator().session().fixedStepSeconds(), world.worldTick(),
+                    player.ownedFleetIds(), campaign.coordinator().runtime().freight().cargoLots(), PERSONAL_RESOURCE_ONTOLOGY));
             for (var entry : knowledge.entries()) {
                 if (entry.object().kind() != com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.INFRASTRUCTURE) continue;
                 if (entry.state() != com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION) continue;
@@ -234,6 +257,7 @@ public final class ProductionUiProjector {
         rows.put(Tab.HISTORY, List.copyOf(personalHistory));
         var craftRows = new ArrayList<>(rows.get(Tab.SHIPS));
         craftRows.addAll(GeneratedCampaignSupplyUi.rows(campaign));
+        craftRows.addAll(GeneratedCampaignAmmunitionUi.rows(campaign));
         campaign.playerState().ifPresent(player -> {
             for (var id : player.ownedFleetIds()) {
                 var placement = campaign.coordinator().runtime().world().findFleet(id).orElseThrow();
@@ -295,7 +319,7 @@ public final class ProductionUiProjector {
                                 null, 0, world.worldTick()));
                     }
                 }
-                craftRows.add(0, row("personal-ship:" + id.value(), "Личный корабль " + id.value(), "Мои корабли",
+                craftRows.add(0, row("personal-ship:" + id.value(), "Личный корабль " + (player.ownedFleetIds().indexOf(id) + 1), "Мои корабли",
                         player.activeFleetId() != null && player.activeFleetId().equals(id) ? "Активный" : "В собственности",
                         personalSections,
                         "Личные права владения и кошелёк пилота; фактическое местоположение существующего корабля",
@@ -308,9 +332,10 @@ public final class ProductionUiProjector {
             var runtime = campaign.coordinator().runtime();
             var active = runtime.world().findFleet(player.activeFleetId()).orElseThrow();
             if (active.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return;
+            int reserveOffer = 0;
             for (var offered : runtime.freight().capture().freighters()) {
                 if (!campaign.canViewPersonalReserveOffer(offered.fleetId())) continue;
-                craftRows.add(row("pilot-reserve|" + offered.fleetId().value(), "Резервный грузовой корабль " + offered.fleetId().value(),
+                craftRows.add(row("pilot-reserve|" + offered.fleetId().value(), "Резервный грузовой корабль " + ++reserveOffer,
                         "Покупка существующих кораблей", "Требуется местный док продавца",
                         List.of(InfoSection.of("Предложение корпуса", "Цена", credits(Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS),
                                 "Продавец", factionName(world, offered.stableFactionId()), "Трюм", offered.cargoCapacityKg() + " кг",
@@ -323,27 +348,40 @@ public final class ProductionUiProjector {
                         null, 0, world.worldTick()));
             }
         });
+        var ownedCraft = personalView ? GeneratedCampaignCarrierUi.ownedCraftIds(campaign) : java.util.Set.<com.spacesim.world.SmallCraftId>of();
+        var flightsById = checkpoint.localFlights().flights().stream().collect(java.util.stream.Collectors.toMap(f -> f.craftId(), f -> f));
+        var baysByHost = checkpoint.flightDeck().profiles().stream().collect(java.util.stream.Collectors.groupingBy(
+                p -> p.hostStableId(), java.util.stream.Collectors.mapping(p -> p.bayStableId(), java.util.stream.Collectors.toList())));
         for (var craft : checkpoint.smallCraft().craft()) {
-            if (!craft.stableFactionId().equals(authorizedFaction)) continue;
+            if (personalView ? !ownedCraft.contains(craft.id()) : !craft.stableFactionId().equals(authorizedFaction)) continue;
             var assignment = checkpoint.hangars().assignments().stream()
                     .filter(item -> item.craftId().equals(craft.id())).findFirst();
             var missions = checkpoint.operations().missions().stream()
                     .filter(item -> item.craftId().equals(craft.id())).toList();
-            craftRows.add(row("craft:" + craft.id().value(), "Малый аппарат «" + label(craft.designId()) + "»",
-                    "Авиакрыло", assignment.map(item -> label(item.occupancyState().name())).orElse("Вне ангара"),
-                    List.of(InfoSection.of("Аппарат", "Проект", label(craft.designId()),
-                            "Ангар", assignment.map(item -> label(item.bayStableId())).orElse("Нет"),
-                            "Состояние", assignment.map(item -> label(item.occupancyState().name())).orElse("Вне ангара"),
-                            "Задания", join(missions.stream().map(item -> label(item.type().name())
-                                    + ": " + label(item.status().name())).toList()))),
-                    "M22.8: реестр индивидуальных аппаратов, ангаров и заданий; сведения своей фракции",
-                    null, 0, world.worldTick()));
+            var flight = personalView ? flightsById.get(craft.id()) : null;
+            craftRows.add(new Row(new UiSelection(flight == null ? SelectionKind.SURFACE_ROW : SelectionKind.LOCAL_OBJECT,
+                    (flight == null ? "craft:" : "small-craft:") + craft.id().value()), "Аппарат №" + craft.id().value(),
+                    "Малые аппараты", assignment.map(item -> GeneratedCampaignCraftUi.occupancyName(item.occupancyState())).orElse("Вне ангара"),
+                    List.of(InfoSection.of("Аппарат", "Проект", GeneratedCampaignCraftUi.designName(craft.designId()),
+                            "Ангар", assignment.map(item -> {
+                                int index = baysByHost.getOrDefault(item.hostStableId(), List.of()).indexOf(item.bayStableId());
+                                return index < 0 ? "Назначенный отсек" : "Отсек " + (index + 1);
+                            }).orElse("Нет"),
+                            "Состояние", assignment.map(item -> GeneratedCampaignCraftUi.occupancyName(item.occupancyState())).orElse("Вне ангара"),
+                            "Задания", join(missions.stream().map(item -> GeneratedCampaignCraftUi.missionName(item.type())
+                                    + ": " + GeneratedCampaignCraftUi.missionStatus(item.status())).toList()))),
+                    "Собственный реестр аппаратов, ангаров и заданий",
+                    flight == null ? null : flight.systemId(), 0, world.worldTick()));
         }
         rows.put(Tab.SHIPS, List.copyOf(craftRows));
         var industry = new ArrayList<>(rows.get(Tab.INDUSTRY));
         industry.addAll(GeneratedCampaignStationAcquisitionUi.rows(campaign));
         industry.addAll(GeneratedCampaignMiningUi.rows(campaign));
         industry.addAll(GeneratedCampaignManufacturingUi.rows(campaign));
+        industry.addAll(GeneratedCampaignSmallCraftBuildUi.rows(campaign));
+        industry.addAll(GeneratedCampaignAmmunitionManufacturingUi.rows(campaign, ammunitionUnits));
+        industry.addAll(GeneratedCampaignRefiningUi.rows(campaign));
+        industry.addAll(GeneratedCampaignComponentUi.rows(campaign, componentKilograms));
         industry.addAll(GeneratedCampaignConstructionUi.rows(campaign));
         industry.addAll(GeneratedCampaignYardConstructionUi.rows(campaign));
         industry.addAll(GeneratedCampaignModuleCustodyUi.rows(campaign));
@@ -363,6 +401,8 @@ public final class ProductionUiProjector {
         rows.put(Tab.INDUSTRY, List.copyOf(industry));
         var contacts = new ArrayList<>(rows.get(Tab.CONTACTS));
         contacts.addAll(GeneratedCampaignDispatcherContactUi.rows(campaign));
+        contacts.addAll(GeneratedCampaignSensorContactUi.actions(campaign));
+        contacts.addAll(GeneratedCampaignSensorContactUi.rows(campaign));
         contacts.addAll(GeneratedCampaignResourceMapUi.rows(campaign));
         contacts.addAll(GeneratedCampaignStationMapUi.rows(campaign));
         contacts.addAll(GeneratedCampaignRouteMapUi.offers(campaign));

@@ -147,8 +147,41 @@ public final class Stage18StationIndustrialNode {
         List<InstalledFacilityReference> references = new ArrayList<>(installedFacilities);
         references.add(addition);
         references.sort(java.util.Comparator.comparing(InstalledFacilityReference::facilityInstanceId));
-        return new Stage18StationIndustrialNode(
-                stationId, archetypeId, locationTag, references, storage, handlingCapability);
+        var handling = handlingCapability;
+        if (addition.facilityDefinitionId().equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)) {
+            if (!com.spacesim.content.Stage23StationStorageCatalog.acceptsHost(archetypeId)
+                    || !locationTag.equals("location.orbital_station")
+                    || installedFacilities.stream().anyMatch(f -> f.facilityDefinitionId().equals(addition.facilityDefinitionId())))
+                throw new IllegalArgumentException("Liquid storage requires its single authored industrial installation interface");
+            var classes = new java.util.TreeSet<>(handlingCapability.supportedStorageClassIds());
+            classes.add("storage.liquid_tank");
+            handling = new HandlingCapability(handlingCapability.handlingId(), classes,
+                    handlingCapability.massRateKgPerSecond(), handlingCapability.maxUnitMassKg());
+        }
+        return new Stage18StationIndustrialNode(stationId, archetypeId, locationTag, references, storage, handling);
+    }
+
+    /** @return exact base capacity plus unique proved completed structural storage effects */
+    public java.util.Map<String, Double> expectedStorageCapacity() {
+        var base = com.spacesim.content.Stage18StationInfrastructureCatalogLoader.loadDefault().findArchetype(archetypeId);
+        var result = new java.util.TreeMap<>(base.storageCapacityByClassKg());
+        long tanks = installedFacilities.stream().filter(f -> f.facilityDefinitionId()
+                .equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)).count();
+        if (tanks > 1 || tanks > 0 && !com.spacesim.content.Stage23StationStorageCatalog.acceptsHost(archetypeId))
+            throw new IllegalArgumentException("Invalid completed storage expansion count or host");
+        if (tanks == 1) result.merge("storage.liquid_tank", com.spacesim.content.Stage23StationStorageCatalog.CAPACITY_KG, Double::sum);
+        return java.util.Map.copyOf(result);
+    }
+
+    /**
+     * Binds the node to the single canonical physical store after validating structural capacity.
+     * @param canonical actual storage including all existing transient reservations
+     * @return node retaining references and handler around that exact store
+     */
+    public Stage18StationIndustrialNode withCanonicalStorage(Stage18StationStorage canonical) {
+        if (!stationId.equals(canonical.stationId()) || !expectedStorageCapacity().equals(canonical.snapshotCapacityByStorageClassKg()))
+            throw new IllegalArgumentException("Canonical station storage differs from proved structures");
+        return new Stage18StationIndustrialNode(stationId, archetypeId, locationTag, installedFacilities, canonical, handlingCapability);
     }
 
     /** @return canonical physical Stage-18F station storage */

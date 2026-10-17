@@ -60,13 +60,16 @@ public final class Stage22CivilianMiningProductionPath {
     private static final class ProductsHolder {
         private static final Stage18ManufacturingProductRegistry VALUE = Stage18ManufacturingProductRegistry.loadDefault()
                 .withEngineeringCatalog(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault(),
+                        Stage18ManufacturingProductRegistry.Provenance.STAGE22_AUTHORED)
+                .withAmmunitionCatalog(com.spacesim.content.weapon.Stage228SmallCraftWeaponRuntimeCatalogLoader.loadCombined().ammunition(),
                         Stage18ManufacturingProductRegistry.Provenance.STAGE22_AUTHORED);
     }
 
     private static final class ManufacturingHolder {
         private static final Stage18ManufacturingCatalog VALUE = Stage22FreightStrategicProductionCatalogs.manufacturing(Stage22AuthoredProductionBridge.withProductBindings(
                 Stage22IndustrialUnionManufacturingCatalogLoader.loadDefault(),
-                List.of(new ProductBindingDefinition(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID,
+                List.of(Stage22EmpireManufacturingCatalogLoader.loadDefault().findProductBinding(Stage23AmmunitionProduction.EMPIRE),
+                        new ProductBindingDefinition(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID,
                         Stage22CommonManufacturingProfiles.INDUSTRIAL_SUPPORT),
                         new ProductBindingDefinition(Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID,
                         Stage22CommonManufacturingProfiles.INDUSTRIAL_SUPPORT))));

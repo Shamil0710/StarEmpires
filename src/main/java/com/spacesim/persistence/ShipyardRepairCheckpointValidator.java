@@ -48,6 +48,33 @@ final class ShipyardRepairCheckpointValidator {
     static void validateCivilianBerth(String stationId, String seller,
             Stage20GeneratedWorldRuntimePersistentState stage20, PlayerState player,
             com.spacesim.world.FleetPlacementState fleet) {
+        validateCivilianBerth(stationId, seller, stage20, player, fleet, true);
+    }
+
+    /** Physical handling needs an existing civilian legal operator, not installed repair machinery. */
+    static void validateCivilianHandlingBerth(String stationId,
+            Stage20GeneratedWorldRuntimePersistentState stage20, PlayerState player,
+            com.spacesim.world.FleetPlacementState fleet) {
+        if (player == null || player.dockedAt() == null)
+            throw new IllegalArgumentException("Individual handling requires its actual berth");
+        var station = stage20.worldState().systems().stream().filter(s -> s.systemId().equals(player.dockedAt().systemId()))
+                .flatMap(s -> s.simulationState().entities().stream()).filter(e -> e.id().equals(player.dockedAt().entityId()))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Missing physical handling berth"));
+        if (station.faction() == null) throw new IllegalArgumentException("Handling station has no legal operator");
+        int owner = station.faction().factionId();
+        String seller = stage20.worldState().factions().stream().map(f -> f.factionContentId()).filter(id -> {
+            var identity = stage20.worldState().factionIdentities().stream().filter(i -> i.stableFactionId().equals(id)).findFirst();
+            var authored = identity.isPresent() ? null : AuthoredFactions.CONTENT.findFaction(id);
+            Integer runtimeId = identity.map(com.spacesim.world.WorldFactionIdentityState::runtimeFactionId)
+                    .orElse(authored == null ? null : authored.runtimeId());
+            return runtimeId != null && runtimeId == owner;
+        }).findFirst().orElseThrow(() -> new IllegalArgumentException("Handling operator has no existing economy"));
+        validateCivilianBerth(stationId, seller, stage20, player, fleet, false);
+    }
+
+    private static void validateCivilianBerth(String stationId, String seller,
+            Stage20GeneratedWorldRuntimePersistentState stage20, PlayerState player,
+            com.spacesim.world.FleetPlacementState fleet, boolean requiresRepairSpecialization) {
         if (!fleet.id().equals(player.activeFleetId()) || player.dockedAt() == null
                 || !player.dockedAt().systemId().equals(fleet.systemId())
                 || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
@@ -73,7 +100,7 @@ final class ShipyardRepairCheckpointValidator {
                 .anyMatch(r -> r.stableId().equals(fleet.systemId().value() + ":" + stationId)
                         && r.values().size() >= 3
                         && com.spacesim.campaign.GeneratedCampaignStationSalePolicy.priceMilliCredits(r.values().get(2)) > 0);
-        if (!specialization || !civilian)
+        if (requiresRepairSpecialization && !specialization || !civilian)
             throw new IllegalArgumentException("Service requires its actual civilian operator");
         var placement = rows.stream().filter(r -> r.domain().equals("INFRASTRUCTURE_PLACEMENT")
                 && r.stableId().equals(fleet.systemId().value() + ":" + stationId)).findFirst().orElseThrow();

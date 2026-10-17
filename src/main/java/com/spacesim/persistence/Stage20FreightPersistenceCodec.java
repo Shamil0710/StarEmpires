@@ -101,7 +101,10 @@ public final class Stage20FreightPersistenceCodec {
 
     private static void writeState(DataOutputStream output, Stage20FreightPersistentState state)
             throws IOException {
-        output.writeInt(state.schemaVersion());
+        // Point-only states retain genuine schema-7 framing. Historical native envelopes can
+        // therefore be generated without relabeling a schema-8 payload as older data.
+        int encodedSchema = state.cargoLots().stream().anyMatch(lot -> lot.receiptSeries() != null) ? 8 : 7;
+        output.writeInt(encodedSchema);
         output.writeLong(state.rootSeed());
         writeText(output, state.generatorVersion());
         writeText(output, state.worldFingerprint());
@@ -138,6 +141,15 @@ public final class Stage20FreightPersistenceCodec {
             writeText(output, lot.sourceEndpointId());
             writeText(output, lot.sourceProvenanceId());
             output.writeDouble(lot.loadedAtSimulationSeconds());
+            if (encodedSchema >= 8) {
+                var series = lot.receiptSeries(); output.writeBoolean(series != null);
+                if (series != null) {
+                    output.writeLong(series.firstOrdinal()); output.writeLong(series.firstTick());
+                    output.writeDouble(series.fixedStepSeconds()); output.writeDouble(series.receiptMassKg());
+                    output.writeLong(series.receiptCount()); output.writeDouble(series.firstReceiptRemainingKg());
+                    output.writeLong(series.originalFirstOrdinal()); output.writeLong(series.originalFirstTick());
+                }
+            }
         }
 
         writeCount(output, state.orders().size(), "transport orders", MAX_ROWS);
@@ -210,7 +222,7 @@ public final class Stage20FreightPersistenceCodec {
         int lotCount = readCount(input, "cargo lots", MAX_ROWS);
         ArrayList<CargoLotState> lots = new ArrayList<>(lotCount);
         for (int index = 0; index < lotCount; index++) {
-            lots.add(new CargoLotState(
+            var point = new CargoLotState(
                     readText(input, "lotId"),
                     new FleetId(input.readLong()),
                     readText(input, "orderId"),
@@ -218,7 +230,12 @@ public final class Stage20FreightPersistenceCodec {
                     input.readDouble(),
                     readText(input, "sourceEndpointId"),
                     readText(input, "sourceProvenanceId"),
-                    input.readDouble()));
+                    input.readDouble());
+            ExtractionReceiptSeries series = schemaVersion >= 8 && input.readBoolean()
+                    ? new ExtractionReceiptSeries(input.readLong(), input.readLong(), input.readDouble(), input.readDouble(),
+                            input.readLong(), input.readDouble(), input.readLong(), input.readLong()) : null;
+            lots.add(series == null ? point : new CargoLotState(point.lotId(), point.fleetId(), point.orderId(), point.commodityId(),
+                    point.massKg(), point.sourceEndpointId(), point.sourceProvenanceId(), point.loadedAtSimulationSeconds(), series));
         }
 
         int orderCount = readCount(input, "transport orders", MAX_ROWS);

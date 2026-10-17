@@ -24,7 +24,7 @@ import java.util.Objects;
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 18;
+    private static final int FILE_VERSION = 29;
     private static final int M22_8M_FILE_VERSION = 4;
     private static final String M22_8M_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
     private static final int MAX_PLAYER_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -53,6 +53,21 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
      * @return deterministic bounded bytes
      */
     public static byte[] encode(Stage228GeneratedCampaignPersistentState state) {
+        try {
+            EncodedParts parts = encodedParts(state);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(parts.size());
+            try (DataOutputStream out = new DataOutputStream(buffer)) {
+                writeParts(out, parts);
+            }
+            return buffer.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unexpected in-memory M22.8 encoding failure", exception);
+        }
+    }
+
+    private record EncodedParts(byte[] header, java.util.List<byte[]> payloads, int size) { }
+
+    private static EncodedParts encodedParts(Stage228GeneratedCampaignPersistentState state) throws IOException {
         Stage228GeneratedCampaignPersistentState checked = Objects.requireNonNull(state, "state");
         byte[] stage21 = Stage21IGeneratedWorldRuntimePersistenceCodec.encode(checked.stage21Runtime());
         byte[] smallCraft = Stage228SmallCraftPersistenceCodec.encode(checked.smallCraft());
@@ -74,37 +89,38 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         requirePayload(flightDeck, MAX_FLIGHT_DECK_PAYLOAD_BYTES, "M22.8C flight deck");
         requirePayload(operations, MAX_OPERATIONS_PAYLOAD_BYTES, "M22.8M operations");
         requirePayload(player, MAX_PLAYER_PAYLOAD_BYTES, "Player state");
-        try {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            try (DataOutputStream out = new DataOutputStream(buffer)) {
-                out.writeInt(MAGIC);
-                out.writeInt(FILE_VERSION);
-                out.writeInt(checked.schemaVersion());
-                out.writeUTF(checked.runtimeVersion());
-                writePayload(out, stage21);
-                writePayload(out, smallCraft);
-                writePayload(out, hangars);
-                writePayload(out, flightDeck);
-                writePayload(out, operations);
-                writePayload(out, player);
-                writePayload(out, journal);
-                writePayload(out, custody);
-                writePayload(out, repairs);
-                writePayload(out, refits);
-                writePayload(out, transfers);
-                writePayload(out, products);
-                writePayload(out, yards);
-                writePayload(out, timeSkip);
-            }
-            byte[] result = buffer.toByteArray();
-            if (result.length <= 0 || result.length > MAX_BYTES) {
-                throw new IllegalArgumentException("M22.8 campaign checkpoint exceeds bounded size");
-            }
-            return result;
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "Unexpected in-memory M22.8 encoding failure", exception);
+        ByteArrayOutputStream header = new ByteArrayOutputStream();
+        try (DataOutputStream out = new DataOutputStream(header)) {
+            out.writeInt(MAGIC);
+            out.writeInt(FILE_VERSION);
+            out.writeInt(checked.schemaVersion());
+            out.writeUTF(checked.runtimeVersion());
         }
+        var contentBuffer = new ByteArrayOutputStream();
+        try (var contentOut = new DataOutputStream(contentBuffer)) {
+            contentOut.writeInt(2);
+            contentOut.writeUTF(com.spacesim.content.Stage23StationStorageCatalog.facilities().getFingerprint());
+            contentOut.writeUTF(com.spacesim.content.Stage23StationStorageCatalog.construction().getFingerprint());
+            contentOut.writeUTF(com.spacesim.content.Stage23StationStorageCatalog.effectFingerprint());
+        }
+        var payloads = java.util.List.of(stage21, smallCraft, hangars, flightDeck, operations,
+                player, journal, custody, repairs, refits, transfers, products, yards, timeSkip, contentBuffer.toByteArray(),
+                Stage23FleetCrewManifestCodec.encode(checked.crewManifest()),
+                SmallCraftLocalFlightPersistenceCodec.encode(checked.localFlights()),
+                PersonalCraftOwnershipCodec.encode(checked.personalCraftOwnership()),
+                IndustrialStationAdmissionCodec.encode(checked.industrialAdmissions()),
+                ShipyardSmallCraftBuildQueuePersistenceCodec.encode(checked.smallCraftBuilds()));
+        long size = header.size();
+        for (byte[] payload : payloads) size += Integer.BYTES + (long) payload.length;
+        if (size <= 0 || size > MAX_BYTES) {
+            throw new IllegalArgumentException("M22.8 campaign checkpoint exceeds bounded size");
+        }
+        return new EncodedParts(header.toByteArray(), payloads, (int) size);
+    }
+
+    private static void writeParts(DataOutputStream out, EncodedParts parts) throws IOException {
+        out.write(parts.header());
+        for (byte[] payload : parts.payloads()) writePayload(out, payload);
     }
 
     /** Decodes native M22.8A/B/C/M and migrates older native layouts to the current envelope.
@@ -125,12 +141,34 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
                 case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case M22_8C_FILE_VERSION -> decodeM22_8C(in);
-                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, FILE_VERSION -> decodeCurrent(in, fileVersion);
+                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, FILE_VERSION -> decodeCurrent(in, fileVersion);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
             };
             var stage20 = decoded.stage21Runtime().stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
                     .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime();
+            var industrial = stage20.campaign().industrialState();
+            if (fileVersion < 29 && containsSmallCraftProduction(decoded, stage20))
+                throw new IllegalArgumentException("Small-craft production stock requires native campaign v29");
+            if (fileVersion < 28 && containsStorageExpansion(industrial))
+                throw new IllegalArgumentException("Paid storage expansion requires native campaign v28");
+            if (fileVersion < 24 && decoded.stage21Runtime().stage21HRuntime().stage21GRuntime().stage21FRuntime()
+                    .stage21ERuntime().stage21DRuntime().fleetCommandState().groups().stream()
+                    .anyMatch(com.spacesim.world.FleetCommandState.CommandGroupState::retired))
+                throw new IllegalArgumentException("Retained retired command groups require native campaign v24");
+            if (fileVersion < 22 && stage20.freight().cargoLots().stream().anyMatch(lot -> lot.receiptSeries() != null))
+                throw new IllegalArgumentException("Extraction receipt series require native campaign v22");
+            if (fileVersion < 21 && (industrial.constructionOrders().stream().anyMatch(o ->
+                    o.facilityDefinitionId().equals(com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID))
+                    || industrial.facilities().stream().anyMatch(f ->
+                    f.state().definitionId().equals(com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID))))
+                throw new IllegalArgumentException("Bootstrap batch materials require native campaign v21");
+            if (fileVersion < 20 && stage20.campaign().industrialState().processOrders().stream().anyMatch(o ->
+                    o.orderId().startsWith(com.spacesim.economy.Stage18ManufacturingWorkQueue.COMPONENT_PREFIX)))
+                throw new IllegalArgumentException("Executable personal components require native campaign v20");
+            if (fileVersion < 19 && stage20.campaign().industrialState().processOrders().stream().anyMatch(o ->
+                    o.orderId().startsWith(com.spacesim.economy.Stage18ManufacturingWorkQueue.REFINING_PREFIX)))
+                throw new IllegalArgumentException("Executable personal refining requires native campaign v19");
             if (fileVersion < 16 && stage20.freight().materializationVersion().equals(Stage20FreightRuntimeMaterializer.MINING_RESERVE_VERSION))
                 throw new IllegalArgumentException("Initial NPC mining reserve manifest requires native campaign v16");
             if (fileVersion < 15 && decoded.stage21Runtime().stage21HRuntime().npcMissionState().missions().stream().anyMatch(m ->
@@ -169,7 +207,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
     public static void write(Path path, Stage228GeneratedCampaignPersistentState state)
             throws IOException {
         Path target = Objects.requireNonNull(path, "path").toAbsolutePath();
-        byte[] bytes = encode(state);
+        EncodedParts parts = encodedParts(state);
         Path parent = target.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
@@ -180,7 +218,9 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         }
         Path temporary = Files.createTempFile(parent, prefix, ".tmp");
         try {
-            Files.write(temporary, bytes);
+            try (DataOutputStream out = new DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(temporary)))) {
+                writeParts(out, parts);
+            }
             try {
                 Files.move(
                         temporary,
@@ -339,6 +379,40 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         var timeSkip = fileVersion >= 18 ? CampaignTimeSkipPersistenceCodec.decode(
                 readPayload(in, CampaignTimeSkipPersistenceCodec.MAX_BYTES, "Interactive time skip"))
                 : com.spacesim.simulation.CampaignTimeSkipState.idle();
+        var industrial = stage21.stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
+                .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime().campaign().industrialState();
+        if (fileVersion < 24 && stage21.stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
+                .stage21DRuntime().fleetCommandState().groups().stream().anyMatch(com.spacesim.world.FleetCommandState.CommandGroupState::retired))
+            throw new IllegalArgumentException("Retained retired command groups require native campaign v24");
+        if (fileVersion < 22 && stage21.stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime()
+                .stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime().freight()
+                .cargoLots().stream().anyMatch(lot -> lot.receiptSeries() != null))
+            throw new IllegalArgumentException("Extraction receipt series require native campaign v22");
+        if (fileVersion < 28 && containsStorageExpansion(industrial))
+            throw new IllegalArgumentException("Paid storage expansion requires native campaign v28");
+        if (fileVersion < 21 && (industrial.constructionOrders().stream().anyMatch(o ->
+                o.facilityDefinitionId().equals(com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID))
+                || industrial.facilities().stream().anyMatch(f -> f.state().definitionId().equals(com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID))))
+            throw new IllegalArgumentException("Bootstrap batch materials require native campaign v21");
+        if (fileVersion < 20 && industrial.processOrders().stream().anyMatch(o ->
+                o.orderId().startsWith(com.spacesim.economy.Stage18ManufacturingWorkQueue.COMPONENT_PREFIX)))
+            throw new IllegalArgumentException("Executable personal components require native campaign v20");
+        if (fileVersion < 19 && industrial.processOrders().stream().anyMatch(o ->
+                o.orderId().startsWith(com.spacesim.economy.Stage18ManufacturingWorkQueue.REFINING_PREFIX)))
+            throw new IllegalArgumentException("Executable personal refining requires native campaign v19");
+        if (fileVersion >= 21) {
+            var content = readPayload(in, 256, "Bootstrap materials content");
+            try (var contentIn = new DataInputStream(new ByteArrayInputStream(content))) {
+                if (contentIn.readInt() != (fileVersion >= 28 ? 2 : 1)
+                        || !contentIn.readUTF().equals(fileVersion >= 28 ? com.spacesim.content.Stage23StationStorageCatalog.facilities().getFingerprint()
+                                : com.spacesim.content.Stage23BootstrapMaterialsCatalog.facilities().getFingerprint())
+                        || !contentIn.readUTF().equals(fileVersion >= 28 ? com.spacesim.content.Stage23StationStorageCatalog.construction().getFingerprint()
+                                : com.spacesim.content.Stage23BootstrapMaterialsCatalog.construction().getFingerprint())
+                        || fileVersion >= 28 && !contentIn.readUTF().equals(com.spacesim.content.Stage23StationStorageCatalog.effectFingerprint()))
+                    throw new IllegalArgumentException("Bootstrap materials content fingerprint mismatch");
+                requireEnd(contentIn);
+            }
+        }
         if (fileVersion < 10 && custody.modules().stream().anyMatch(row -> row.stationId().startsWith("freight-hold:")))
             throw new IllegalArgumentException("Aboard equipment requires native campaign v10");
         if (fileVersion < 13 && repairs.orders().stream().anyMatch(order -> order.servicePayment() != null))
@@ -353,16 +427,48 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
             throw new IllegalArgumentException("Personal physical supply contracts require native campaign v15");
         if (fileVersion < 17 && products.orders().stream().anyMatch(order -> order.purchasePayment() != null))
             throw new IllegalArgumentException("Held finished product purchases require native campaign v17");
+        var crews = fileVersion >= 23 ? Stage23FleetCrewManifestCodec.decode(
+                readPayload(in, Stage23FleetCrewManifestCodec.MAX_BYTES, "Commissioned crew observations"))
+                : com.spacesim.world.Stage23FleetCrewManifest.unobserved();
+        var localFlights = fileVersion >= 25 ? SmallCraftLocalFlightPersistenceCodec.decode(
+                readPayload(in, 32 * 1024 * 1024, "Exact local craft flight"))
+                : com.spacesim.world.SmallCraftLocalFlightState.empty();
+        var personalCraft = fileVersion >= 26 ? PersonalCraftOwnershipCodec.decode(
+                readPayload(in, PersonalCraftOwnershipCodec.MAX_BYTES, "Personal craft property")) : java.util.List.<com.spacesim.world.SmallCraftId>of();
+        var admissions = fileVersion >= 27 ? IndustrialStationAdmissionCodec.decode(
+                readPayload(in, IndustrialStationAdmissionCodec.MAX_BYTES, "Existing industrial admissions")) : java.util.Map.<String, String>of();
+        var builds = fileVersion >= 29 ? ShipyardSmallCraftBuildQueuePersistenceCodec.decode(
+                readPayload(in, ShipyardSmallCraftBuildQueuePersistenceCodec.MAX_BYTES, "Paid small-craft construction"))
+                : com.spacesim.economy.ShipyardSmallCraftBuildQueueState.empty();
         requireEnd(in);
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
-                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards, timeSkip);
+                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards, timeSkip, crews, localFlights, personalCraft, admissions, builds);
     }
 
     private static void requireEnd(DataInputStream in) throws IOException {
         if (in.read() != -1) {
             throw new IllegalArgumentException("Trailing bytes after M22.8 checkpoint");
         }
+    }
+
+    private static boolean containsStorageExpansion(Stage18IndustrialState industrial) {
+        return industrial.constructionOrders().stream().anyMatch(o -> o.facilityDefinitionId()
+                .equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID))
+                || industrial.facilities().stream().anyMatch(f -> f.state().definitionId()
+                .equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID));
+    }
+
+    private static boolean containsSmallCraftProduction(Stage228GeneratedCampaignPersistentState state,
+            Stage20GeneratedWorldRuntimePersistentState stage20) {
+        var ids = com.spacesim.content.Stage23SmallCraftProductionCatalogs.moduleIds();
+        var industrial = stage20.campaign().industrialState();
+        return !state.smallCraftBuilds().orders().isEmpty()
+                || Stage228GeneratedCampaignPersistentState.containsSmallCraftProductionStock(state.stage21Runtime())
+                || state.productTransfers().orders().stream().anyMatch(o -> ids.contains(o.productId()))
+                || state.moduleCustody().modules().stream().anyMatch(m -> ids.contains(m.condition().assignment().moduleId()))
+                || state.refitQueue().orders().stream().anyMatch(o -> o.reservedProductCounts().keySet().stream().anyMatch(ids::contains)
+                        || o.reservedUsedModulesByTargetMount().values().stream().anyMatch(m -> ids.contains(m.condition().assignment().moduleId())));
     }
 
     private static int readMagic(byte[] bytes) {

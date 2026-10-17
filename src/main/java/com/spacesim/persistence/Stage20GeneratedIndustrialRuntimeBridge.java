@@ -98,19 +98,41 @@ public final class Stage20GeneratedIndustrialRuntimeBridge {
     public static MaterializedGeneratedIndustrialRuntime restore(
             Stage20GeneratedCampaignPersistentState saved,
             Stage18ManufacturingProductRegistry products) {
+        return restore(saved, products, java.util.Map.of());
+    }
+
+    /**
+     * @param saved existing campaign
+     * @param products physical product vocabulary
+     * @param admissions explicit existing-station operators
+     * @return composed runtime including admitted stations
+     */
+    public static MaterializedGeneratedIndustrialRuntime restore(Stage20GeneratedCampaignPersistentState saved,
+            Stage18ManufacturingProductRegistry products, java.util.Map<String, String> admissions) {
         Stage20GeneratedCampaignPersistentState base = Objects.requireNonNull(saved, "saved");
         MaterializedSourceOutpostRegistry sourceOutposts = Stage20SourceOutpostMaterializer.materialize(base);
         Stage20GeneratedCampaignPersistentState industrialView = replaceIndustry(
-                base, industrialStationView(base));
+                base, industrialStationView(base, admissions.keySet()));
         MaterializedIndustrialRegistry industrial = Stage20IndustrialEntityMaterializer.restore(
                 industrialView,
-                Objects.requireNonNull(products, "products"));
+                Objects.requireNonNull(products, "products"), admissions);
         return new MaterializedGeneratedIndustrialRuntime(industrial, sourceOutposts);
     }
 
     private static Stage18IndustrialState industrialStationView(
-            Stage20GeneratedCampaignPersistentState saved) {
-        Set<String> stationIds = specializedStationIds(saved);
+            Stage20GeneratedCampaignPersistentState saved, Set<String> admittedIds) {
+        var stationIds = new TreeSet<>(specializedStationIds(saved));
+        stationIds.addAll(admittedIds);
+        var unadmitted = saved.materializedWorld().worldRows().stream()
+                .filter(r -> r.domain().equals("INFRASTRUCTURE_PLACEMENT") && r.values().size() >= 9)
+                .filter(r -> r.values().get(1).equals("MAJOR_HUB_STATION") || r.values().get(1).equals("INDEPENDENT_STATION"))
+                .map(r -> r.stableId().substring(r.stableId().indexOf(':') + 1))
+                .filter(id -> !stationIds.contains(id)).collect(java.util.stream.Collectors.toSet());
+        if (saved.industrialState().facilities().stream().anyMatch(f -> unadmitted.contains(f.stationId()))
+                || saved.industrialState().yards().stream().anyMatch(y -> unadmitted.contains(y.stationId()))
+                || saved.industrialState().constructionOrders().stream().anyMatch(o -> unadmitted.contains(o.stationId()))
+                || saved.industrialState().processOrders().stream().anyMatch(o -> unadmitted.contains(o.stationId())))
+            throw new IllegalArgumentException("Unregistered infrastructure cannot claim industrial state");
         List<StationStorageSnapshot> storage = saved.industrialState().stationStorages().stream()
                 .filter(value -> stationIds.contains(value.stationId()))
                 .toList();

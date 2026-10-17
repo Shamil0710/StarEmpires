@@ -14,8 +14,28 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ShipEngineeringGrantServiceTest {
+    @Test void completedPropulsionAndRechargeCannotOfferTheSameReactorMarginAgain() {
+        var catalog = ShipEngineeringCatalogLoader.loadDefault();
+        var fit = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit("fit.escort_destroyer_schema_v1"));
+        var runtime = new ShipEngineeringRuntime(catalog);
+        var component = new EngineeringComponent(fit, runtime.initialize(fit, ConsumableState.empty()), ShipInstanceRuntimeState.legacyNeutral());
+        var result = runtime.advance(fit, component.runtimeState, ShipEngineeringRuntime.OperatingCommand.idle(), .1);
+        component.setRuntimeState(result.state());
+        var service = new ShipEngineeringGrantService(catalog);
+        double headroom = Math.max(0, result.powerSupplyW() - result.powerDemandW());
+        var budget = service.beginAfterPropulsion(component, .1, result, headroom);
+        assertEquals(0, budget.remainingContinuousPowerW());
+        var before = component.runtimeState;
+        assertFalse(service.grantAndCommit(component, "core_drive", 1, 0, .1, budget).committed());
+        assertEquals(before, component.runtimeState);
+        assertThrows(IllegalArgumentException.class, () -> service.beginAfterPropulsion(component, .1, result, headroom + 1));
+        component.setRuntimeState(new RuntimeState(before.consumables(), before.sharedBusEnergyJ(), before.shipHeatStoredJ() + 1,
+                before.localHeatJByMount(), before.thrustLimitNByMount(), before.coolantBusCapacityW(), before.ftlCooldownSecondsByMount()));
+        assertThrows(IllegalArgumentException.class, () -> service.beginAfterPropulsion(component, .1, result, 0));
+    }
     @Test
     void operationInsideContinuousMarginCommitsHeatWithoutInventingSharedStorage() {
         ShipEngineeringCatalog catalog = ShipEngineeringCatalogLoader.loadDefault();

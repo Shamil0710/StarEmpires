@@ -18,7 +18,7 @@ import java.util.Objects;
 /** Deterministic bounded codec for Stage-21D command-group and strategic-order state. */
 public final class FleetCommandStateCodec {
     private static final int MAGIC = 0x46323144;
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final int MAX_BYTES = 32 * 1024 * 1024;
     private static final int MAX_GROUPS = 100_000;
     private static final int MAX_ORDERS = 1_000_000;
@@ -36,10 +36,11 @@ public final class FleetCommandStateCodec {
      */
     public static byte[] encode(FleetCommandState state) {
         FleetCommandState checked = Objects.requireNonNull(state, "state");
+        int version = checked.groups().stream().anyMatch(CommandGroupState::retired) ? VERSION : 1;
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (DataOutputStream out = new DataOutputStream(buffer)) {
-                out.writeInt(MAGIC); out.writeInt(VERSION);
+                out.writeInt(MAGIC); out.writeInt(version);
                 out.writeLong(checked.nextCommandGroupId()); out.writeLong(checked.nextOrderId());
                 requireCount(checked.groups().size(), MAX_GROUPS, "groups");
                 out.writeInt(checked.groups().size());
@@ -48,6 +49,7 @@ public final class FleetCommandStateCodec {
                     out.writeLong(group.homeSystemId().value());
                     out.writeBoolean(group.reserve()); out.writeBoolean(group.homeDefense());
                     out.writeInt(group.maxStrategicRiskBps());
+                    if (version >= 2) out.writeBoolean(group.retired());
                     requireCount(group.memberFleetIds().size(), MAX_MEMBERS, "group members");
                     out.writeInt(group.memberFleetIds().size());
                     for (FleetId fleetId : group.memberFleetIds()) out.writeLong(fleetId.value());
@@ -89,7 +91,7 @@ public final class FleetCommandStateCodec {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
             if (in.readInt() != MAGIC) throw new IllegalArgumentException("Invalid Stage-21D command magic");
             int version = in.readInt();
-            if (version != VERSION) throw new IllegalArgumentException("Unsupported Stage-21D command version: " + version);
+            if (version != 1 && version != VERSION) throw new IllegalArgumentException("Unsupported Stage-21D command version: " + version);
             long nextGroup = in.readLong(); long nextOrder = in.readLong();
             int groupCount = readCount(in, MAX_GROUPS, "groups");
             ArrayList<CommandGroupState> groups = new ArrayList<>(groupCount);
@@ -98,10 +100,11 @@ public final class FleetCommandStateCodec {
                 StarSystemId home = new StarSystemId(in.readLong());
                 boolean reserve = in.readBoolean(); boolean homeDefense = in.readBoolean();
                 int maxRisk = in.readInt();
+                boolean retired = version >= 2 && in.readBoolean();
                 int memberCount = readCount(in, MAX_MEMBERS, "group members");
                 ArrayList<FleetId> members = new ArrayList<>(memberCount);
                 for (int m = 0; m < memberCount; m++) members.add(new FleetId(in.readLong()));
-                groups.add(new CommandGroupState(id, factionId, name, members, home, reserve, homeDefense, maxRisk));
+                groups.add(new CommandGroupState(id, factionId, name, members, home, reserve, homeDefense, maxRisk, retired));
             }
             int orderCount = readCount(in, MAX_ORDERS, "orders");
             ArrayList<FleetOrderState> orders = new ArrayList<>(orderCount);

@@ -13,12 +13,77 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("slow")
 class GeneratedCampaignManufacturingQueuePersistenceTest {
-    @Test void realCampaignRetainsReservedCustodyAndRejectsMissingPersonalStationOwner() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void bulkCustodyRequiresPersonalOwnerAndItsNativeVersion(boolean components) {
+        var initial = FoundedCampaignFixture.restore();
+        String recipe = components ? "manufacturing.component.heavy" : "refining.conductor_metal";
+        var station = initial.coordinator().runtime().industry().industrial().stations().stream()
+                .filter(s -> components ? initial.hasComponentLine(s.stationId(), recipe) : initial.hasRefiningLine(s.stationId(), recipe)).findFirst().orElseThrow();
+        var before = initial.captureState();
+        assertFalse(initial.previewPilotAction(components ? "START_COMPONENT_MANUFACTURING" : "START_REFINING", station.stationId(), recipe, 100).allowed());
+        var ref = initial.pilotMarketReference(station.stationId()).orElseThrow();
+        var p = before.playerState();
+        var systems = new ArrayList<>(p.discoveredSystemIds());
+        if (!systems.contains(ref.systemId())) systems.add(ref.systemId());
+        // Explicit ownership/input fixtures isolate native custody rules; the ordinary journey is separate.
+        var owner = new PlayerState(p.walletMilliCredits(), p.factionContentId(), p.reputations(), p.ownedFleetIds(),
+                p.activeFleetId(), systems, p.discoveredObjects(), p.homeSystemId(), p.dockedAt(),
+                p.fleetOrders(), p.threatIntel(), p.ownedConstructionProjectIds(), List.of(new OwnedStationRef(ref.systemId(), ref.entityId())));
+        var campaign = Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistentState.compose(before.stage21Runtime(),
+                before.smallCraft(), before.hangars(), before.flightDeck(), before.operations(), owner));
+        var runtime = campaign.coordinator().runtime();
+        var storage = runtime.industry().industrial().station(station.stationId()).storage();
+        var ontology = Stage18ResourceOntologyLoader.loadDefault();
+        var materials = new TreeMap<String, Double>();
+        var tags = components ? Stage22CivilianMiningProductionPath.loadManufacturing().findComponentRecipe(recipe).requiredCapabilityTags()
+                : Stage18RefiningCatalogLoader.loadDefault().findRecipe(recipe).requiredCapabilityTags();
+        if (components) Stage22CivilianMiningProductionPath.loadManufacturing().findComponentRecipe(recipe).inputs()
+                .forEach(i -> materials.put(i.commodityId(), 100 * i.fractionOfOutputMass()));
+        else materials.put("commodity.feedstock.conductor_ore", 100d);
+        var capacities = new TreeMap<String, Double>();
+        materials.forEach((commodity, mass) -> capacities.merge(ontology.findCommodity(commodity).storageClassId(), mass, Double::sum));
+        var source = new Stage18StationStorage(ontology, Stage22CivilianMiningProductionPath.loadProducts(),
+                "fixture.materials", capacities, materials, Map.of());
+        var handling = new Stage18LogisticsRuntime.HandlingCapability("fixture.handling", capacities.keySet(), 100, 100);
+        var logistics = new Stage18LogisticsRuntime(ontology, Stage22CivilianMiningProductionPath.loadProducts());
+        for (var input : materials.entrySet()) assertTrue(logistics.transferCommodity(source, storage, input.getKey(),
+                input.getValue(), handling, handling.openInterval(1)).transferred());
+        var installed = runtime.industry().industrial().station(station.stationId()).facilityCapabilities().stream()
+                .filter(c -> c.capabilityTags().containsAll(tags) && c.effectiveProcessPowerW() > 0).findFirst().orElseThrow();
+        var line = new Stage18ManufacturingRuntime.ManufacturingCapability(installed.facilityInstanceId(), installed.capabilityTags(),
+                installed.effectiveProcessPowerW(), installed.effectiveEngineeringWorkRate(), installed.effectiveMaintenanceWorkRate());
+        if (components) runtime.manufacturingQueue().startComponents(Stage18ManufacturingWorkQueue.COMPONENT_PREFIX + station.stationId(),
+                recipe, 100, storage, line, runtime.world().getAuthoritativeWorldTick());
+        else runtime.manufacturingQueue().startRefining(Stage18ManufacturingWorkQueue.REFINING_PREFIX + station.stationId(),
+                recipe, 100, storage, line, runtime.world().getAuthoritativeWorldTick());
+        var pending = campaign.captureState();
+        assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistentState.compose(pending.stage21Runtime(),
+                pending.smallCraft(), pending.hangars(), pending.flightDeck(), pending.operations(), before.playerState()));
+        byte[] bytes = Stage228GeneratedCampaignPersistenceCodec.encode(pending);
+        assertEquals(pending, Stage228GeneratedCampaignPersistenceCodec.decode(bytes));
+        int historicalVersion = components ? 19 : 18;
+        java.nio.ByteBuffer.wrap(bytes).putInt(4, historicalVersion).putInt(8, historicalVersion);
+        int length = ((bytes[12] & 0xff) << 8) | (bytes[13] & 0xff);
+        bytes[14 + length - 2] = '1';
+        bytes[14 + length - 1] = (byte) (components ? '9' : '8');
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(bytes))
+                .getMessage().contains(components ? "native campaign v20" : "native campaign v19"));
+    }
+
+    static java.util.stream.Stream<String> supportedSections() {
+        return java.util.stream.Stream.of(Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID,
+                Stage22CivilianMiningEngineeringCatalogLoader.FREIGHT_MINING_MODULE_ID,
+                "module.industrial_union_cargo_section_v1");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("supportedSections")
+    void realCampaignRetainsReservedCustodyAndRejectsMissingPersonalStationOwner(String module) {
         var campaign = FoundedCampaignFixture.restore();
         var products = Stage22CivilianMiningProductionPath.loadProducts();
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         var catalog = Stage22CivilianMiningProductionPath.loadManufacturing();
-        String module = Stage22CivilianMiningEngineeringCatalogLoader.MINING_MODULE_ID;
         double mass = products.findProduct(module).unitMassKg();
         var profile = catalog.findProductProfile(catalog.findProductBinding(module).profileId());
         var initialCampaign = campaign;
@@ -79,7 +144,22 @@ class GeneratedCampaignManufacturingQueuePersistenceTest {
         var restoredStorage = restored.coordinator().runtime().industry().industrial().station(station.stationId()).storage();
         for (var storageClass : storage.snapshotCapacityByStorageClassKg().keySet())
             assertEquals(storage.usedCapacityKg(storageClass), restoredStorage.usedCapacityKg(storageClass));
-        assertEquals(2, GeneratedCampaignManufacturingUi.rows(restored).size());
+        var presentationBefore = restored.captureState();
+        var rows = GeneratedCampaignManufacturingUi.rows(restored);
+        assertEquals(10, rows.size());
+        var smallCraftEngineering = com.spacesim.content.ship.Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
+        for (var product : Stage23SmallCraftProductionCatalogs.moduleIds()) {
+            var row = rows.stream().filter(r -> r.selection().stableId().equals(
+                    "pilot-manufacturing|" + station.stationId() + '|' + product)).findFirst().orElseThrow();
+            assertEquals(smallCraftEngineering.findModule(product).displayName(), row.name());
+        }
+        String orderId = restored.coordinator().runtime().manufacturingQueue().capture().stream()
+                .filter(order -> order.stationId().equals(station.stationId()) && order.operationId().equals(module))
+                .findFirst().orElseThrow().orderId();
+        assertTrue(rows.stream().anyMatch(row -> row.selection().stableId().equals(
+                "pilot-manufacturing-cancel|" + station.stationId() + '|' + orderId)));
+        assertTrue(rows.stream().anyMatch(row -> row.name().equals("Грузовая секция для грузового корабля")));
+        assertEquals(presentationBefore, restored.captureState(), "Manufacturing presentation cannot grant equipment or materials");
         restored.advanceFrame(0);
         assertTrue(saved.equals(restored.captureState()), "Zero frame cannot perform work");
         campaign.coordinator().setPaused(false); restored.coordinator().setPaused(false);

@@ -57,7 +57,7 @@ public final class GeneratedWorldFreightAutopilot {
         int dispatched = 0;
         int jumpsRequested = 0;
         int extracted = 0;
-        for (FreighterState fleet : runtime.freight().capture().freighters()) {
+        for (FreighterState fleet : runtime.freight().freighterStates()) {
             if (fleet.phase() == FreightPhase.IDLE || fleet.phase() == FreightPhase.DESTROYED) {
                 continue;
             }

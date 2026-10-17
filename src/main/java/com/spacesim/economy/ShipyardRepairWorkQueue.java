@@ -17,7 +17,7 @@ import java.util.function.Function;
 public final class ShipyardRepairWorkQueue {
     private final Stage18ResourceOntologyCatalog ontology = Stage18ResourceOntologyLoader.loadDefault();
     private final Stage18ShipyardRuntime physical = new Stage18ShipyardRuntime(
-            Stage22CivilianMiningProductionPath.loadRuntimeShipyards(), ontology, Stage22CivilianMiningProductionPath.loadProducts());
+            com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards(), ontology, com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
     private final TreeMap<String, RepairOrder> orders = new TreeMap<>();
     private long lastTick;
     /**
@@ -71,7 +71,7 @@ public final class ShipyardRepairWorkQueue {
         private static final ShipyardEngineeringService COMMON_PLANNER = new ShipyardEngineeringService(COMMON_ENGINEERING, ShipyardIndustrialCatalogLoader.loadDefault(COMMON_ENGINEERING));
     }
     private void validateRecipe(RepairOrder order) {
-        var definition = Stage22CivilianMiningProductionPath.loadRuntimeShipyards().findYard(order.yardDefinitionId());
+        var definition = com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards().findYard(order.yardDefinitionId());
         if (definition == null) throw new IllegalArgumentException("Unknown repair yard definition");
         // Authored design envelope is used only to validate the recipe, never as an operational grant.
         var design = new ShipyardCapability(order.yardInstanceId(), definition.berthDimensionsM(), definition.maxServiceMassKg(),

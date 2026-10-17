@@ -14,7 +14,7 @@ import java.util.function.*;
 
 /** Finite physical refit queue. Caller owns authorization, cargo preflight and composed persistence. */
 public final class ShipyardRefitWorkQueue {
-    private final Stage18ManufacturingProductRegistry products = Stage22CivilianMiningProductionPath.loadProducts();
+    private final Stage18ManufacturingProductRegistry products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
     private final TreeMap<String, Order> orders = new TreeMap<>();
     private long lastTick;
     /**
@@ -42,7 +42,7 @@ public final class ShipyardRefitWorkQueue {
                 ship.runtimeState.consumables(), ship.instanceState.damage(), yard.plannerCapability());
     }
     private WorkPlan designPlan(Order o) {
-        var d = Objects.requireNonNull(Stage22CivilianMiningProductionPath.loadRuntimeShipyards().findYard(o.yardDefinitionId()), "Unknown refit yard");
+        var d = Objects.requireNonNull(com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards().findYard(o.yardDefinitionId()), "Unknown refit yard");
         var capability = new ShipyardCapability(o.yardInstanceId(), d.berthDimensionsM(), d.maxServiceMassKg(),
                 d.stage175FabricationCapabilities(), d.stage175HandledRequirementIds(), d.toolingTags(), d.precisionCapability(),
                 d.ratedEngineeringWorkRate(), d.laborCapacity(), d.automationCapacity(), d.ratedIntegrationPowerW());
@@ -258,7 +258,7 @@ public final class ShipyardRefitWorkQueue {
         var result = new TreeMap<String, Double>(); counts.forEach((id, count) -> {
             var product = products.findProduct(id);
             if (product == null || product.kind() != Stage18ManufacturingProductRegistry.ProductKind.MODULE
-                    || Stage22CivilianMiningProductionPath.loadRuntimeShipyards().findModuleProfile(id) == null) throw new IllegalArgumentException("Unknown physical refit module");
+                    || com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards().findModuleProfile(id) == null) throw new IllegalArgumentException("Unknown physical refit module");
             result.merge(product.storageClassId(), product.unitMassKg() * count, Double::sum);
         }); return result;
     }

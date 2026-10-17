@@ -81,7 +81,7 @@ public final class GeneratedCampaignSession {
         Stage20GeneratedWorldRuntimePersistentState prepared =
                 GeneratedCampaignInitialFreightCommitment.apply(berthed);
         LiveRuntime runtime = Stage20GeneratedWorldRuntimeBridge.restore(prepared,
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
         return new GeneratedCampaignSession(generated.rootSeed(), generated.content(), runtime);
     }
 
@@ -92,9 +92,18 @@ public final class GeneratedCampaignSession {
      * @return resumed ordinary campaign session
      */
     public static GeneratedCampaignSession restore(Stage20GeneratedWorldRuntimePersistentState checkpoint) {
+        return restore(checkpoint, java.util.Map.of());
+    }
+
+    /**
+     * @param checkpoint exact saved campaign
+     * @param admissions explicit existing-station operators
+     * @return restored authority retaining admitted industrial stations
+     */
+    public static GeneratedCampaignSession restore(Stage20GeneratedWorldRuntimePersistentState checkpoint, java.util.Map<String, String> admissions) {
         Stage20GeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(checkpoint, "checkpoint");
         LiveRuntime restored = Stage20GeneratedWorldRuntimeBridge.restore(saved,
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), java.util.Map.copyOf(admissions));
         return new GeneratedCampaignSession(
                 saved.campaign().generationIdentity().worldSeed(),
                 ContentCatalogLoader.loadDefault(),
@@ -249,7 +258,7 @@ public final class GeneratedCampaignSession {
     private void observeFreightDeliveryDeadlines(long authoritativeTick) {
         double simulationSeconds = authoritativeTick * (double) activeClock().getFixedStepSeconds();
         var freight = runtime.freight();
-        for (var fleet : freight.capture().freighters()) {
+        for (var fleet : freight.freighterStates()) {
             if (fleet.activeOrderId().isEmpty()) {
                 continue;
             }

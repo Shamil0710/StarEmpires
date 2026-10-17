@@ -64,7 +64,7 @@ final class GeneratedCampaignNpcSupplyOffers {
                     station.stationId(), station.systemId().value(), kilograms, order.commodityId());
             try {
                 com.spacesim.world.Stage21HMissionAuthority.requireIssuerAuthority(world, runtime.freight().capture(),
-                        runtime.captureState().campaign().industrialState(), archive, coordinator.operations(), npc.factionContentId(), objective);
+                        runtime.captureCampaignState().industrialState(), archive, coordinator.operations(), npc.factionContentId(), objective);
             } catch (IllegalStateException exception) {
                 continue;
             }
@@ -73,7 +73,7 @@ final class GeneratedCampaignNpcSupplyOffers {
                 service.receiveActorObservation(npcId, observations, observation, cause);
             long duration = (long) Math.ceil(86400d / coordinator.session().fixedStepSeconds());
             if (tick > Long.MAX_VALUE - duration) return;
-            service.offerMission(world, runtime.freight().capture(), runtime.captureState().campaign().industrialState(), archive,
+            service.offerMission(world, runtime.freight().capture(), runtime.captureCampaignState().industrialState(), archive,
                     coordinator.operations(), npcId, Stage21HNpcMissionState.MissionTemplate.EMERGENCY_SUPPLY_DELIVERY,
                     objective, List.of(cause), tick + duration, reward);
             return;

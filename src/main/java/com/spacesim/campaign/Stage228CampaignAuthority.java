@@ -44,6 +44,7 @@ import java.util.function.LongFunction;
 public final class Stage228CampaignAuthority {
     private final GeneratedCampaignCoordinator coordinator;
     private PlayerState playerState;
+    private com.spacesim.world.Stage23FleetCrewManifest crewManifest = com.spacesim.world.Stage23FleetCrewManifest.unobserved();
     private com.spacesim.simulation.CampaignTimeSkipState timeSkip = com.spacesim.simulation.CampaignTimeSkipState.idle();
     private String lastTimeSkipMessage = "";
     private com.spacesim.player.PlayerJournalState playerJournal = com.spacesim.player.PlayerJournalState.empty();
@@ -51,13 +52,23 @@ public final class Stage228CampaignAuthority {
             com.spacesim.economy.ShipyardModuleCustodyState.empty();
     private com.spacesim.economy.ShipyardRepairWorkQueue repairQueue = new com.spacesim.economy.ShipyardRepairWorkQueue(
             com.spacesim.economy.ShipyardRepairQueueState.empty());
+    private com.spacesim.economy.ShipyardSmallCraftBuildWorkQueue smallCraftBuilds = new com.spacesim.economy.ShipyardSmallCraftBuildWorkQueue(
+            com.spacesim.economy.ShipyardSmallCraftBuildQueueState.empty());
     private com.spacesim.economy.ShipyardRefitWorkQueue refitQueue = new com.spacesim.economy.ShipyardRefitWorkQueue(
             com.spacesim.economy.ShipyardRefitQueueState.empty());
     private boolean freshPilotStart;
+    private GeneratedCampaignInitialStationLegalCapital.Plan initialStationCapital =
+            GeneratedCampaignInitialStationLegalCapital.Plan.baseline();
+
+    /** Explicit fresh-campaign legal-capital authoring, never applied by restore. */
+    public enum StationLegalCapitalPolicy {
+        /** Preserve the historical specialization/territorial owner associations. */ BASELINE,
+        /** Assign bounded existing civilian processing assets to existing NPC factions. */ CIVILIAN_PROCESSING_CAPITAL
+    }
     private com.spacesim.economy.ShipyardModuleTransferWorkQueue moduleTransfers = new com.spacesim.economy.ShipyardModuleTransferWorkQueue(
-            com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), com.spacesim.economy.ShipyardModuleTransferWorkQueue.State.empty());
+            com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), com.spacesim.economy.ShipyardModuleTransferWorkQueue.State.empty());
     private com.spacesim.economy.FinishedProductTransferWorkQueue productTransfers = new com.spacesim.economy.FinishedProductTransferWorkQueue(
-            com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), com.spacesim.economy.FinishedProductTransferWorkQueue.State.empty());
+            com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), com.spacesim.economy.FinishedProductTransferWorkQueue.State.empty());
     private float thrustAxisX;
     private com.spacesim.economy.Stage23YardConstructionWorkQueue yardConstruction = new com.spacesim.economy.Stage23YardConstructionWorkQueue(
             com.spacesim.content.Stage23YardConstructionCatalog.loadDefault(), com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault(),
@@ -76,6 +87,10 @@ public final class Stage228CampaignAuthority {
     private SmallCraftMissionState missions;
     private LogisticsState logistics;
     private List<CarrierWingAssignment> carrierWings;
+    private java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership = java.util.List.of();
+    private java.util.Map<String, String> industrialAdmissions = java.util.Map.of();
+    private com.spacesim.world.SmallCraftLocalFlightRuntime localFlights;
+    private final java.util.Set<FleetId> groupIntervalClaims = new java.util.HashSet<>();
 
     private Stage228CampaignAuthority(
             GeneratedCampaignCoordinator coordinator,
@@ -107,6 +122,8 @@ public final class Stage228CampaignAuthority {
                 this.logistics,
                 this.carrierWings,
                 this.coordinator.runtime().world().getAuthoritativeWorldTick());
+        localFlights = new com.spacesim.world.SmallCraftLocalFlightRuntime(smallCraft, hangars, flightDeck,
+                SmallCraftCatalog.CONTENT, missions, com.spacesim.world.SmallCraftLocalFlightState.empty());
     }
 
     /**
@@ -132,7 +149,8 @@ public final class Stage228CampaignAuthority {
             long rootSeed,
             Collection<DeckProfile> flightDeckProfiles) {
         return create(rootSeed, flightDeckProfiles,
-                com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.CIVILIAN_MINING_RESERVE);
+                com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.CIVILIAN_MINING_RESERVE,
+                StationLegalCapitalPolicy.CIVILIAN_PROCESSING_CAPITAL);
     }
 
     /**
@@ -144,6 +162,20 @@ public final class Stage228CampaignAuthority {
      */
     public static Stage228CampaignAuthority create(long rootSeed, Collection<DeckProfile> flightDeckProfiles,
             com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy) {
+        return create(rootSeed, flightDeckProfiles, reservePolicy, StationLegalCapitalPolicy.BASELINE);
+    }
+
+    /**
+     * Authors explicit initial NPC ship and station manifests on a fresh campaign only.
+     * @param rootSeed deterministic world seed
+     * @param flightDeckProfiles actual handling profiles
+     * @param reservePolicy initial ship loadouts
+     * @param stationPolicy bounded initial legal station associations
+     * @return fresh campaign authority
+     */
+    public static Stage228CampaignAuthority create(long rootSeed, Collection<DeckProfile> flightDeckProfiles,
+            com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy reservePolicy,
+            StationLegalCapitalPolicy stationPolicy) {
         SmallCraftFitAuthority fitAuthority = productionFitAuthority();
         SmallCraftRegistry smallCraft = SmallCraftRegistry.empty(fitAuthority);
         SmallCraftHangarRegistry hangars = SmallCraftHangarRegistry.empty(smallCraft);
@@ -158,7 +190,13 @@ public final class Stage228CampaignAuthority {
                 LogisticsState.empty(),
                 List.of(),
                 null);
-        GeneratedCampaignNpcPlacement.install(created.coordinator);
+        created.initialStationCapital = GeneratedCampaignInitialStationLegalCapital.plan(created.coordinator.runtime(),
+                Objects.requireNonNull(stationPolicy, "stationPolicy"));
+        created.coordinator.runtime().authorInitialStationOwnershipKnowledge(created.initialStationCapital.assignments(),
+                GeneratedCampaignInitialStationLegalCapital.VERSION);
+        GeneratedCampaignNpcPlacement.install(created.coordinator, created.initialStationCapital);
+        if (reservePolicy != com.spacesim.persistence.Stage20FreightRuntimeMaterializer.ReserveLoadoutPolicy.BASELINE)
+            created.crewManifest = com.spacesim.world.Stage23FleetCrewManifest.commissionNewGame(created.coordinator.runtime().world());
         created.freshPilotStart = true;
         return created;
     }
@@ -177,7 +215,7 @@ public final class Stage228CampaignAuthority {
         Stage228GeneratedCampaignPersistentState saved =
                 Objects.requireNonNull(checkpoint, "checkpoint");
         GeneratedCampaignCoordinator coordinator =
-                GeneratedCampaignCoordinator.restore(saved.stage21Runtime());
+                GeneratedCampaignCoordinator.restore(saved.stage21Runtime(), saved.industrialAdmissions());
         long authoritativeTick = coordinator.runtime().world().getAuthoritativeWorldTick();
         if (saved.flightDeck().lastProcessedTick() > authoritativeTick) {
             throw new IllegalArgumentException(
@@ -210,9 +248,11 @@ public final class Stage228CampaignAuthority {
                 operations.carrierWings(),
                 saved.playerState());
         restored.playerJournal = saved.playerJournal();
+        restored.localFlights = new com.spacesim.world.SmallCraftLocalFlightRuntime(smallCraft, hangars, flightDeck,
+                SmallCraftCatalog.CONTENT, operations.missions(), saved.localFlights());
         restored.moduleCustody = saved.moduleCustody();
         com.spacesim.economy.ShipyardModuleCustodyStorage.bind(restored.moduleCustody,
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(),
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(),
                 restored::moduleStorage);
         coordinator.runtime().freight().synchronizeModuleCustody(restored.moduleCustody);
         restored.repairQueue = new com.spacesim.economy.ShipyardRepairWorkQueue(saved.repairQueue());
@@ -221,16 +261,28 @@ public final class Stage228CampaignAuthority {
         restored.refitQueue.validateUsedReservations(restored.moduleCustody);
         restored.refitQueue.restoreReservations(id -> coordinator.runtime().infrastructure().endpoint(id).storage());
         restored.moduleTransfers = new com.spacesim.economy.ShipyardModuleTransferWorkQueue(
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), saved.moduleTransfers());
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), saved.moduleTransfers());
         restored.moduleTransfers.validateCustody(restored.moduleCustody);
         restored.timeSkip = saved.timeSkip();
+        restored.crewManifest = saved.crewManifest();
+        restored.personalCraftOwnership = saved.personalCraftOwnership();
+        restored.industrialAdmissions = saved.industrialAdmissions();
+        for (var admission : restored.industrialAdmissions.entrySet()) {
+            var ref = restored.pilotMarketReference(admission.getKey()).orElseThrow();
+            var faction = coordinator.runtime().world().findSession(ref.systemId()).orElseThrow().getEntityRegistry()
+                    .require(ref.entityId()).getComponent(com.spacesim.components.FactionComponent.class);
+            if (faction == null || coordinator.runtime().world().findFactionStableId(faction.factionId)
+                    .filter(admission.getValue()::equals).isEmpty()) throw new IllegalArgumentException("Admitted station operator differs from physical registration");
+        }
         restored.productTransfers = new com.spacesim.economy.FinishedProductTransferWorkQueue(
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(), saved.productTransfers());
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), saved.productTransfers());
         restored.productTransfers.bindReservations(restored::productStorage);
         restored.yardConstruction = new com.spacesim.economy.Stage23YardConstructionWorkQueue(
                 com.spacesim.content.Stage23YardConstructionCatalog.loadDefault(), com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault(),
                 saved.yardConstruction());
         restored.yardConstruction.bindReservations(id -> restored.coordinator.runtime().infrastructure().endpoint(id).storage());
+        restored.smallCraftBuilds = new com.spacesim.economy.ShipyardSmallCraftBuildWorkQueue(saved.smallCraftBuilds());
+        restored.smallCraftBuilds.restoreReservations(id -> restored.coordinator.runtime().infrastructure().endpoint(id).storage());
         return restored;
     }
 
@@ -265,11 +317,14 @@ public final class Stage228CampaignAuthority {
                 Stage228FlightDeckPersistenceMapper.capture(flightDeck),
                 Stage228OperationsPersistenceMapper.capture(
                         missions, logistics, carrierWings),
-                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip);
+                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip, crewManifest, localFlights.capture(), personalCraftOwnership, industrialAdmissions, smallCraftBuilds.capture());
     }
 
     /** @return immutable personal committed history, independent of the selected knowledge viewer */
     public com.spacesim.player.PlayerJournalState playerJournal() { return playerJournal; }
+
+    /** @return exact current deployed-craft positions, without creating or advancing a flight */
+    public com.spacesim.world.SmallCraftLocalFlightState localFlightState() { return localFlights.capture(); }
 
     /** @return exact individual used equipment inventory, never pristine product counts */
     public com.spacesim.economy.ShipyardModuleCustodyState moduleCustody() { return moduleCustody; }
@@ -293,6 +348,12 @@ public final class Stage228CampaignAuthority {
     /** @return actual pending refit equipment custody and performed work */
     public com.spacesim.economy.ShipyardRefitQueueState refitQueue() { return refitQueue.capture(); }
 
+    private void recordPersonalSensorContacts(long tick) {
+        for (long contact : GeneratedCampaignPersonalSensors.review(this, tick))
+            recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "SENSOR_CONTACT_DETECTED",
+                    "", "Контакт " + contact, 1, 0, playerState.activeFleetId());
+    }
+
     private void recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind kind, String action,
             String endpoint, String subject, long quantity, long walletDelta, FleetId fleet) {
         if (playerState == null) return;
@@ -315,6 +376,9 @@ public final class Stage228CampaignAuthority {
 
     /** @return whether this unsaved new-game session can still initialize a pilot */
     public boolean canStartIndependentPilot() { return freshPilotStart && playerState == null; }
+
+    /** @return number of existing civilian stations assigned initial NPC operators by this fresh campaign */
+    public int initialCivilianStationAssociationCount() { return initialStationCapital.assignments().size(); }
 
     /** Immutable campaign-bound new-game confirmation. */
     public static final class PilotStartPreview {
@@ -346,7 +410,7 @@ public final class Stage228CampaignAuthority {
         if (reserve == null) return new PilotStartPreview(this, baseline, null, null);
         var candidate = restore(baseline);
         try {
-            candidate.initializePilot(reserve.fleetId(), reserve.stableFactionId());
+            candidate.initializePilot(reserve.fleetId(), reserve.stableFactionId(), initialStationCapital);
             candidate.captureState();
             return new PilotStartPreview(this, baseline, reserve.fleetId(), reserve.stableFactionId());
         } catch (IllegalArgumentException | IllegalStateException exception) {
@@ -363,7 +427,7 @@ public final class Stage228CampaignAuthority {
         var checked = Objects.requireNonNull(preview);
         if (checked.owner != this || !checked.allowed() || !canStartIndependentPilot()
                 || !checked.baseline.equals(captureState())) throw new IllegalStateException("Pilot start is stale or unavailable");
-        int briefingCount = initializePilot(checked.fleet, checked.seller);
+        int briefingCount = initializePilot(checked.fleet, checked.seller, initialStationCapital);
         freshPilotStart = false;
         recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "PILOT_START", checked.seller,
                 "", 1, PILOT_SAVINGS_MILLI_CREDITS - PILOT_SHIP_PRICE_MILLI_CREDITS, checked.fleet);
@@ -372,7 +436,7 @@ public final class Stage228CampaignAuthority {
         return playerState;
     }
 
-    private int initializePilot(FleetId fleetId, String seller) {
+    private int initializePilot(FleetId fleetId, String seller, GeneratedCampaignInitialStationLegalCapital.Plan stationCapital) {
         if (playerState != null) throw new IllegalStateException("Player already initialized");
         var runtime = coordinator.runtime();
         var reserve = runtime.freight().findFreighter(fleetId).orElseThrow();
@@ -390,7 +454,7 @@ public final class Stage228CampaignAuthority {
                 .purchaseFactionFleet(fleetId, seller, PILOT_SHIP_PRICE_MILLI_CREDITS))
             throw new IllegalStateException("Reserve purchase cannot settle");
         playerState = adapter.player();
-        initializePilotMarkets();
+        initializePilotMarkets(stationCapital);
         return receiveSellerStationBriefing(fleetId, seller);
     }
 
@@ -558,6 +622,7 @@ public final class Stage228CampaignAuthority {
                 order.targetFleetId() == null ? "" : Long.toString(order.targetFleetId().value()), isolated -> {
             var player = isolated.playerState;
             if (order.fleetId().equals(player.activeFleetId())) throw new IllegalStateException("Direct control takes priority");
+            isolated.cancelPersonalGroupForFleet(order.fleetId());
             if (!java.util.Set.of(com.spacesim.player.FleetOrderType.HOLD, com.spacesim.player.FleetOrderType.MOVE,
                     com.spacesim.player.FleetOrderType.FOLLOW, com.spacesim.player.FleetOrderType.ESCORT,
                     com.spacesim.player.FleetOrderType.PATROL).contains(order.type()))
@@ -595,6 +660,39 @@ public final class Stage228CampaignAuthority {
         });
     }
 
+    /**
+     * Cancels an owned craft's queued launch through the common physical deck validator.
+     * Damaged or unavailable host bays do not prevent cancelling existing pending work.
+     * @param craftId existing individual craft identity
+     * @return pure single-use preview; deployed craft cannot be cancelled or removed
+     */
+    public PlayerFactionCommandPreview previewPlayerCraftLaunchCancellation(com.spacesim.world.SmallCraftId craftId) {
+        Objects.requireNonNull(craftId);
+        return previewPersonalCommand("SMALL_CRAFT_LAUNCH_CANCELLED", null, "", "Аппарат №" + craftId.value(), isolated -> {
+            var p = isolated.playerState;
+            if (!isolated.personalCraftOwnership.contains(craftId)) throw new IllegalStateException("No personal craft property right");
+            var individual = isolated.smallCraft.find(craftId).orElseThrow(() -> new IllegalStateException("Unknown craft"));
+            var wing = isolated.carrierWings.stream().filter(w -> w.craftIds().contains(craftId)
+                    && p.ownedFleetIds().contains(w.carrierFleetId())).findFirst().orElseThrow(() -> new IllegalStateException("No personal craft ownership"));
+            var world = isolated.coordinator.runtime().world();
+            var host = world.findFleet(wing.carrierFleetId()).orElseThrow(() -> new IllegalStateException("Absent craft host"));
+            Integer legalOwner = null;
+            if (host.locationKind() == com.spacesim.world.FleetLocationKind.IN_SYSTEM) {
+                var faction = world.findSession(host.systemId()).orElseThrow().getEntityRegistry().require(host.localEntityId())
+                        .getComponent(com.spacesim.components.FactionComponent.class);
+                if (faction != null) legalOwner = faction.factionId;
+            } else if (host.transitState() != null && host.transitState().entityState().faction() != null)
+                legalOwner = host.transitState().entityState().faction().factionId();
+            if (legalOwner == null || !wing.stableFactionId().equals(individual.stableFactionId())
+                    || world.findFactionStableId(legalOwner).filter(wing.stableFactionId()::equals).isEmpty())
+                throw new IllegalStateException("Craft cancellation requires its current personally owned legal host");
+            var mission = isolated.missions.activeMissionFor(craftId).orElseThrow(() -> new IllegalStateException("No pending craft mission"));
+            var command = new com.spacesim.world.SmallCraftMissionCommandService(isolated.smallCraft, isolated.hangars,
+                    isolated.flightDeck, SmallCraftCatalog.CONTENT);
+            isolated.commitMissionState(command.cancelQueuedLaunch(isolated.missions, mission.id()));
+        });
+    }
+
     private PlayerFactionCommandPreview previewPersonalCommand(String action, FleetId fleet, String target, String subject,
             java.util.function.Consumer<Stage228CampaignAuthority> command) {
         var baseline = captureState();
@@ -607,6 +705,276 @@ public final class Stage228CampaignAuthority {
             restore(candidate).captureState();
         } catch (IllegalStateException | IllegalArgumentException exception) { candidate = null; }
         return new PlayerFactionCommandPreview(this, baseline, candidate, action, target, subject, fleet);
+    }
+
+    /**
+     * Previews an ordinary Stage-21D group around existing personally owned, legally registered fleets.
+     * @param name display name, independent of raw fleet identifiers
+     * @param members non-empty personal ordinary fleet identities
+     * @param home existing personally known home system
+     * @return pure single-use checkpoint confirmation without new assets or readiness grants
+     */
+    public PlayerFactionCommandPreview previewPlayerCommandGroup(String name, List<FleetId> members,
+            com.spacesim.world.StarSystemId home) {
+        var requested = List.copyOf(members);
+        return previewPersonalCommand("FORM_COMMAND_GROUP", null, "", name, isolated -> {
+            var player = isolated.playerState;
+            if (name == null || name.length() > 512 || name.indexOf('\n') >= 0 || name.indexOf('\r') >= 0)
+                throw new IllegalArgumentException("Personal command-group name exceeds journal bounds");
+            if (player.factionContentId() == null || requested.isEmpty()
+                    || !player.ownedFleetIds().containsAll(requested) || !player.discoveredSystemIds().contains(home))
+                throw new IllegalStateException("Command group requires own faction, owned members and known home");
+            var world = isolated.coordinator.runtime().world();
+            int faction = world.findFactionRuntimeId(player.factionContentId()).orElseThrow();
+            for (var id : requested) {
+                var freight = isolated.coordinator.runtime().freight().findFreighter(id);
+                if (freight.isPresent() && freight.orElseThrow().phase()
+                        != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
+                    throw new IllegalStateException("An assigned transport remains with its existing owner");
+            }
+            isolated.coordinator.formCommandGroup(faction, name, requested, home, isolated.personalOperationalAvailability());
+        });
+    }
+
+    /**
+     * Previews releasing a personal faction's group without erasing its history or aborting a jump.
+     * @param groupId current own-faction group identity
+     * @return pure single-use exact-state confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerCommandGroupRetirement(long groupId) {
+        return previewPersonalCommand("RETIRE_COMMAND_GROUP", null, "", "", isolated -> {
+            var p = isolated.playerState;
+            if (p.factionContentId() == null) throw new IllegalStateException("Own faction required");
+            var group = isolated.coordinator.commands().requireGroup(groupId);
+            int owner = isolated.coordinator.runtime().world().findFactionRuntimeId(p.factionContentId()).orElseThrow();
+            if (group.retired() || group.factionId() != owner || !p.ownedFleetIds().containsAll(group.memberFleetIds()))
+                throw new IllegalStateException("No current personal command-group authority");
+            isolated.coordinator.retireCommandGroup(groupId, com.spacesim.world.FleetCommandState.OrderStatus.CANCELLED);
+        });
+    }
+
+    /**
+     * Previews known lawful STAGE/RETURN movement for an existing personal faction group.
+     * @param groupId current personally controlled group
+     * @param type STAGE or RETURN
+     * @param target known destination; RETURN requires the group's recorded home
+     * @return pure exact-state confirmation; no stock, crew, coordinates or time are granted
+     */
+    public PlayerFactionCommandPreview previewPlayerGroupMovement(long groupId,
+            com.spacesim.world.FleetCommandState.OrderType type, com.spacesim.world.StarSystemId target) {
+        return previewPersonalCommand("GROUP_" + type.name(), null, "", "", isolated -> {
+            if (thrustAxisX != 0 || thrustAxisY != 0 || braking)
+                throw new IllegalStateException("Release direct controls before delegating group movement");
+            var p = isolated.playerState; var w = isolated.coordinator.runtime().world();
+            var group = isolated.coordinator.commands().requireGroup(groupId);
+            if (p.factionContentId() == null || group.retired()
+                    || w.findFactionRuntimeId(p.factionContentId()).orElseThrow() != group.factionId()
+                    || !p.ownedFleetIds().containsAll(group.memberFleetIds()) || !p.discoveredSystemIds().contains(target)
+                    || (type != com.spacesim.world.FleetCommandState.OrderType.STAGE && type != com.spacesim.world.FleetCommandState.OrderType.RETURN)
+                    || type == com.spacesim.world.FleetCommandState.OrderType.RETURN && !target.equals(group.homeSystemId()))
+                throw new IllegalStateException("No current owned group, admitted movement type or known destination");
+            if (p.docked() && group.memberFleetIds().contains(p.activeFleetId())
+                    || !isolated.flightDeck.queued().isEmpty() || !isolated.flightDeck.active().isEmpty())
+                throw new IllegalStateException("Undock and finish flight-deck work before group movement");
+            for (var id : group.memberFleetIds()) {
+                var placement = w.findFleet(id).orElseThrow();
+                if (placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                        || w.findFleetJump(id).isPresent() || !isolated.canAdvanceExactPersonalFleet(id))
+                    throw new IllegalStateException("Group member remains with another physical movement owner");
+                var ready = w.previewFittedFleetJump(id).orElseThrow();
+                if (ready.failure() == com.spacesim.ship.ShipEngineeringRuntime.JumpFailure.NO_FTL_MODULE
+                        || ready.failure() == com.spacesim.ship.ShipEngineeringRuntime.JumpFailure.INVALID_CAPABILITY
+                        || ready.failure() == com.spacesim.ship.ShipEngineeringRuntime.JumpFailure.TRANSLATED_MASS_EXCEEDED)
+                    throw new IllegalStateException("Group member lacks compatible fitted movement capability");
+            }
+            var orders = p.fleetOrders().stream().filter(o -> !group.memberFleetIds().contains(o.fleetId())).toList();
+            isolated.playerState = new PlayerState(p.walletMilliCredits(), p.factionContentId(), p.reputations(), p.ownedFleetIds(),
+                    p.activeFleetId(), p.discoveredSystemIds(), p.discoveredObjects(), p.homeSystemId(), p.dockedAt(), orders,
+                    p.threatIntel(), p.ownedConstructionProjectIds(), p.ownedStations());
+            isolated.coordinator.submitPersonalGroupMovement(isolated.playerState, groupId, type, target,
+                    isolated.personalOperationalAvailability());
+        });
+    }
+
+    /**
+     * Previews stationary self-defense duty in the group's current personally known system.
+     * @param groupId existing own registered group
+     * @return pure confirmation with shared combat-readiness admission and no supply grants
+     */
+    public PlayerFactionCommandPreview previewPlayerGroupGuard(long groupId) {
+        return previewPersonalCommand("GROUP_GUARD", null, "", "", isolated -> {
+            if (thrustAxisX != 0 || thrustAxisY != 0 || braking)
+                throw new IllegalStateException("Release direct controls before group duty");
+            var p = isolated.playerState; var w = isolated.coordinator.runtime().world();
+            var group = isolated.coordinator.commands().requireGroup(groupId);
+            if (p.factionContentId() == null || group.retired()
+                    || w.findFactionRuntimeId(p.factionContentId()).orElseThrow() != group.factionId()
+                    || !p.ownedFleetIds().containsAll(group.memberFleetIds())
+                    || p.docked() && group.memberFleetIds().contains(p.activeFleetId())
+                    || !isolated.flightDeck.queued().isEmpty() || !isolated.flightDeck.active().isEmpty())
+                throw new IllegalStateException("Local guard requires own undocked registered forces");
+            for (var id : group.memberFleetIds()) {
+                var placement = w.findFleet(id).orElseThrow();
+                if (placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                        || !p.discoveredSystemIds().contains(placement.systemId()) || w.findFleetJump(id).isPresent()
+                        || !isolated.canAdvanceExactPersonalFleet(id)
+                        || isolated.coordinator.runtime().freight().personalMiningOrders().stream().anyMatch(o -> o.fleetId().equals(id))
+                        || isolated.repairQueue.capture().orders().stream().anyMatch(o -> o.fleetId() == id.value())
+                        || isolated.refitQueue.capture().orders().stream().anyMatch(o -> o.fleetId() == id.value()))
+                    throw new IllegalStateException("Guard member has competing work or unknown physical placement");
+            }
+            isolated.playerState = new PlayerState(p.walletMilliCredits(), p.factionContentId(), p.reputations(), p.ownedFleetIds(),
+                    p.activeFleetId(), p.discoveredSystemIds(), p.discoveredObjects(), p.homeSystemId(), p.dockedAt(),
+                    p.fleetOrders().stream().filter(o -> !group.memberFleetIds().contains(o.fleetId())).toList(),
+                    p.threatIntel(), p.ownedConstructionProjectIds(), p.ownedStations());
+            isolated.coordinator.submitPersonalGroupGuard(groupId, isolated.personalOperationalAvailability());
+        });
+    }
+
+    /**
+     * Previews ending local guard duty while retaining its order and operation history.
+     * @param groupId current own local guard group
+     * @return pure single-use stop confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerGroupGuardStop(long groupId) {
+        return previewPersonalCommand("GROUP_GUARD_STOPPED", null, "", "", isolated -> {
+            var p = isolated.playerState; var group = isolated.coordinator.commands().requireGroup(groupId);
+            if (p.factionContentId() == null || group.retired() || !p.ownedFleetIds().containsAll(group.memberFleetIds())
+                    || isolated.coordinator.runtime().world().findFactionRuntimeId(p.factionContentId()).orElseThrow() != group.factionId()
+                    || !isolated.hasPlayerGroupGuard(groupId))
+                throw new IllegalStateException("No personal local guard authority");
+            isolated.coordinator.cancelPersonalGroupMovement(groupId);
+        });
+    }
+
+    /**
+     * Cancels future group movement without interrupting its already started physical jump.
+     * @param groupId current own-faction group
+     * @return pure single-use command confirmation
+     */
+    public PlayerFactionCommandPreview previewPlayerGroupMovementCancellation(long groupId) {
+        return previewPersonalCommand("GROUP_MOVEMENT_CANCELLED", null, "", "", isolated -> {
+            var p = isolated.playerState; var group = isolated.coordinator.commands().requireGroup(groupId);
+            if (p.factionContentId() == null || group.retired() || !p.ownedFleetIds().containsAll(group.memberFleetIds())
+                    || isolated.coordinator.runtime().world().findFactionRuntimeId(p.factionContentId()).orElseThrow() != group.factionId())
+                throw new IllegalStateException("No personal group authority");
+            isolated.coordinator.cancelPersonalGroupMovement(groupId);
+        });
+    }
+
+    /**
+     * Identifies an active personal local guard with its retained onboard policy.
+     * @param groupId command group identity
+     * @return whether the local guard lifecycle owns this group
+     */
+    public boolean hasPlayerGroupGuard(long groupId) {
+        return coordinator.hasPersonalGroupGuard(groupId);
+    }
+
+    /**
+     * Recognizes retained local guard history without reinterpreting other defense operations.
+     * @param operation retained operation
+     * @return whether the operation has the personal local guard shape and source order
+     */
+    public boolean isPlayerGroupGuardOperation(com.spacesim.world.StrategicOperationState.OperationState operation) {
+        return coordinator.isPersonalGroupGuardOperation(operation);
+    }
+
+    private boolean personalGroupControls(FleetId id) {
+        if (id == null || playerState == null || playerState.factionContentId() == null) return false;
+        var owner = coordinator.runtime().world().findFactionRuntimeId(playerState.factionContentId());
+        return owner.isPresent() && coordinator.commands().orders().stream().anyMatch(o -> o.status().active()
+                && o.source() == com.spacesim.world.FleetCommandState.OrderSource.PLAYER
+                && (o.type() == com.spacesim.world.FleetCommandState.OrderType.STAGE || o.type() == com.spacesim.world.FleetCommandState.OrderType.RETURN
+                || o.type() == com.spacesim.world.FleetCommandState.OrderType.GUARD && hasPlayerGroupGuard(o.commandGroupId()))
+                && coordinator.commands().requireGroup(o.commandGroupId()).factionId() == owner.orElseThrow()
+                && playerState.ownedFleetIds().containsAll(coordinator.commands().requireGroup(o.commandGroupId()).memberFleetIds())
+                && coordinator.commands().requireGroup(o.commandGroupId()).memberFleetIds().contains(id));
+    }
+
+    private void cancelPersonalGroupForFleet(FleetId id) {
+        for (var group : coordinator.commands().groups()) if (!group.retired() && group.memberFleetIds().contains(id)
+                && personalGroupControls(id)) {
+            boolean guarding = coordinator.commands().activeOrderFor(group.id()).orElseThrow().type()
+                    == com.spacesim.world.FleetCommandState.OrderType.GUARD;
+            coordinator.cancelPersonalGroupMovement(group.id());
+            recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    guarding ? "GROUP_GUARD_STOPPED" : "GROUP_MOVEMENT_CANCELLED", "", "", 0, 0, id);
+        }
+    }
+
+    private void advancePersonalGroupsAtTick() {
+        groupIntervalClaims.clear();
+        if (playerState == null) return;
+        var r = coordinator.runtime(); var w = r.world();
+        for (var order : coordinator.commands().orders()) {
+            if (!order.status().active() || order.source() != com.spacesim.world.FleetCommandState.OrderSource.PLAYER
+                    || (order.type() != com.spacesim.world.FleetCommandState.OrderType.STAGE
+                    && order.type() != com.spacesim.world.FleetCommandState.OrderType.RETURN
+                    && order.type() != com.spacesim.world.FleetCommandState.OrderType.GUARD)) continue;
+            var group = coordinator.commands().requireGroup(order.commandGroupId());
+            if (group.retired() || !playerState.ownedFleetIds().containsAll(group.memberFleetIds())
+                    || !personalGroupControls(group.memberFleetIds().get(0))) continue;
+            groupIntervalClaims.addAll(group.memberFleetIds());
+            for (var id : group.memberFleetIds()) {
+                var f = w.findFleet(id).orElseThrow();
+                if (f.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM || w.findFleetJump(id).isPresent()
+                        || w.processedFleetJumpInLastInterval(id)) continue;
+                var entity = w.findSession(f.systemId()).orElseThrow().getEntityRegistry().require(f.localEntityId());
+                var physical = r.arrival().materialization(f.systemId());
+                physical.updatePhysicalState(f.localEntityId(), playerFlight.advanceExact(entity,
+                        physical.physicalState(f.localEntityId()).orElseThrow(), 0, 0, false, coordinator.session().fixedStepSeconds()));
+            }
+            if (order.type() == com.spacesim.world.FleetCommandState.OrderType.GUARD) {
+                var operation = coordinator.advancePersonalGroupGuard(group.id(), personalOperationalAvailability());
+                if (operation.status() == com.spacesim.world.StrategicOperationState.OperationStatus.FAILED)
+                    recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                            "GROUP_GUARD_INTERRUPTED", "", group.name().replace('\n', ' ').replace('\r', ' ')
+                                .substring(0, Math.min(512, group.name().length())), 0, 0, null);
+                continue;
+            }
+            var after = coordinator.advancePersonalGroupMovement(order.id(), personalOperationalAvailability());
+            if (after.status() == com.spacesim.world.FleetCommandState.OrderStatus.COMPLETE
+                    || after.status() == com.spacesim.world.FleetCommandState.OrderStatus.FAILED)
+                recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                        after.status() == com.spacesim.world.FleetCommandState.OrderStatus.COMPLETE ? "GROUP_MOVEMENT_COMPLETED" : "GROUP_MOVEMENT_INTERRUPTED",
+                        "", group.name().replace('\n', ' ').replace('\r', ' ')
+                            .substring(0, Math.min(512, group.name().length())), 0, 0, null);
+        }
+    }
+
+    private void recordRetiredGroupEvents() {
+        if (playerState == null || playerState.factionContentId() == null) return;
+        var owner = coordinator.runtime().world().findFactionRuntimeId(playerState.factionContentId());
+        for (var group : coordinator.retiredGroupEvents()) if (owner.isPresent() && group.factionId() == owner.orElseThrow())
+            recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    "GROUP_AUTHORITY_LOST", "", group.name().replace('\n', ' ').replace('\r', ' ')
+                            .substring(0, Math.min(512, group.name().length())), 0, 0, null);
+    }
+
+    /**
+     * Reads a personal live hull's explicitly recorded staffing; absent observations stay unknown.
+     * @param fleetId personally owned existing hull
+     * @return its declared available crew, or no personal observation
+     */
+    public java.util.OptionalInt observedPlayerFleetCrew(FleetId fleetId) {
+        if (playerState == null || !playerState.ownedFleetIds().contains(fleetId)
+                || coordinator.runtime().world().findFleet(fleetId).isEmpty()) return java.util.OptionalInt.empty();
+        return crewManifest.observedCrew(fleetId);
+    }
+
+    private java.util.Map<FleetId, com.spacesim.world.FleetOperationalAvailability> personalOperationalAvailability() {
+        var result = new java.util.TreeMap<FleetId, com.spacesim.world.FleetOperationalAvailability>();
+        if (playerState == null) return result;
+        for (var id : playerState.ownedFleetIds()) {
+            if (coordinator.runtime().world().findFleet(id).isEmpty()) continue;
+            int crew = crewManifest.availableCrew(id);
+            // The existing independent-pilot actor proves one captain aboard the active hull.
+            // It cannot stand in for an unobserved full crew or staff a second inactive hull.
+            if (id.equals(playerState.activeFleetId())) crew = Math.max(crew, 1);
+            result.put(id, new com.spacesim.world.FleetOperationalAvailability(crew, 0));
+        }
+        return java.util.Map.copyOf(result);
     }
 
     private PlayerFactionCommandPreview previewFactionCommand(
@@ -666,6 +1034,9 @@ public final class Stage228CampaignAuthority {
         var p = Objects.requireNonNull(preview);
         if (p.owner != this || !p.allowed() || !p.baseline.equals(captureState()))
             throw new IllegalStateException("Faction command is stale or unauthorized");
+        if ((p.action.equals("GROUP_STAGE") || p.action.equals("GROUP_RETURN") || p.action.equals("GROUP_GUARD"))
+                && (thrustAxisX != 0 || thrustAxisY != 0 || braking))
+            throw new IllegalStateException("Group movement preview is stale after direct control input");
         var adopted = restore(p.candidate);
         adopted.recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.GOVERNMENT_COMMAND,
                 p.action, p.target.isEmpty() ? adopted.playerState.factionContentId() : p.target, p.subject, 0,
@@ -673,7 +1044,7 @@ public final class Stage228CampaignAuthority {
         p.used = true; return adopted;
     }
 
-    private void initializePilotMarkets() {
+    private void initializePilotMarkets(GeneratedCampaignInitialStationLegalCapital.Plan stationCapital) {
         var runtime = coordinator.runtime();
         for (var endpoint : runtime.infrastructure().endpoints()) {
             var system = endpoint.systemId();
@@ -687,9 +1058,7 @@ public final class Stage228CampaignAuthority {
                     .add(new WalletComponent());
             // A station's economic owner can differ from the faction controlling its territory.
             // Bind newly commissioned station wallets to their actual existing asset owner.
-            var owner = runtime.industry().industrial().stations().stream()
-                    .filter(s -> s.stationId().equals(endpoint.stationId())).map(s -> s.stableFactionId()).findFirst()
-                    .or(() -> runtime.world().controllingFaction(system));
+            var owner = GeneratedCampaignInitialStationLegalCapital.owner(runtime, endpoint, stationCapital);
             owner.ifPresent(f -> entity.add(new com.spacesim.components.FactionComponent(
                     runtime.world().findFactionRuntimeId(f).orElseThrow())));
             runtime.world().createEntity(system, entity);
@@ -783,7 +1152,7 @@ public final class Stage228CampaignAuthority {
      * @param action docking, trade, flight, asset, finance, mining, supply, report or manufacturing verb
      * @param stationId endpoint, destination for JUMP, fleet for PURCHASE/SWITCH, or milli-credits for CAPITALIZE/WITHDRAW; ignored by UNDOCK
      * @param commodityId physical commodity, manufacturing product, or cancellation order identity
-     * @param kilograms whole kilograms, or whole output units for START_MANUFACTURING
+     * @param kilograms whole kilograms, whole output units for START_MANUFACTURING, or rounds for LOAD_AMMUNITION
      * @return pure exact-state confirmation with no live changes
      */
     public PlayerPhysicalPreview previewPilotAction(String action, String stationId, String commodityId, int kilograms) {
@@ -791,7 +1160,11 @@ public final class Stage228CampaignAuthority {
         var candidate = restore(baseline);
         boolean allowed;
         long walletChange = 0;
-        try { candidate.executePilotAction(action, stationId, commodityId, kilograms); candidate.captureState(); allowed = true;
+        try { if ("SCAN".equals(action)) {
+                requireCompatibleScanInterval();
+                candidate.thrustAxisX = thrustAxisX; candidate.thrustAxisY = thrustAxisY; candidate.braking = braking;
+            }
+            candidate.executePilotAction(action, stationId, commodityId, kilograms); candidate.captureState(); allowed = true;
             walletChange = candidate.playerState.walletMilliCredits() - playerState.walletMilliCredits(); }
         catch (IllegalStateException | IllegalArgumentException | ArithmeticException | java.util.NoSuchElementException exception) { allowed = false; }
         return new PlayerPhysicalPreview(this, baseline, action, stationId, commodityId, kilograms, allowed, walletChange);
@@ -806,10 +1179,13 @@ public final class Stage228CampaignAuthority {
         private final int kilograms;
         private final boolean allowed;
         private final long walletChange;
+        private final float scanAxisX, scanAxisY;
+        private final boolean scanBraking;
         private PlayerPhysicalPreview(Stage228CampaignAuthority owner, Stage228GeneratedCampaignPersistentState baseline,
                 String action, String station, String commodity, int kilograms, boolean allowed, long walletChange) {
             this.owner = owner; this.baseline = baseline; this.action = action; this.station = station;
             this.commodity = commodity; this.kilograms = kilograms; this.allowed = allowed; this.walletChange = walletChange;
+            this.scanAxisX = owner.thrustAxisX; this.scanAxisY = owner.thrustAxisY; this.scanBraking = owner.braking;
         }
         /** @return whether the shared domain path accepts the command */
         public boolean allowed() { return allowed && !used; }
@@ -826,15 +1202,22 @@ public final class Stage228CampaignAuthority {
         var p = Objects.requireNonNull(preview);
         if (p.owner != this || !p.allowed() || !p.baseline.equals(captureState()))
             throw new IllegalStateException("Physical action is stale or unauthorized");
+        if (p.action.equals("SCAN") && (Float.floatToIntBits(p.scanAxisX) != Float.floatToIntBits(thrustAxisX)
+                || Float.floatToIntBits(p.scanAxisY) != Float.floatToIntBits(thrustAxisY) || p.scanBraking != braking))
+            throw new IllegalStateException("Radar preview is stale after a control input change");
         long beforeWallet = playerState.walletMilliCredits();
         var beforeFleet = playerState.activeFleetId();
         long beforeJournalSequence = playerJournal.nextSequence();
         executePilotAction(p.action, p.station, p.commodity, p.kilograms);
         p.used = true;
+        String committedEndpoint = p.action.equals("BUY_CONSUMABLE")
+                ? coordinator.runtime().infrastructure().endpoints().stream()
+                    .filter(e -> pilotMarketReference(e.stationId()).filter(playerState.dockedAt()::equals).isPresent())
+                    .findFirst().orElseThrow().stationId() : p.station;
         if (!p.action.equals("ACKNOWLEDGE_JOURNAL")) recordPersonalCommit(
-                com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, p.station, p.commodity,
+                com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, committedEndpoint, p.commodity,
                 switch (p.action) {
-                    case "BUY", "SELL", "LOAD_CONSUMABLE", "START_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT" -> p.kilograms;
+                    case "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "LOAD_CONSUMABLE", "BUY_CONSUMABLE", "LOAD_AMMUNITION", "START_MINING", "START_MANUFACTURING", "START_REFINING", "START_COMPONENT_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT" -> p.kilograms;
                     case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP", "BUY_STATION_MAP", "BUY_ROUTE_MAP" -> 1;
                     default -> 0;
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
@@ -865,21 +1248,25 @@ public final class Stage228CampaignAuthority {
         if (route.isEmpty() || !route.orElseThrow().travels()) return Optional.empty();
         var checked = route.orElseThrow();
         return Optional.of(new PilotRoutePreview(checked,
-                previewPilotAction("JUMP", Long.toString(checked.path().get(1).value()), "", 1)));
+                previewPilotAction("JUMP", Long.toString(checked.path().get(1).value()), "", 1),
+                world.planFleetRouteFuel(placement.fleetId(), checked.path().subList(0, 2))));
     }
 
     /**
      * Read-only route diagnostics paired with an authority-bound first-hop preview.
      * @param route ordinary planner result; no saved travel intent
      * @param departure exact first-hop validation token
+     * @param firstHopFuel pure onboard fuel check, without future station stock or servicing
      */
-    public record PilotRoutePreview(com.spacesim.player.PlayerRouteRiskView route, PlayerPhysicalPreview departure) {
+    public record PilotRoutePreview(com.spacesim.player.PlayerRouteRiskView route, PlayerPhysicalPreview departure,
+            com.spacesim.world.FleetArrivalAuthority.RouteFuelPlan firstHopFuel) {
         /**
          * Requires both shared route diagnostics and its ordinary departure token.
          * @param route read-only path
          * @param departure first-hop token
+         * @param firstHopFuel current onboard fuel diagnostics
          */
-        public PilotRoutePreview { Objects.requireNonNull(route); Objects.requireNonNull(departure); }
+        public PilotRoutePreview { Objects.requireNonNull(route); Objects.requireNonNull(departure); Objects.requireNonNull(firstHopFuel); }
     }
 
     private void replacePilotFinancialDocking(long wallet, com.spacesim.player.DiscoveredObjectRef dock,
@@ -890,7 +1277,51 @@ public final class Stage228CampaignAuthority {
                 p.ownedConstructionProjectIds(), p.ownedStations());
     }
 
+    private void requireCompatibleScanInterval() {
+        if (playerState == null || playerState.activeFleetId() == null
+                || !playerState.ownedFleetIds().contains(playerState.activeFleetId()) || timeSkip.active()
+                || playerState.fleetOrders().stream().anyMatch(o -> o.fleetId().equals(playerState.activeFleetId()))
+                || !canAdvanceExactPersonalFleet(playerState.activeFleetId())
+                || personalGroupControls(playerState.activeFleetId())
+                || coordinator.runtime().world().findFleetJump(playerState.activeFleetId()).isPresent()
+                || coordinator.runtime().freight().personalMiningOrders().stream().anyMatch(o -> o.fleetId().equals(playerState.activeFleetId()))
+                || repairQueue.capture().orders().stream().anyMatch(o -> o.fleetId() == playerState.activeFleetId().value())
+                || refitQueue.capture().orders().stream().anyMatch(o -> o.fleetId() == playerState.activeFleetId().value())
+                || !moduleTransfers.capture().orders().isEmpty() || !productTransfers.capture().orders().isEmpty())
+            throw new IllegalStateException("Active scanning cannot overlap jumping, mining or ship servicing");
+    }
+
     private void executePilotAction(String action, String stationId, String commodity, int kg) {
+        if (playerState != null && personalGroupControls(playerState.activeFleetId())
+                && java.util.Set.of("JUMP", "DOCK", "UNDOCK", "SCAN", "START_MINING", "SWITCH",
+                        "START_REPAIR", "START_REFIT", "START_REFIT_USED", "LOAD_MODULE", "UNLOAD_MODULE",
+                        "LOAD_CONSUMABLE", "BUY_CONSUMABLE", "LOAD_AMMUNITION", "BUY_PRODUCT", "LOAD_PRODUCT", "UNLOAD_PRODUCT",
+                        "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY").contains(action))
+            throw new IllegalStateException("Cancel group movement before another physical ship action");
+        if ("SCAN".equals(action)) {
+            requireCompatibleScanInterval();
+            var placement = coordinator.runtime().world().findFleet(playerState.activeFleetId()).orElseThrow();
+            if (placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM)
+                throw new IllegalStateException("Active scanning requires a local ship");
+            var engineering = coordinator.runtime().world().findSession(placement.systemId()).orElseThrow()
+                    .getEntityRegistry().require(placement.localEntityId()).getComponent(com.spacesim.components.EngineeringComponent.class);
+            if (engineering == null) throw new IllegalStateException("No installed radar equipment");
+            double beforeEnergyJ = engineering.runtimeState.sharedBusEnergyJ();
+            playerFlight.clearExactIntervalEvidence();
+            boolean paused = coordinator.isPaused(); double scale = coordinator.timeScale();
+            try {
+                coordinator.setTimeScale(1); coordinator.setPaused(false);
+                advanceFrame(coordinator.session().fixedStepSeconds());
+            } finally { coordinator.setTimeScale(scale); coordinator.setPaused(paused); }
+            // Propulsion, storage recharge and radar modes share the same elapsed electrical interval.
+            double rechargePowerW = Math.max(0, engineering.runtimeState.sharedBusEnergyJ() - beforeEnergyJ)
+                    / coordinator.session().fixedStepSeconds();
+            var detected = GeneratedCampaignPersonalSensors.pulse(this, rechargePowerW,
+                    playerFlight.exactIntervalEvidence(engineering).orElse(null));
+            for (long contact : detected) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
+                    "SENSOR_CONTACT_DETECTED", "", "Контакт " + contact, 1, 0, playerState.activeFleetId());
+            return;
+        }
         if ("BUY_ROUTE_MAP".equals(action)) {
             if (!canPurchaseRouteMap(stationId, commodity)) throw new IllegalStateException("Contact the actual seller of this completed-route archive");
             var npc = coordinator.npcMissions().npcs().stream().filter(n -> n.npcId().equals(stationId)).findFirst().orElseThrow();
@@ -963,6 +1394,30 @@ public final class Stage228CampaignAuthority {
         if (playerState == null || playerState.activeFleetId() == null) throw new IllegalStateException("No active personal ship");
         var runtime = coordinator.runtime();
         var world = runtime.world();
+        if ("LOAD_AMMUNITION".equals(action)) {
+            if (!dockedAmmunitionStationId().filter(stationId::equals).isPresent() || kg <= 0
+                    || world.getAuthoritativeWorldTick() == 0 || handlingUsedThisTick(stationId))
+                throw new IllegalStateException("Ammunition loading requires an own physical berth and unused handling interval");
+            if (!repairQueue.capture().orders().isEmpty() || !refitQueue.capture().orders().isEmpty()
+                    || !moduleTransfers.capture().orders().isEmpty() || !productTransfers.capture().orders().isEmpty()
+                    || !runtime.freight().personalMiningOrders().isEmpty() || timeSkip.active())
+                throw new IllegalStateException("Finish current physical work before ammunition loading");
+            var fleet = world.findFleet(playerState.activeFleetId()).orElseThrow();
+            var ship = world.findSession(fleet.systemId()).orElseThrow().getEntityRegistry().require(fleet.localEntityId())
+                    .getComponent(com.spacesim.components.EngineeringComponent.class);
+            var service = new com.spacesim.ship.ShipAmmunitionSupplyService();
+            var feed = service.feeds(ship).stream().filter(f -> f.mountId().equals(commodity)).findFirst().orElseThrow();
+            var endpoint = runtime.infrastructure().endpoint(stationId);
+            var product = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products().findProduct(feed.productId());
+            double mass = kg * feed.unitMassKg();
+            if (!endpoint.handlingCapability().supportedStorageClassIds().contains(product.storageClassId())
+                    || feed.unitMassKg() > endpoint.handlingCapability().maxUnitMassKg()
+                    || mass > endpoint.handlingCapability().openInterval(coordinator.session().fixedStepSeconds()).remainingMassKg())
+                throw new IllegalStateException("Ammunition exceeds actual station handling capabilities");
+            service.load(ship, commodity, kg, endpoint.storage());
+            runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+            return;
+        }
         if ("CANCEL_PRODUCT_TRANSFER".equals(action)) {
             var job = productTransfers.capture().orders().stream().filter(o -> o.orderId().equals(commodity)).findFirst().orElseThrow();
             if ((!ownsProductionStation(stationId) && job.purchasePayment() == null) || !job.stationId().equals(stationId)
@@ -1000,7 +1455,7 @@ public final class Stage228CampaignAuthority {
             return;
         }
         if (!productTransfers.capture().orders().isEmpty() && java.util.Set.of("START_REFIT", "START_REFIT_USED", "START_REPAIR",
-                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_CONSUMABLE", "LOAD_MODULE", "UNLOAD_MODULE", "PURCHASE_STATION").contains(action))
+                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "LOAD_CONSUMABLE", "BUY_CONSUMABLE", "LOAD_MODULE", "UNLOAD_MODULE", "PURCHASE_STATION").contains(action))
             throw new IllegalStateException("Finish or cancel product handling first");
         if ("CANCEL_MODULE_TRANSFER".equals(action)) {
             var job = moduleTransfers.capture().orders().stream().filter(o -> o.orderId().equals(commodity)).findFirst().orElseThrow();
@@ -1015,7 +1470,7 @@ public final class Stage228CampaignAuthority {
             var fleet = runtime.freight().findFreighter(playerState.activeFleetId()).orElseThrow();
             var row = moduleCustody.modules().stream().filter(m -> m.custodyId().equals(commodity)).findFirst().orElseThrow();
             if (!ownsStoredModule(commodity)) throw new IllegalStateException("Equipment belongs to another actor");
-            double mass = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts().findProduct(row.condition().assignment().moduleId()).unitMassKg();
+            double mass = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products().findProduct(row.condition().assignment().moduleId()).unitMassKg();
             if ("LOAD_MODULE".equals(action) && fleet.cargoMassKg() + mass > fleet.cargoCapacityKg()) throw new IllegalStateException("Total ship hold is full");
             if (handlingUsedThisTick(stationId)) throw new IllegalStateException("This tick's endpoint handling is already spent");
             if (row.ownerActorId() == null) moduleCustody = moduleCustody.declareOwner(commodity, Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
@@ -1023,7 +1478,7 @@ public final class Stage228CampaignAuthority {
                     moduleCustody, commodity, context, reservedRefitModules(), world.getAuthoritativeWorldTick()); return;
         }
         if (!moduleTransfers.capture().orders().isEmpty() && java.util.Set.of("START_REFIT", "START_REFIT_USED", "START_REPAIR",
-                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_CONSUMABLE").contains(action))
+                "UNDOCK", "JUMP", "SWITCH", "START_MINING", "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "LOAD_CONSUMABLE", "BUY_CONSUMABLE").contains(action))
             throw new IllegalStateException("Finish or cancel equipment handling first");
         if ("CANCEL_REFIT".equals(action)) {
             var job = refitQueue.capture().orders().stream().filter(o -> o.orderId().equals(commodity)
@@ -1119,9 +1574,9 @@ public final class Stage228CampaignAuthority {
                 || refitQueue.capture().orders().stream().anyMatch(o -> o.fleetId() == playerState.activeFleetId().value()))
                 && java.util.Set.of("UNDOCK", "JUMP", "SWITCH", "START_MINING").contains(action))
             throw new IllegalStateException("Finish or cancel physical yard work before departure or handover");
-        if (java.util.Set.of("START_MANUFACTURING", "CANCEL_MANUFACTURING", "START_FACILITY_CONSTRUCTION",
-                "CANCEL_FACILITY_CONSTRUCTION", "ALLOCATE_FACILITY_RESOURCES", "START_YARD_CONSTRUCTION",
-                "CANCEL_YARD_CONSTRUCTION", "ALLOCATE_YARD_RESOURCES").contains(action)) {
+        if (java.util.Set.of("START_MANUFACTURING", "START_REFINING", "START_COMPONENT_MANUFACTURING", "CANCEL_MANUFACTURING", "START_FACILITY_CONSTRUCTION",
+                "CANCEL_FACILITY_CONSTRUCTION", "ALLOCATE_FACILITY_RESOURCES", "ALLOCATE_FACILITY_RESOURCES_HALF", "START_YARD_CONSTRUCTION",
+                "CANCEL_YARD_CONSTRUCTION", "ALLOCATE_YARD_RESOURCES", "ALLOCATE_YARD_RESOURCES_AVAILABLE", "START_SMALL_CRAFT_BUILD", "CANCEL_SMALL_CRAFT_BUILD", "CLAIM_SMALL_CRAFT_BUILD").contains(action)) {
             if (!ownsProductionStation(stationId)) throw new IllegalStateException("Production requires the personally owned station");
             var ref = pilotMarketReference(stationId).orElseThrow();
             if (!ref.equals(playerState.dockedAt())) throw new IllegalStateException("Dock at your production station first");
@@ -1137,8 +1592,13 @@ public final class Stage228CampaignAuthority {
                 throw new IllegalStateException("Production command requires actual berth geometry");
             var queue = runtime.manufacturingQueue();
             var storage = runtime.infrastructure().endpoint(stationId).storage();
-            if ("ALLOCATE_FACILITY_RESOURCES".equals(action)) runtime.allocateFacilityResources(stationId, commodity);
+            if ("START_SMALL_CRAFT_BUILD".equals(action)) startSmallCraftBuild(stationId, commodity);
+            else if ("CANCEL_SMALL_CRAFT_BUILD".equals(action)) { requireBuildOwner(stationId, commodity); smallCraftBuilds.cancel(commodity, storage); }
+            else if ("CLAIM_SMALL_CRAFT_BUILD".equals(action)) claimSmallCraftBuild(stationId, commodity);
+            else if ("ALLOCATE_FACILITY_RESOURCES".equals(action)) runtime.allocateFacilityResources(stationId, commodity);
+            else if ("ALLOCATE_FACILITY_RESOURCES_HALF".equals(action)) runtime.allocateFacilityResources(stationId, commodity, true);
             else if ("ALLOCATE_YARD_RESOURCES".equals(action)) runtime.allocateYardResources(stationId, commodity);
+            else if ("ALLOCATE_YARD_RESOURCES_AVAILABLE".equals(action)) runtime.allocateYardResources(stationId, commodity, true);
             else if ("CANCEL_YARD_CONSTRUCTION".equals(action)) yardConstruction.cancel(commodity, storage);
             else if ("START_YARD_CONSTRUCTION".equals(action)) {
                 if (yardConstructionCapability(stationId, commodity) == null)
@@ -1161,6 +1621,18 @@ public final class Stage228CampaignAuthority {
                         world.getAuthoritativeWorldTick());
             }
             else if ("CANCEL_MANUFACTURING".equals(action)) queue.cancel(commodity, storage);
+            else if ("START_COMPONENT_MANUFACTURING".equals(action)) {
+                var capability = componentCapability(stationId, commodity);
+                if (capability == null) throw new IllegalStateException("No installed compatible component line");
+                queue.startComponents(com.spacesim.economy.Stage18ManufacturingWorkQueue.COMPONENT_PREFIX + stationId + ':' + commodity,
+                        commodity, kg, storage, capability, world.getAuthoritativeWorldTick());
+            }
+            else if ("START_REFINING".equals(action)) {
+                var capability = refiningCapability(stationId, commodity);
+                if (capability == null) throw new IllegalStateException("No installed compatible refining line");
+                String id = com.spacesim.economy.Stage18ManufacturingWorkQueue.REFINING_PREFIX + stationId + ':' + commodity;
+                queue.startRefining(id, commodity, kg, storage, capability, world.getAuthoritativeWorldTick());
+            }
             else {
                 var capability = manufacturingCapability(stationId, commodity);
                 if (capability == null) throw new IllegalStateException("No installed compatible manufacturing line");
@@ -1219,7 +1691,7 @@ public final class Stage228CampaignAuthority {
             reconcileOnePlayerMission(mission.missionId(), runtime.captureState());
             return;
         }
-        if ("LOAD_CONSUMABLE".equals(action)) {
+        if ("LOAD_CONSUMABLE".equals(action) || "BUY_CONSUMABLE".equals(action)) {
             if (!playerState.docked() || kg <= 0) throw new IllegalStateException("Physical servicing requires docking and positive mass");
             var endpoint = runtime.infrastructure().endpoints().stream()
                     .filter(e -> pilotMarketReference(e.stationId()).filter(playerState.dockedAt()::equals).isPresent())
@@ -1235,6 +1707,45 @@ public final class Stage228CampaignAuthority {
             var binding = bindings.findBinding(stationId);
             if (binding == null) throw new IllegalArgumentException("Unknown consumable binding");
             var old = fitted.runtimeState;
+            if ("BUY_CONSUMABLE".equals(action)) {
+                var transport = runtime.freight().findFreighter(fleet.fleetId()).orElseThrow();
+                if (transport.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE)
+                    throw new IllegalStateException("Assigned freight remains under its existing transport owner");
+                long tick = world.getAuthoritativeWorldTick();
+                var ref = playerState.dockedAt();
+                var session = world.findSession(ref.systemId()).orElseThrow();
+                String reason = "player-market-handling:" + fleet.fleetId().value() + ':' + tick + ':';
+                if (tick == 0 || handlingUsedThisTick(endpoint.stationId())
+                        || session.getLedger().getEntries().stream().anyMatch(e -> e.reason().startsWith(reason)))
+                    throw new IllegalStateException("This tick's physical handling budget is unavailable");
+                var definition = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault().findCommodity(binding.commodityId());
+                var handling = endpoint.handlingCapability();
+                if (definition == null || !handling.supportedStorageClassIds().contains(definition.storageClassId())
+                        || kg > handling.openInterval(coordinator.session().fixedStepSeconds()).remainingMassKg())
+                    throw new IllegalStateException("Station consumable interface or handling budget unavailable");
+                var station = session.getEntityRegistry().require(ref.entityId());
+                var proxy = new com.badlogic.ashley.core.Entity().add(new WalletComponent(playerState.walletMilliCredits()))
+                        .add(new com.spacesim.components.IdentityComponent("PLAYER", com.spacesim.components.IdentityComponent.Kind.FLEET));
+                if (playerState.factionContentId() != null) proxy.add(new com.spacesim.components.FactionComponent(
+                        world.findFactionRuntimeId(playerState.factionContentId()).orElseThrow()));
+                var service = new com.spacesim.economy.Stage18ShipConsumableService(bindings,
+                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
+                long price = Math.multiplyExact(pilotCommodityPrice(endpoint.stationId(), binding.commodityId(), true), kg);
+                if (!world.createTradeController(session).settlePhysicalCargo(station, proxy,
+                        com.spacesim.controllers.TradeTransactionPolicy.Direction.BUY_FROM_STATION, price,
+                        reason + "consumable:" + binding.id() + ':' + commodity + ":kg=" + kg, () -> {
+                            var supplied = service.load(binding.id(), commodity, kg, fitted.fit, old.consumables(), endpoint.storage());
+                            if (!supplied.committed()) return false;
+                            fitted.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(supplied.consumables(),
+                                    old.sharedBusEnergyJ(), old.shipHeatStoredJ(), old.localHeatJByMount(), old.thrustLimitNByMount(),
+                                    old.coolantBusCapacityW(), old.ftlCooldownSecondsByMount()));
+                            return true;
+                        })) throw new IllegalStateException("Finite stock, interface, wallet or legal access rejected servicing");
+                runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+                replacePilotFinancialDocking(proxy.getComponent(WalletComponent.class).getBalanceMilliCredits(), ref,
+                        playerState.discoveredObjects());
+                return;
+            }
             var result = runtime.freight().loadManualConsumable(fleet.fleetId(), bindings,
                     com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault(),
                     binding.id(), commodity, kg, fitted.fit, old.consumables());
@@ -1306,15 +1817,37 @@ public final class Stage228CampaignAuthority {
             if (!ref.equals(playerState.dockedAt())) throw new IllegalStateException("Station purchase requires this physical dock");
             long price = stationSalePriceMilliCredits(stationId);
             if (price <= 0) throw new IllegalStateException("No current civilian station sale offer");
-            var industrial = runtime.industry().industrial().station(stationId);
+            var legal = world.findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
+                    .getComponent(com.spacesim.components.FactionComponent.class);
+            String seller = world.findFactionStableId(legal.factionId).orElseThrow();
             var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(world, coordinator.content(), playerState);
             if (!new com.spacesim.player.PlayerOwnershipService(adapter).purchaseFactionStation(
-                    new com.spacesim.player.OwnedStationRef(ref.systemId(), ref.entityId()), industrial.stableFactionId(), price))
+                    new com.spacesim.player.OwnedStationRef(ref.systemId(), ref.entityId()), seller, price))
                 throw new IllegalStateException("Station ownership or conserved consideration rejected");
+            if (!endpoint.generatedIndustrial()) {
+                runtime.admitExistingIndustrialStation(stationId, seller);
+                var admitted = new java.util.TreeMap<>(industrialAdmissions);
+                admitted.put(stationId, seller);
+                industrialAdmissions = java.util.Map.copyOf(admitted);
+            }
             playerState = adapter.player(); return;
         }
         boolean buying = "BUY".equals(action);
+        boolean ownHandling = "LOAD_COMMODITY".equals(action) || "UNLOAD_COMMODITY".equals(action);
         if (handlingUsedThisTick(stationId)) throw new IllegalStateException("This tick's handling has already been used");
+        if (ownHandling) {
+            if (!ownsProductionStation(stationId) || !ref.equals(playerState.dockedAt()) || kg <= 0)
+                throw new IllegalStateException("Commodity handling requires this owned physical dock and positive mass");
+            long tick = world.getAuthoritativeWorldTick();
+            if (tick == 0) throw new IllegalStateException("No completed handling interval");
+            var handling = endpoint.handlingCapability();
+            if (!runtime.freight().exchangeManualCommodity(fleet.fleetId(), endpoint.storage(), commodity, kg,
+                    "LOAD_COMMODITY".equals(action), tick * coordinator.session().fixedStepSeconds(),
+                    handling, handling.openInterval(coordinator.session().fixedStepSeconds())))
+                throw new IllegalStateException("Physical stock, capacity or handling rejected commodity transfer");
+            runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+            return;
+        }
         if (!buying && !"SELL".equals(action) || !ref.equals(playerState.dockedAt()) || kg <= 0)
             throw new IllegalStateException("Trade requires this dock and a positive amount");
         var station = world.findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId());
@@ -1452,6 +1985,7 @@ public final class Stage228CampaignAuthority {
             thrustAxisX = 0; thrustAxisY = 0; braking = false; return false;
         }
         float magnitude = (float) Math.hypot(axisX, axisY);
+        if (axisX != 0 || axisY != 0 || brake) cancelPersonalGroupForFleet(playerState.activeFleetId());
         thrustAxisX = magnitude > 1 ? axisX / magnitude : axisX;
         thrustAxisY = magnitude > 1 ? axisY / magnitude : axisY;
         braking = brake; return true;
@@ -1463,6 +1997,10 @@ public final class Stage228CampaignAuthority {
                 : freight.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE;
     }
 
+    private boolean canAdvanceIndividualPersonalFleet(FleetId id) {
+        return canAdvanceExactPersonalFleet(id) && !groupIntervalClaims.contains(id) && !personalGroupControls(id);
+    }
+
     private void advancePersonalFleetOrdersAtTick() {
         if (playerState == null) return;
         var runtime = coordinator.runtime();
@@ -1470,14 +2008,14 @@ public final class Stage228CampaignAuthority {
         if (playerState.ownedFleetIds().isEmpty()) return;
         var adapter = com.spacesim.player.PlayerRuntime.attachToCampaign(runtime.world(), coordinator.content(), playerState);
         adapter.advanceComposedFleetOrders(runtime.arrival(), playerFlight,
-                this::canAdvanceExactPersonalFleet,
+                this::canAdvanceIndividualPersonalFleet,
                 coordinator.session().fixedStepSeconds());
         playerState = adapter.player();
     }
 
     private void advancePilotAtTick(long tick) {
         if (playerState == null || playerState.activeFleetId() == null || playerState.docked()
-                || !canAdvanceExactPersonalFleet(playerState.activeFleetId())) return;
+                || !canAdvanceIndividualPersonalFleet(playerState.activeFleetId())) return;
         var runtime = coordinator.runtime();
         var placement = runtime.world().findFleet(playerState.activeFleetId()).orElse(null);
         if (placement == null || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
@@ -1540,7 +2078,7 @@ public final class Stage228CampaignAuthority {
             double requested = Math.min(order.requestedSourceKgPerTick(), contact.capability().maximumSourceKgPerSecond() * duration);
             var result = runtime.freight().extractPersonalCommodity(order.fleetId(), contact.source().sourceState(),
                     order.methodId(), requested, contact.capability().extraction(), contact.capability().openInterval(duration),
-                    tick * duration);
+                    tick, duration);
             if (result.committed()) {
                 runtime.synchronizeFreightEngineeringCargo(order.fleetId());
                 if (result.outputMassStoredKg() > 0) runtime.recordPersonalExtractionSample(playerState, order.sourceId());
@@ -1591,6 +2129,23 @@ public final class Stage228CampaignAuthority {
         return carrierWings;
     }
 
+    /** @return explicit personal property rights, retained after host loss */
+    public java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership() { return personalCraftOwnership; }
+
+    /**
+     * Commits an explicit acquisition/transfer result at the trusted composition boundary.
+     * Wing assignment never grants ownership; new rights require existing physical individuals.
+     * @param next complete resulting personal property register
+     */
+    public void commitPersonalCraftOwnership(java.util.Collection<com.spacesim.world.SmallCraftId> next) {
+        if (playerState == null) throw new IllegalStateException("Personal property requires a player");
+        var sorted = new java.util.TreeSet<>(Objects.requireNonNull(next));
+        if (sorted.size() != next.size() || sorted.size() > 100_000)
+            throw new IllegalArgumentException("Invalid personal craft property register");
+        for (var id : sorted) if (!personalCraftOwnership.contains(id) && smallCraft.find(id).isEmpty())
+            throw new IllegalArgumentException("Acquisition requires an existing physical craft");
+        personalCraftOwnership = java.util.List.copyOf(sorted);
+    }
     /**
      * Commits a validated D mission-state transition into the campaign composition root.
      *
@@ -1601,7 +2156,9 @@ public final class Stage228CampaignAuthority {
         validateOperations(
                 smallCraft, hangars, flightDeck, checked, logistics, carrierWings,
                 coordinator.runtime().world().getAuthoritativeWorldTick());
-        missions = checked;
+        var lost = localFlights.capture().flights().stream().filter(f -> smallCraft.find(f.craftId()).isEmpty()).toList();
+        missions = localFlights.reconcileCommittedLosses(checked);
+        for (var flight : lost) recordPersonalCraftEvent("SMALL_CRAFT_LOST", flight);
     }
 
     /**
@@ -1753,24 +2310,32 @@ public final class Stage228CampaignAuthority {
     }
 
     /**
-     * Advances exact campaign ticks when no flight-deck work requires a bay projection.
+     * Advances exact campaign ticks with current installed bays for associated carrier hosts.
      * @param realDeltaSeconds finite non-negative presentation delta
      * @return exact progression diagnostics
      */
     public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds) {
         if (!flightDeck.queued().isEmpty() || !flightDeck.active().isEmpty()) {
-            throw new IllegalStateException(
-                    "Active flight-deck work requires per-tick physical bay projection");
+            var hosts = carrierWings.stream().map(CarrierWingAssignment::hostStableId)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (flightDeck.queued().stream().anyMatch(r -> !hosts.contains(r.bayId().hostStableId()))
+                    || flightDeck.active().stream().anyMatch(o -> !hosts.contains(o.request().bayId().hostStableId())))
+                throw new IllegalStateException("Active flight-deck work requires an installed associated carrier bay or explicit per-tick physical bay projection");
+            return advanceFrame(realDeltaSeconds, tick -> GeneratedCampaignCarrierBays.resolveAll(this));
         }
         return coordinator.advanceFrame(realDeltaSeconds, tick -> {
+            recordRetiredGroupEvents();
+            advancePersonalGroupsAtTick();
             advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
+            recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
             advancePersonalRepairsAtTick(tick);
             advanceModuleTransfersAtTick(tick, handlingBudgets);
+            advanceLocalCraftAtTick(tick, coordinator.session().fixedStepSeconds(), java.util.Map.of());
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
             observeTimeSkip();
@@ -1791,6 +2356,21 @@ public final class Stage228CampaignAuthority {
     public GeneratedCampaignSession.AdvanceReport advanceFrame(
             float realDeltaSeconds,
             LongFunction<Map<BayId, BayDefinition>> bayProjectionByTick) {
+        return advanceFrame(realDeltaSeconds, bayProjectionByTick, tick -> java.util.Map.of());
+    }
+
+    /**
+     * Composes completed deck work with explicitly supplied current physical launch mouths.
+     * This world-integration seam is not a player command and does not synthesize mouth geometry.
+     * @param realDeltaSeconds presentation delta
+     * @param bayProjectionByTick actual installed bay projections
+     * @param aperturesByTick actual current launch-mouth kinematics supplied by the physical owner
+     * @return exact shared-clock advancement
+     */
+    public GeneratedCampaignSession.AdvanceReport advanceFrame(float realDeltaSeconds,
+            LongFunction<Map<BayId, BayDefinition>> bayProjectionByTick,
+            LongFunction<Map<BayId, com.spacesim.world.SmallCraftLocalFlightRuntime.LaunchAperture>> aperturesByTick) {
+        Objects.requireNonNull(aperturesByTick);
         LongFunction<Map<BayId, BayDefinition>> provider =
                 Objects.requireNonNull(bayProjectionByTick, "bayProjectionByTick");
         double fixedStepSeconds = coordinator.session().fixedStepSeconds();
@@ -1798,18 +2378,65 @@ public final class Stage228CampaignAuthority {
             Map<BayId, BayDefinition> bays =
                     Objects.requireNonNull(provider.apply(tick), "bay projection");
             flightDeck.advanceFixedTick(tick, fixedStepSeconds, bays);
+            recordRetiredGroupEvents();
+            advancePersonalGroupsAtTick();
             advancePersonalFleetOrdersAtTick();
             advancePilotAtTick(tick);
+            recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
             advancePersonalRepairsAtTick(tick);
             advanceModuleTransfersAtTick(tick, handlingBudgets);
+            advanceLocalCraftAtTick(tick, fixedStepSeconds,
+                    validateCurrentLaunchApertures(Objects.requireNonNull(aperturesByTick.apply(tick))));
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
             observeTimeSkip();
         });
+    }
+
+    private Map<BayId, com.spacesim.world.SmallCraftLocalFlightRuntime.LaunchAperture> validateCurrentLaunchApertures(
+            Map<BayId, com.spacesim.world.SmallCraftLocalFlightRuntime.LaunchAperture> apertures) {
+        var world = coordinator.runtime().world();
+        for (var entry : apertures.entrySet()) {
+            var aperture = Objects.requireNonNull(entry.getValue());
+            var wing = carrierWings.stream().filter(w -> w.hostStableId().equals(entry.getKey().hostStableId())).findFirst().orElseThrow();
+            var fleet = world.findFleet(wing.carrierFleetId()).orElseThrow();
+            if (fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                    || world.findFleetJump(fleet.id()).isPresent() || fleet.systemId() == null
+                    || !entry.getKey().equals(aperture.bay().id()) || !fleet.systemId().equals(aperture.systemId())
+                    || !wing.stableFactionId().equals(aperture.stableFactionId())
+                    || GeneratedCampaignCarrierBays.resolve(this, wing).stream().noneMatch(b -> b.equals(aperture.bay())))
+                throw new IllegalArgumentException("Launch aperture requires its actual local installed carrier bay and operator");
+        }
+        return apertures;
+    }
+
+    private void advanceLocalCraftAtTick(long tick, double seconds,
+            Map<BayId, com.spacesim.world.SmallCraftLocalFlightRuntime.LaunchAperture> apertures) {
+        if (!localFlights.hasFlights() && apertures.isEmpty()) {
+            missions = localFlights.advanceFixedTick(tick, seconds, missions, apertures);
+            return;
+        }
+        var previous = localFlights.capture().flights();
+        var previousIds = previous.stream().map(f -> f.craftId()).collect(java.util.stream.Collectors.toSet());
+        missions = localFlights.advanceFixedTick(tick, seconds, missions, apertures);
+        for (var flight : localFlights.capture().flights()) if (!previousIds.contains(flight.craftId()))
+            recordPersonalCraftEvent("SMALL_CRAFT_LAUNCHED", flight);
+        for (var flight : previous) {
+            if (smallCraft.find(flight.craftId()).isEmpty()) recordPersonalCraftEvent("SMALL_CRAFT_LOST", flight);
+            else if (hangars.find(flight.craftId()).isPresent()) recordPersonalCraftEvent("SMALL_CRAFT_RECOVERED", flight);
+        }
+    }
+
+    private void recordPersonalCraftEvent(String action, com.spacesim.world.SmallCraftLocalFlightState.Flight flight) {
+        if (playerState == null || !personalCraftOwnership.contains(flight.craftId())) return;
+        var wing = carrierWings.stream().filter(w -> w.hostStableId().equals(flight.hostStableId())
+                && w.craftIds().contains(flight.craftId()) && playerState.ownedFleetIds().contains(w.carrierFleetId())).findFirst();
+        recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, action, "",
+                "Аппарат №" + flight.craftId().value(), 1, 0, wing.map(CarrierWingAssignment::carrierFleetId).orElse(null));
     }
 
     /**
@@ -2001,9 +2628,10 @@ public final class Stage228CampaignAuthority {
             }
         }
         if (due.isEmpty()) return;
-        var runtimeCheckpoint = coordinator.runtime().captureState();
+        var freight = coordinator.runtime().captureFreightState();
+        var campaignCheckpoint = coordinator.runtime().captureCampaignState();
         for (String id : due) {
-            reconcileOnePlayerMission(id, runtimeCheckpoint);
+            reconcileOnePlayerMission(id, campaignCheckpoint, freight);
         }
     }
 
@@ -2141,24 +2769,25 @@ public final class Stage228CampaignAuthority {
         if (playerState == null || ownsProductionStation(stationId)) return 0;
         var ref = pilotMarketReference(stationId).orElse(null);
         if (ref == null || !playerState.discoveredObjects().contains(ref)) return 0;
-        var station = coordinator.runtime().industry().industrial().station(stationId);
+        var station = coordinator.runtime().infrastructure().endpoint(stationId);
         var legal = coordinator.runtime().world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
                 .getComponent(com.spacesim.components.FactionComponent.class);
-        var seller = coordinator.runtime().world().findFactionRuntimeId(station.stableFactionId());
-        if (legal == null || seller.isEmpty() || legal.factionId != seller.get()) return 0;
+        if (legal == null) return 0;
+        var seller = coordinator.runtime().world().findFactionStableId(legal.factionId);
+        if (seller.isEmpty() || coordinator.runtime().world().findFactionEconomicState(seller.orElseThrow()).isEmpty()) return 0;
         long price = GeneratedCampaignStationSalePolicy.priceMilliCredits(station.stationArchetypeId());
-        if (price == 0 || Objects.equals(station.stableFactionId(), playerState.factionContentId())) return 0;
+        if (price == 0 || Objects.equals(seller.orElseThrow(), playerState.factionContentId())) return 0;
         return price;
     }
 
     private com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability manufacturingCapability(
             String stationId, String productId) {
-        var catalog = com.spacesim.content.Stage22CivilianMiningProductionPath.loadManufacturing();
+        var catalog = com.spacesim.content.Stage23SmallCraftProductionCatalogs.manufacturing();
         var binding = catalog.findProductBinding(productId);
         if (binding == null) return null;
         var profile = catalog.findProductProfile(binding.profileId());
         var required = profile.requiredCapabilityTags();
-        var product = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts().findProduct(productId);
+        var product = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products().findProduct(productId);
         if (product == null) return null;
         var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
         var storageClasses = new java.util.HashSet<String>();
@@ -2175,6 +2804,64 @@ public final class Stage228CampaignAuthority {
                 .map(c -> new com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability(c.facilityInstanceId(),
                         c.capabilityTags(), c.effectiveProcessPowerW(), c.effectiveEngineeringWorkRate(), c.effectiveMaintenanceWorkRate()))
                 .findFirst().orElse(null);
+    }
+
+    private com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability refiningCapability(
+            String stationId, String recipeId) {
+        var recipe = com.spacesim.content.Stage18RefiningCatalogLoader.loadDefault().findRecipe(recipeId);
+        if (recipe == null) return null;
+        var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+        var classes = new java.util.HashSet<String>();
+        classes.add(ontology.findCommodity(recipe.outputCommodityId()).storageClassId());
+        recipe.inputs().forEach(i -> classes.add(ontology.findCommodity(i.commodityId()).storageClassId()));
+        return coordinator.runtime().industry().industrial().station(stationId).facilityCapabilities().stream()
+                .filter(c -> c.capabilityTags().containsAll(recipe.requiredCapabilityTags())
+                        && c.effectiveProcessPowerW() > 0 && c.effectiveEngineeringWorkRate() > 0
+                        && (recipe.maintenanceWorkSecondsPerInputKg() == 0 || c.effectiveMaintenanceWorkRate() > 0)
+                        && c.storageClassInterfaces().containsAll(classes))
+                .sorted(java.util.Comparator.comparing(com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot::facilityInstanceId))
+                .map(c -> new com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability(c.facilityInstanceId(),
+                        c.capabilityTags(), c.effectiveProcessPowerW(), c.effectiveEngineeringWorkRate(), c.effectiveMaintenanceWorkRate()))
+                .findFirst().orElse(null);
+    }
+
+    private com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability componentCapability(
+            String stationId, String recipeId) {
+        var recipe = com.spacesim.content.Stage23SmallCraftProductionCatalogs.manufacturing().findComponentRecipe(recipeId);
+        if (recipe == null) return null;
+        var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+        var classes = new java.util.HashSet<String>();
+        classes.add(ontology.findCommodity(recipe.outputCommodityId()).storageClassId());
+        recipe.inputs().forEach(i -> classes.add(ontology.findCommodity(i.commodityId()).storageClassId()));
+        return coordinator.runtime().industry().industrial().station(stationId).facilityCapabilities().stream()
+                .filter(c -> c.capabilityTags().containsAll(recipe.requiredCapabilityTags())
+                        && c.effectiveProcessPowerW() > 0 && c.effectiveEngineeringWorkRate() > 0
+                        && (recipe.maintenanceWorkSecondsPerOutputKg() == 0 || c.effectiveMaintenanceWorkRate() > 0)
+                        && c.storageClassInterfaces().containsAll(classes))
+                .sorted(java.util.Comparator.comparing(com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot::facilityInstanceId))
+                .map(c -> new com.spacesim.economy.Stage18ManufacturingRuntime.ManufacturingCapability(c.facilityInstanceId(),
+                        c.capabilityTags(), c.effectiveProcessPowerW(), c.effectiveEngineeringWorkRate(), c.effectiveMaintenanceWorkRate()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * Checks an actually installed refining line and its physical storage interfaces.
+     * @param stationId station under inspection
+     * @param recipeId authored refining recipe
+     * @return whether the current installed line can execute the process
+     */
+    public boolean hasRefiningLine(String stationId, String recipeId) {
+        return refiningCapability(stationId, recipeId) != null;
+    }
+
+    /**
+     * Checks actual installed capabilities and storage interfaces for a component recipe.
+     * @param stationId station under inspection
+     * @param recipeId authored component recipe
+     * @return whether an installed operational line can execute the process
+     */
+    public boolean hasComponentLine(String stationId, String recipeId) {
+        return componentCapability(stationId, recipeId) != null;
     }
 
     /**
@@ -2211,9 +2898,14 @@ public final class Stage228CampaignAuthority {
 
     private com.spacesim.economy.Stage18FacilityRuntime.FacilityCapabilitySnapshot constructionCapability(
             String stationId, String definitionId) {
-        var catalog = com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault();
+        var catalog = com.spacesim.content.Stage23StationStorageCatalog.construction();
         var binding = catalog.findFacility(definitionId);
         if (binding == null) return null;
+        if (definitionId.equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)) {
+            var station = coordinator.runtime().industry().industrial().station(stationId);
+            if (!com.spacesim.content.Stage23StationStorageCatalog.acceptsHost(station.stationArchetypeId())
+                    || station.facilities().stream().anyMatch(f -> f.definitionId().equals(definitionId))) return null;
+        }
         var profile = catalog.findProfile(binding.profileId());
         return coordinator.runtime().industry().industrial().station(stationId).facilityCapabilities().stream()
                 .filter(c -> c.status() == com.spacesim.economy.Stage18FacilityRuntime.Status.ACTIVE
@@ -2230,6 +2922,10 @@ public final class Stage228CampaignAuthority {
      * @return whether a compatible active installed line is available
      */
     public boolean hasFacilityConstructionLine(String stationId, String definitionId) {
+        if (definitionId.equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)
+                && coordinator.runtime().constructionQueue().capture().stream().anyMatch(o -> o.stationId().equals(stationId)
+                        && o.facilityDefinitionId().equals(definitionId)
+                        && o.status() != com.spacesim.economy.Stage18FacilityConstructionRuntime.OrderStatus.CANCELLED)) return false;
         return constructionCapability(stationId, definitionId) != null;
     }
 
@@ -2290,6 +2986,58 @@ public final class Stage228CampaignAuthority {
     private record PersonalYards(com.spacesim.persistence.EntityId asset,
             com.spacesim.components.EngineeringComponent ship,
             java.util.List<com.spacesim.economy.Stage18ShipyardRuntime.YardCapabilitySnapshot> yards) { }
+
+    /** @return exact paid build custody; observing it does not allocate a craft */
+    public com.spacesim.economy.ShipyardSmallCraftBuildQueueState smallCraftBuilds() { return smallCraftBuilds.capture(); }
+
+    private com.spacesim.economy.Stage18ShipyardRuntime.YardCapabilitySnapshot smallCraftBuildContext(
+            com.spacesim.economy.ShipyardSmallCraftBuildQueueState.Order order) {
+        if (!ownsProductionStation(order.stationId()) || !order.ownerActorId().equals(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)) return null;
+        var station = coordinator.runtime().industry().industrial().station(order.stationId());
+        if (!station.stableFactionId().equals(order.builderFactionId())) return null;
+        return station.yardCapabilities().stream().filter(y -> y.active() && y.yardInstanceId().equals(order.yardInstanceId())
+                && y.yardDefinitionId().equals(order.yardDefinitionId())).findFirst().orElse(null);
+    }
+
+    private void requireBuildOwner(String station, String id) {
+        if (smallCraftBuilds.capture().orders().stream().noneMatch(o -> o.orderId().equals(id) && o.stationId().equals(station)
+                && o.ownerActorId().equals(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)))
+            throw new IllegalStateException("Build belongs to another physical owner");
+    }
+
+    private void startSmallCraftBuild(String stationId, String design) {
+        var yards = personalYards(stationId, null, null);
+        if (yards == null) throw new IllegalStateException("Dock at the owned build station");
+        var yard = yards.yards().stream().filter(y -> smallCraftBuilds.capture().orders().stream()
+                .noneMatch(o -> o.stationId().equals(stationId) && o.yardInstanceId().equals(y.yardInstanceId())))
+                .filter(y -> com.spacesim.economy.ShipyardSmallCraftBuildWorkQueue.plan(design, y).feasibility().feasible())
+                .findFirst().orElseThrow(() -> new IllegalStateException("No unoccupied compatible build yard"));
+        var runtime = coordinator.runtime(); long tick = runtime.world().getAuthoritativeWorldTick();
+        smallCraftBuilds.start("player-craft-build:" + stationId + ':' + design + ':' + tick,
+                Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID, runtime.industry().industrial().station(stationId).stableFactionId(),
+                design, runtime.infrastructure().endpoint(stationId).storage(), yard, tick);
+    }
+
+    private void claimSmallCraftBuild(String stationId, String id) {
+        requireBuildOwner(stationId, id);
+        var order = smallCraftBuilds.capture().orders().stream().filter(o -> o.orderId().equals(id)).findFirst().orElseThrow();
+        if (!order.ready() || personalCraftOwnership.size() >= 100_000
+                || smallCraft.nextIdValue() == Long.MAX_VALUE) throw new IllegalStateException("Build is not ready for publication");
+        if (!coordinator.runtime().industry().industrial().station(stationId).stableFactionId().equals(order.builderFactionId()))
+            throw new IllegalStateException("Build operator no longer matches its actual legal station");
+        var engineering = SmallCraftCatalog.CONTENT;
+        var service = new com.spacesim.world.SmallCraftPhysicalLogisticsService(smallCraft, hangars, engineering,
+                com.spacesim.content.ship.Stage22CorePairProtectionCatalogLoader.project(engineering),
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.planner(order.designId()),
+                new com.spacesim.economy.Stage18ShipyardRuntime(com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards(),
+                        com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault(), com.spacesim.content.Stage23SmallCraftProductionCatalogs.products()),
+                (pending, bay, tick) -> { throw new IllegalStateException("Physical delivery has not been performed"); });
+        var result = service.completeEscrowedBuild(logistics, smallCraftBuilds.completionPermit(id,
+                coordinator.runtime().infrastructure().endpoint(stationId).storage()));
+        logistics = result.logisticsState();
+        var property = new java.util.ArrayList<>(personalCraftOwnership); property.add(result.producedCraftOptional().orElseThrow().id());
+        personalCraftOwnership = java.util.List.copyOf(property);
+    }
 
     private PersonalYards personalYards(String stationId, Long fleetId, Long assetId) {
         return personalYards(stationId, fleetId, assetId, false);
@@ -2490,6 +3238,11 @@ public final class Stage228CampaignAuthority {
             return context == null ? null : budgets.computeIfAbsent(order.stationId() + '|' + order.yardInstanceId(),
                     id -> context.yard().openInterval(coordinator.session().fixedStepSeconds()));
         }, moduleCustody);
+        smallCraftBuilds.advance(tick, this::smallCraftBuildContext, order -> {
+            var yard = smallCraftBuildContext(order);
+            return yard == null ? null : budgets.computeIfAbsent(order.stationId() + '|' + order.yardInstanceId(),
+                    id -> yard.openInterval(coordinator.session().fixedStepSeconds()));
+        });
         moduleCustody = refitted.custody();
         for (var order : refitted.completed()) {
             if (order.servicePayment() != null) recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND,
@@ -2537,7 +3290,29 @@ public final class Stage228CampaignAuthority {
         long tick = coordinator.runtime().world().getAuthoritativeWorldTick();
         return playerJournal.entries().stream().anyMatch(e -> e.tick() == tick && e.endpoint().equals(stationId)
                 && (e.kind() == com.spacesim.player.PlayerJournalState.Kind.MODULE_TRANSFER_COMPLETED
-                || java.util.Set.of("BUY", "SELL", "PRODUCT_TRANSFER_COMPLETED", "YARD_MATERIAL_DELIVERED").contains(e.action())));
+                || java.util.Set.of("BUY", "SELL", "BUY_CONSUMABLE", "LOAD_AMMUNITION", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "PRODUCT_TRANSFER_COMPLETED", "YARD_MATERIAL_DELIVERED").contains(e.action())));
+    }
+
+    /**
+     * Reads the current personally owned ammunition-service berth without revealing remote storage.
+     * @return own station at the actual active idle ship's stationary dock, otherwise empty
+     */
+    public Optional<String> dockedAmmunitionStationId() {
+        if (playerState == null || playerState.activeFleetId() == null || !playerState.docked()
+                || !playerState.ownedFleetIds().contains(playerState.activeFleetId())) return Optional.empty();
+        var runtime = coordinator.runtime(); var world = runtime.world();
+        var fleet = world.findFleet(playerState.activeFleetId()).orElse(null);
+        var freight = runtime.freight().findFreighter(playerState.activeFleetId()).orElse(null);
+        if (fleet == null || freight == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM
+                || freight.phase() != com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE
+                || world.findFleetJump(fleet.fleetId()).isPresent()) return Optional.empty();
+        return runtime.infrastructure().endpoints().stream().filter(e -> e.systemId().equals(fleet.systemId())
+                && ownsProductionStation(e.stationId())
+                && pilotMarketReference(e.stationId()).filter(playerState.dockedAt()::equals).isPresent())
+                .filter(e -> runtime.arrival().materialization(fleet.systemId()).physicalState(fleet.localEntityId())
+                        .filter(p -> p.position().distanceTo(e.position()) <= 1000d
+                                && Math.hypot(p.velocityXMps(), p.velocityYMps()) <= 1d).isPresent())
+                .map(e -> e.stationId()).findFirst();
     }
 
     private com.spacesim.economy.ShipyardModuleTransferWorkQueue.Context moduleTransferContext(String stationId, boolean loading) {
@@ -2561,7 +3336,7 @@ public final class Stage228CampaignAuthority {
             var context = moduleTransferContext(station, loading); if (context == null) return null;
             if (loading) {
                 var f = coordinator.runtime().freight().findFreighter(playerState.activeFleetId()).orElseThrow();
-                double kg = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts()
+                double kg = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products()
                         .findProduct(order.source().condition().assignment().moduleId()).unitMassKg();
                 if (f.cargoMassKg() + kg > f.cargoCapacityKg()) return null;
             }
@@ -2671,16 +3446,30 @@ public final class Stage228CampaignAuthority {
         var budgets = new java.util.HashMap<String, com.spacesim.economy.Stage18ManufacturingRuntime.IntervalBudget>();
         runtime.manufacturingQueue().advance(tick, id -> runtime.infrastructure().endpoint(id).storage(), order -> {
             if (!ownsProductionStation(order.stationId())) return null;
-            var capability = manufacturingCapability(order.stationId(), order.operationId());
+            var capability = order.kind() == com.spacesim.persistence.Stage18IndustrialState.ProcessKind.REFINING
+                    ? refiningCapability(order.stationId(), order.operationId())
+                    : order.kind() == com.spacesim.persistence.Stage18IndustrialState.ProcessKind.COMPONENT_MANUFACTURING
+                    ? componentCapability(order.stationId(), order.operationId())
+                    : manufacturingCapability(order.stationId(), order.operationId());
             if (capability == null) return null;
             return budgets.computeIfAbsent(order.stationId() + '|' + capability.capabilityId(),
                     ignored -> capability.openInterval(coordinator.session().fixedStepSeconds()));
         });
         var remaining = runtime.manufacturingQueue().capture().stream().map(o -> o.orderId())
                 .collect(java.util.stream.Collectors.toSet());
-        for (var order : before) if (!remaining.contains(order.orderId())) recordPersonalCommit(
-                com.spacesim.player.PlayerJournalState.Kind.MANUFACTURING_COMPLETED, "MANUFACTURING_COMPLETED",
-                order.stationId(), order.operationId(), order.requestedUnits(), 0, null);
+        for (var order : before) if (!remaining.contains(order.orderId())) {
+            if (order.kind() == com.spacesim.persistence.Stage18IndustrialState.ProcessKind.REFINING) {
+                var recipe = com.spacesim.content.Stage18RefiningCatalogLoader.loadDefault().findRecipe(order.operationId());
+                recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.MANUFACTURING_COMPLETED, "REFINING_COMPLETED",
+                        order.stationId(), order.operationId(), Math.round(order.requestedAmount() * recipe.outputMassFraction()), 0, null);
+                recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.MANUFACTURING_COMPLETED, "REFINING_TAILINGS_DISCARDED",
+                        order.stationId(), order.operationId(), Math.round(order.requestedAmount() * recipe.discardedMassFraction()), 0, null);
+            } else if (order.kind() == com.spacesim.persistence.Stage18IndustrialState.ProcessKind.COMPONENT_MANUFACTURING)
+                recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.MANUFACTURING_COMPLETED, "COMPONENT_MANUFACTURING_COMPLETED",
+                        order.stationId(), order.operationId(), Math.round(order.requestedAmount()), 0, null);
+            else recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.MANUFACTURING_COMPLETED, "MANUFACTURING_COMPLETED",
+                    order.stationId(), order.operationId(), order.requestedUnits(), 0, null);
+        }
         advancePersonalFacilityConstructionAtTick(tick, budgets, handlingBudgets);
     }
 
@@ -2739,16 +3528,22 @@ public final class Stage228CampaignAuthority {
     }
 
     private void reconcileOnePlayerMission(String id, com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistentState runtimeCheckpoint) {
+        reconcileOnePlayerMission(id, runtimeCheckpoint.campaign(), runtimeCheckpoint.freight());
+    }
+
+    private void reconcileOnePlayerMission(String id,
+            com.spacesim.persistence.Stage20GeneratedCampaignPersistentState campaignCheckpoint,
+            com.spacesim.persistence.Stage20FreightPersistentState freight) {
         var service = coordinator.npcMissionService();
-        var discovery = runtimeCheckpoint.campaign().discoveryState();
+        var discovery = campaignCheckpoint.discoveryState();
         MissionContract mission = service.snapshot().missions().stream()
                 .filter(value -> value.missionId().equals(id)).findFirst().orElseThrow();
         long beforeWallet = playerState.walletMilliCredits();
         // Transaction-local adapter to the existing service's exact escrow-transfer API.
         // Only PlayerState survives the call; this is not an additional persistent wallet.
         WalletComponent recipient = new WalletComponent(playerState.walletMilliCredits());
-        service.reconcilePlayerMission(coordinator.runtime().world(), runtimeCheckpoint.freight(),
-                runtimeCheckpoint.campaign().industrialState(), discovery.knowledgeFor(mission.issuerFactionId()),
+        service.reconcilePlayerMission(coordinator.runtime().world(), freight,
+                campaignCheckpoint.industrialState(), discovery.knowledgeFor(mission.issuerFactionId()),
                 discovery.knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID),
                 coordinator.operations(), playerState, id, recipient);
         if (recipient.getBalanceMilliCredits() != playerState.walletMilliCredits()) {
@@ -2943,6 +3738,10 @@ public final class Stage228CampaignAuthority {
 
     private static SmallCraftFitAuthority productionFitAuthority() {
         return new SmallCraftFitAuthority(
-                Stage228SmallCraftEngineeringCatalogLoader.loadDefault());
+                SmallCraftCatalog.CONTENT);
+    }
+
+    private static final class SmallCraftCatalog {
+        private static final com.spacesim.content.ship.ShipEngineeringCatalog CONTENT = Stage228SmallCraftEngineeringCatalogLoader.loadDefault();
     }
 }

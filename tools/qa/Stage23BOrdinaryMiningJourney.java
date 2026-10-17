@@ -15,15 +15,243 @@ public final class Stage23BOrdinaryMiningJourney {
  private static final long MAX_FLIGHT_TICKS=Long.getLong("stage23b.journey.maxFlightTicks",20_000_000L);
  private static final long CHECKPOINT_INTERVAL=Long.getLong("stage23b.journey.checkpointInterval",100_000L);
  private static final int MINING_TARGET_KG=Integer.getInteger("stage23b.journey.miningKg",1);
+ private static final int SALE_BATCH_KG=Integer.getInteger("stage23b.journey.saleBatchKg",1000);
+ private static final int SALE_TARGET_KG=Integer.getInteger("stage23b.journey.saleKg",MINING_TARGET_KG);
+ private static final int MAX_ANONYMOUS_APPROACHES=Integer.getInteger("stage23b.journey.maxAnonymousApproaches",8);
  private static long startedTick;
  private static boolean budgetActive;
  public static void main(String[] args) throws Exception {
-  if(MAX_TICKS<=0 || MAX_FLIGHT_TICKS<=0 || CHECKPOINT_INTERVAL<=0 || MINING_TARGET_KG<=0)throw new IllegalArgumentException("Probe tick budgets and mining request must be positive");
-  try { if(Boolean.getBoolean("stage23b.journey.stationPurchase")) stationPurchaseJourney();
-        else if(Boolean.getBoolean("stage23b.journey.resourceMap")) resourceMapJourney(); else journey(); }
+  if(MAX_TICKS<=0 || MAX_FLIGHT_TICKS<=0 || CHECKPOINT_INTERVAL<=0 || MINING_TARGET_KG<=0 || SALE_BATCH_KG<=0 || SALE_TARGET_KG<=0 || MAX_ANONYMOUS_APPROACHES<=0)throw new IllegalArgumentException("Probe tick budgets and mining/sale requests must be positive");
+  try { if(Boolean.getBoolean("stage23b.journey.resourceVisit")) resourceVisitJourney();
+        else if(Boolean.getBoolean("stage23b.journey.unknownRadarStation")) unknownRadarStationJourney();
+        else if(Boolean.getBoolean("stage23b.journey.stationRadar")) stationRadarJourney();
+        else if(Boolean.getBoolean("stage23b.journey.stationPurchase")) stationPurchaseJourney();
+        else if(Boolean.getBoolean("stage23b.journey.resourceMap")) resourceMapJourney();
+        else if(Boolean.getBoolean("stage23b.journey.materialSupply")) materialSupplyJourney();
+        else if(Boolean.getBoolean("stage23b.journey.localFuelSearch")) localFuelSearchJourney(); else journey(); }
   catch(ProbePaused paused){System.out.println("JOURNEY PAUSED tick="+world().getAuthoritativeWorldTick()+" checkpoint="+CHECKPOINT+"; requested journey is not yet proven");}
+  catch(Exception|Error failure){System.err.println("JOURNEY FAILURE before final checkpoint:");failure.printStackTrace();throw failure;}
   finally {if(campaign!=null){campaign.coordinator().setPaused(true);Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,campaign.captureState());}}
  }
+ private static void resourceVisitJourney() throws Exception {
+  var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact resource visit input");
+  var initialPlayer=campaign.playerState().orElseThrow();
+  String objectId=System.getProperty("stage23b.journey.resourceId");
+  var known=campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .entries().stream().filter(k->k.object().resourceObject()&&k.object().objectId().equals(objectId)
+      &&k.knownLocation().isPresent()).findFirst().orElseThrow(()->new IllegalStateException("No personal resource waypoint"));
+  if(!known.object().systemId().equals(fleet().systemId()))throw new IllegalStateException("Reach the personally mapped system first");
+  var resourceBefore=known.resourceKnowledge();
+  var evidenceBefore=known.evidence();
+  saved=null;
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  if(initialPlayer.docked())action("UNDOCK","","",0);
+  System.out.println("PERSONAL RESOURCE APPROACH target="+objectId+" evidence="+evidenceBefore);
+  fly(known.knownLocation().orElseThrow(),500);
+  var after=campaign.playerState().orElseThrow();
+  if(after.walletMilliCredits()!=initialPlayer.walletMilliCredits()
+      ||!after.ownedFleetIds().equals(initialPlayer.ownedFleetIds()))throw new AssertionError("Visit granted money or ships");
+  var current=campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .knowledge(known.object()).orElseThrow();
+  if(!current.resourceKnowledge().equals(resourceBefore)||!current.evidence().equals(evidenceBefore))
+    throw new AssertionError("Approach fabricated resource evidence");
+  var complete=campaign.captureState();
+  Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,complete);
+  if(!complete.equals(Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT)).captureState()))
+    throw new AssertionError("Non-exact physical resource visit reload");
+  System.out.println("ORDINARY PERSONAL RESOURCE VISIT PASS target="+objectId+" distanceM="
+    +physical().position().distanceTo(known.knownLocation().orElseThrow())+" tick="+world().getAuthoritativeWorldTick()
+    +"; paid waypoint, physical thrust and braking, exact reload; no extraction or deposit survey claimed");
+ }
+ private static void unknownRadarStationJourney() throws Exception {
+  var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact unknown-contact input");
+  saved=null;
+  var initialKnown=new HashSet<>(campaign.playerState().orElseThrow().discoveredObjects());
+  var initialArchive=campaign.coordinator().runtime().discoveryState()
+    .knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).entries().stream()
+    .map(k->k.object().objectId()).collect(java.util.stream.Collectors.toSet());
+  var attempted=new HashSet<Long>();
+  var anchor=physical().position();
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
+  // Predetermined search offsets use no endpoint, source or generated target coordinates.
+  double[][] offsets={{0,0},{10000,0},{0,10000},{-10000,0},{0,-10000}};
+  for(var offset:offsets) {
+   fly(anchor.translated(offset[0],offset[1]),200);
+   action("SCAN","","",1);
+   var f=fleet();
+   var sensor=world().findSession(f.systemId()).orElseThrow().getEntityRegistry().require(f.localEntityId())
+     .getComponent(com.spacesim.components.SensorKnowledgeComponent.class);
+   var candidates=sensor.tracks().stream().filter(t->t.positionKnown()&&!attempted.contains(t.targetId()))
+     .filter(t->initialKnown.stream().noneMatch(k->k.systemId().equals(f.systemId())&&k.entityId().value()==t.targetId()))
+     .filter(t->sensor.receivedMeasurements().stream().anyMatch(m->m.targetId()==t.targetId()&&m.hasRange()
+       &&m.timestampSeconds()==t.lastMeasurementSeconds()))
+     .sorted(Comparator.comparingLong(com.spacesim.ship.TrackState::targetId)).toList();
+   for(var track:candidates) {
+    if(attempted.size()>=MAX_ANONYMOUS_APPROACHES)throw new ProbePaused();
+    attempted.add(track.targetId());
+    // Only a personally received estimated position chooses this approach; identity is unknown.
+    var estimate=LocalPhysicalPosition.origin().translated(track.estimatedXM(),track.estimatedYM());
+    System.out.println("ANONYMOUS CONTACT APPROACH estimate="+estimate+"; measured position only");
+    fly(estimate,200);
+    for(int refinement=0;refinement<3;refinement++) {
+     action("SCAN","","",1);
+     var currentFleet=fleet();
+     var currentSensor=world().findSession(currentFleet.systemId()).orElseThrow().getEntityRegistry().require(currentFleet.localEntityId())
+       .getComponent(com.spacesim.components.SensorKnowledgeComponent.class);
+     var updated=currentSensor.tracks().stream().filter(t->t.targetId()==track.targetId()&&t.positionKnown())
+       .filter(t->currentSensor.receivedMeasurements().stream().anyMatch(m->m.targetId()==t.targetId()
+         &&m.hasRange()&&m.timestampSeconds()==t.lastMeasurementSeconds())).findFirst();
+     if(updated.isEmpty())break;
+     var refined=LocalPhysicalPosition.origin().translated(updated.orElseThrow().estimatedXM(),updated.orElseThrow().estimatedYM());
+     if(physical().position().distanceTo(refined)<=200)break;
+     System.out.println("ANONYMOUS CONTACT REFINEMENT estimate="+refined+"; newly paid range/bearing only");
+     fly(refined,200);
+    }
+    var contact=campaign.coordinator().runtime().infrastructure().endpoints().stream()
+      .filter(e->campaign.canDockAtPersonalStation(e.stationId()))
+      .filter(e->campaign.pilotMarketReference(e.stationId()).orElseThrow().entityId().value()==track.targetId())
+      .filter(e->!initialArchive.contains(e.stationId()))
+      .filter(e->!initialKnown.contains(campaign.pilotMarketReference(e.stationId()).orElseThrow()))
+      .sorted(Comparator.comparing(e->e.stationId())).findFirst();
+    if(contact.isEmpty())continue;
+    var station=contact.orElseThrow();
+    action("DOCK",station.stationId(),"",0);
+    var complete=campaign.captureState();
+    var restored=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
+      Stage228GeneratedCampaignPersistenceCodec.encode(complete)));
+    if(!complete.equals(restored.captureState()))throw new AssertionError("Non-exact measured approach checkpoint");
+    System.out.println("UNKNOWN STATION RADAR APPROACH PASS station="+station.stationId()+" tick="+world().getAuthoritativeWorldTick()
+      +"; paid pulse, measured guidance, physical contact and dock, exact reload; no hidden target coordinates");
+    return;
+   }
+  }
+  throw new ProbePaused();
+ }
+ private static void stationRadarJourney() throws Exception {
+  var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact radar journey input");
+  String station=System.getProperty("stage23b.journey.radarStation","hub.14");
+  var coordinate=personalCoordinate(station).orElseThrow(()->new IllegalStateException("Physical test approach needs existing personal station coordinates"));
+  var reference=campaign.pilotMarketReference(station).orElseThrow();
+  if(!reference.systemId().equals(fleet().systemId()))throw new IllegalStateException("Radar journey must start in the actual station system");
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
+  fly(coordinate.translated(5000,0),200);
+  boolean thrust=Boolean.getBoolean("stage23b.journey.radarThrust");
+  var expectedPhysical=physical();
+  var fitted=world().findSession(fleet().systemId()).orElseThrow().getEntityRegistry().require(fleet().localEntityId())
+   .getComponent(com.spacesim.components.EngineeringComponent.class);
+  var beforeOperating=fitted.runtimeState;
+  com.spacesim.components.EngineeringComponent referenceEngineering=null;
+  if(thrust) {
+   campaign.setPilotThrust(.5f,0,false);
+   referenceEngineering=new com.spacesim.components.EngineeringComponent(fitted.fit,fitted.runtimeState,fitted.instanceState);
+   expectedPhysical=new com.spacesim.systems.PlayerDirectControlSystem().advanceExact(
+    new com.badlogic.ashley.core.Entity().add(referenceEngineering),expectedPhysical,.5f,0,false,campaign.coordinator().session().fixedStepSeconds());
+  }
+  long pulseTick=world().getAuthoritativeWorldTick();
+  var before=campaign.captureState();
+  var pulse=campaign.previewPilotAction("SCAN","","",1);
+  if(!pulse.allowed() || !before.equals(campaign.captureState()))throw new AssertionError("Ordinary fitted radar preview failed or mutated state");
+  campaign.submitPilotAction(pulse);
+  if(thrust && (!expectedPhysical.equals(physical())
+    ||!referenceEngineering.runtimeState.consumables().equals(fitted.runtimeState.consumables())
+    ||fitted.runtimeState.sharedBusEnergyJ()>referenceEngineering.runtimeState.sharedBusEnergyJ()
+    ||new ProductionEngineeringRuntimeResolver().derive(fitted).reactionMassKg()>=new ProductionEngineeringRuntimeResolver().derive(
+     new com.spacesim.components.EngineeringComponent(fitted.fit,beforeOperating,fitted.instanceState)).reactionMassKg()))
+   throw new AssertionError("Radar with thrust duplicated movement/fuel or electrical energy");
+  campaign.setPilotThrust(0,0,false);
+  var sensor=world().findSession(fleet().systemId()).orElseThrow().getEntityRegistry().require(fleet().localEntityId())
+   .getComponent(com.spacesim.components.SensorKnowledgeComponent.class);
+  var measurement=sensor.receivedMeasurements().stream().filter(m->m.targetId()==reference.entityId().value()&&m.hasRange())
+   .max(java.util.Comparator.comparingDouble(com.spacesim.ship.SensorMeasurement::timestampSeconds)).orElseThrow();
+  if(measurement.rangeM()<=1000 || world().getAuthoritativeWorldTick()!=pulseTick+1)
+   throw new AssertionError("Radar must measure beyond docking range on one real tick");
+  var complete=campaign.captureState();
+  var restored=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(Stage228GeneratedCampaignPersistenceCodec.encode(complete)));
+  if(!complete.equals(restored.captureState()))throw new AssertionError("Non-exact ordinary radar round trip");
+  System.out.println("ORDINARY STATION RADAR PASS station="+station+" measuredRangeM="+measurement.rangeM()+" tick="+world().getAuthoritativeWorldTick()+" thrust="+thrust+"; existing fit and coordinates, physical flight, pulse, exact reload; no grants");
+ }
+ private static void localFuelSearchJourney() throws Exception {
+  var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact local search checkpoint");
+  saved=null;
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
+  // A predetermined coordinate-system origin is a search waypoint, not an unpaid station location.
+  // No endpoint/source/catalog coordinates are read to choose or adjust this waypoint.
+  System.out.println("LOCAL SEARCH WAYPOINT origin=(0,0); no hidden station navigation granted");
+  fly(new LocalPhysicalPosition(0,0,0,0),500);
+  var contact=campaign.coordinator().runtime().infrastructure().endpoints().stream()
+    .filter(e->e.systemId().equals(fleet().systemId())&&campaign.canDockAtPersonalStation(e.stationId()))
+    .sorted(Comparator.comparing(e->e.stationId())).findFirst().orElseThrow(()->new IllegalStateException("No actual immediate dock contact at search waypoint"));
+  action("DOCK",contact.stationId(),"",0);
+  System.out.println("ACTUAL LOCAL DOCK SEARCH PASS station="+contact.stationId()+" waterStockKg="+contact.storage().commodityMassKg("commodity.material.purified_water")
+    +" tick="+world().getAuthoritativeWorldTick()+"; physical visit only, refueling not claimed");
+ }
+ private static void materialSupplyJourney() throws Exception {
+  var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+  var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
+  campaign=Stage228CampaignAuthority.restore(saved);
+  if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact actual supply checkpoint");
+  saved=null;
+  campaign.coordinator().setTimeScale(1d);startedTick=world().getAuthoritativeWorldTick();budgetActive=true;
+  String commodity=System.getProperty("stage23b.journey.commodity","commodity.feedstock.conductor_ore");
+  String station=System.getProperty("stage23b.journey.stationId","industry.2");
+  if(!campaign.ownsProductionStation(station))throw new IllegalStateException("Actual owned receiving station required");
+  double goal=Double.parseDouble(System.getProperty("stage23b.journey.stockGoalKg"));
+  double initialStock=campaign.coordinator().runtime().infrastructure().endpoint(station).storage().commodityMassKg(commodity);
+  double missing=goal-initialStock;
+  if(!Double.isFinite(goal)||missing < -1e-8||Math.abs(missing-Math.rint(missing))>1e-8||missing>MINING_TARGET_KG)throw new IllegalStateException("Supply goal must be a fixed whole-kg increment within the requested bound");
+  int requested=(int)Math.rint(missing);
+  if(requested==0){System.out.println("ACTUAL MATERIAL SUPPLY ALREADY COMPLETE stockKg="+initialStock);return;}
+  System.out.println("ACTUAL SUPPLY FUEL cargoWaterKg="+cargoMass("commodity.material.purified_water")
+    +" ownWaterStockKg="+campaign.coordinator().runtime().infrastructure().endpoint(station).storage().commodityMassKg("commodity.material.purified_water"));
+  for(var row:com.spacesim.ui.GeneratedCampaignSupplyUi.rows(campaign))System.out.println("ACTUAL CONSUMABLE INTERFACE "+row.selection().stableId()+" "+row.sections());
+  var known=campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .entries().stream().filter(k->k.object().resourceObject()&&k.knownLocation().isPresent()
+      &&k.classificationId().filter(commodity::equals).isPresent()).findFirst().orElseThrow();
+  long wallet=campaign.playerState().orElseThrow().walletMilliCredits();
+  var active=campaign.coordinator().runtime().freight().capture().personalMiningOrders().stream().filter(o->o.fleetId().equals(fleetId())).findFirst();
+  double cargo=cargoMass(commodity);
+  if(cargo<requested || active.isPresent()) {
+   if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
+   travel(known.object().systemId());fly(known.knownLocation().orElseThrow(),500);
+   if(active.isEmpty())action("START_MINING",known.object().objectId(),"",(int)Math.ceil(requested-cargo));
+   while(campaign.coordinator().runtime().freight().capture().personalMiningOrders().stream().anyMatch(o->o.fleetId().equals(fleetId())))tick();
+   if(cargoMass(commodity)<requested-1e-8)throw new AssertionError("Actual source failed requested material extraction");
+  }
+  var berth=campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
+    .entries().stream().filter(k->k.object().objectId().equals(station)&&k.knownLocation().isPresent()).findFirst().orElseThrow();
+  travel(berth.object().systemId());fly(berth.knownLocation().orElseThrow(),500);
+  if(!campaign.playerState().orElseThrow().docked())action("DOCK",station,"",0);
+  double before=cargoMass(commodity);
+  double stock=campaign.coordinator().runtime().infrastructure().endpoint(station).storage().commodityMassKg(commodity);
+  // Respect the shared finite dock-handling limit; do not bypass the command boundary.
+  int left=requested;
+  while(left>0){
+   int batch=Math.min(left,1000);
+   while(batch>0&&!campaign.previewPilotAction("UNLOAD_COMMODITY",station,commodity,batch).allowed())batch/=2;
+   if(batch==0){tick();continue;}
+   action("UNLOAD_COMMODITY",station,commodity,batch);left-=batch;if(left>0)tick();
+  }
+  if(Math.abs(cargoMass(commodity)-(before-requested))>1e-8
+      ||Math.abs(campaign.coordinator().runtime().infrastructure().endpoint(station).storage().commodityMassKg(commodity)-(stock+requested))>1e-8
+      ||campaign.playerState().orElseThrow().walletMilliCredits()!=wallet)throw new AssertionError("Non-conserved own material delivery");
+  System.out.println("ACTUAL MATERIAL SUPPLY PASS commodity="+commodity+" deliveredThisContinuationKg="+requested+" stockGoalKg="+goal+" tick="+world().getAuthoritativeWorldTick());
+ }
+ private static double cargoMass(String commodity){return campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage().commodityMassByIdKg().getOrDefault(commodity,0d);}
  private static void stationPurchaseJourney() throws Exception {
   var saved=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT);
   campaign=Stage228CampaignAuthority.restore(saved);
@@ -86,8 +314,9 @@ public final class Stage23BOrdinaryMiningJourney {
   campaign=Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(purchased));
  }
  private static void journey() throws Exception {
-  if(java.nio.file.Files.exists(CHECKPOINT)) {
-   var loaded=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(CHECKPOINT);
+  if(java.nio.file.Files.exists(CHECKPOINT) || System.getProperty("stage23b.journey.input")!=null) {
+   var input=java.nio.file.Files.exists(CHECKPOINT)?CHECKPOINT:java.nio.file.Path.of(System.getProperty("stage23b.journey.input"));
+   var loaded=Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(input);
    campaign=Stage228CampaignAuthority.restore(loaded);
    if(!loaded.equals(campaign.captureState()))throw new AssertionError("Non-exact resumed journey checkpoint");
    System.out.println("JOURNEY RESUMED tick="+world().getAuthoritativeWorldTick()+" jump="+world().findFleetJump(fleetId()));
@@ -104,7 +333,7 @@ public final class Stage23BOrdinaryMiningJourney {
   var miner=campaign.coordinator().runtime().freight().capture().freighters().stream()
    .filter(f->MINING_TARGET_KG==1 || campaign.playerState().orElseThrow().ownedFleetIds().contains(f.fleetId()))
    .filter(f->f.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)).findFirst().orElseThrow();
-  String miningDock="hub."+miner.currentSystemId().value();
+  String miningDock=System.getProperty("stage23b.journey.saleStation","hub."+miner.currentSystemId().value());
   var original=miner;
   if(!campaign.playerState().orElseThrow().ownedFleetIds().contains(miner.fleetId())) {
    travel(miner.currentSystemId());
@@ -127,9 +356,16 @@ public final class Stage23BOrdinaryMiningJourney {
   System.out.println("MINER PURCHASED "+miner.fleetId()+" wallet="+campaign.playerState().orElseThrow().walletMilliCredits());
   var activeMining=campaign.coordinator().runtime().freight().capture().personalMiningOrders().stream().filter(o->o.fleetId().equals(fleetId())).findFirst();
   boolean sellOnly=Boolean.getBoolean("stage23b.journey.sellOnly");
-  if(sellOnly && (!campaign.playerState().orElseThrow().docked()
+  if(sellOnly && System.getProperty("stage23b.journey.saleStation")==null && (!campaign.playerState().orElseThrow().docked()
       || !campaign.pilotMarketReference(miningDock).orElseThrow().equals(campaign.playerState().orElseThrow().dockedAt())))
       throw new IllegalStateException("Sale-only continuation requires the actual saved market berth");
+  if(sellOnly && System.getProperty("stage23b.journey.saleStation")!=null) {
+   personalCoordinate(miningDock).orElseThrow(()->new IllegalStateException("Sale destination needs existing personal navigation"));
+   if(!campaign.pilotMarketReference(miningDock).orElseThrow().equals(campaign.playerState().orElseThrow().dockedAt())) {
+    if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
+    travel(campaign.coordinator().runtime().infrastructure().endpoint(miningDock).systemId());
+   }
+  }
   boolean hasOre=hasMinedOre();
   if(!sellOnly && (!hasOre || activeMining.isPresent())) {
    if(campaign.playerState().orElseThrow().docked())action("UNDOCK","","",0);
@@ -154,12 +390,15 @@ public final class Stage23BOrdinaryMiningJourney {
   if(!saved.equals(campaign.captureState()))throw new AssertionError("Non-exact ordinary save/load");
   System.out.println("JOURNEY CHECKPOINT PASS tick="+world().getAuthoritativeWorldTick());
   Stage228GeneratedCampaignPersistenceCodec.write(CHECKPOINT,saved);
+  // The restored authority owns its state. Do not retain a second full world snapshot
+  // throughout a multi-million-tick flight and every subsequent checkpoint encoding.
+  saved=null;
   fly(MINING_TARGET_KG==1 ? campaign.coordinator().runtime().infrastructure().endpoint(miningDock).position()
       : personalCoordinate(miningDock).orElseThrow(),500);
   if(!campaign.playerState().orElseThrow().docked())action("DOCK",miningDock,"",0);tick();
   var cargo=campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage();
   var ore=cargo.commodityMassByIdKg().entrySet().stream().filter(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=1).findFirst().orElseThrow();
-  int quantity=(int)Math.min(MINING_TARGET_KG,Math.floor(ore.getValue()));
+  int quantity=(int)Math.min(SALE_TARGET_KG,Math.floor(ore.getValue()));
   double beforeCargo=cargo.commodityMassByIdKg().getOrDefault(ore.getKey(),0d);
   double beforeStock=campaign.coordinator().runtime().infrastructure().endpoint(miningDock).storage().commodityMassKg(ore.getKey());
   long beforeMoney=campaign.playerState().orElseThrow().walletMilliCredits();
@@ -171,7 +410,7 @@ public final class Stage23BOrdinaryMiningJourney {
        .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
    long quote=campaign.pilotCommodityPrice(miningDock,ore.getKey(),false);
    long physicalLimit=(long)Math.floor(endpoint.handlingCapability().massRateKgPerSecond()*campaign.coordinator().session().fixedStepSeconds());
-   int batch=(int)Math.min(left,Math.min(1000,Math.min(physicalLimit,liquid/quote)));
+   int batch=(int)Math.min(left,Math.min(SALE_BATCH_KG,Math.min(physicalLimit,liquid/quote)));
    if(batch<=0)throw new IllegalStateException("No actual sale budget: handlingKg="+physicalLimit+" stationMilliCredits="+liquid+" quote="+quote);
    var sell=campaign.previewPilotAction("SELL",miningDock,ore.getKey(),batch);
    if(!sell.allowed())throw new AssertionError("Ordinary mined cargo cannot be sold at its actual market");
@@ -193,18 +432,33 @@ public final class Stage23BOrdinaryMiningJourney {
  private static FleetPlacementState fleet(){return world().findFleet(campaign.playerState().orElseThrow().activeFleetId()).orElseThrow();}
  private static LocalPhysicalKinematics physical(){var f=fleet();return campaign.coordinator().runtime().arrival().materialization(f.systemId()).physicalState(f.localEntityId()).orElseThrow();}
  private static boolean hasMinedOre(){return campaign.coordinator().runtime().freight().findFreighter(fleetId()).orElseThrow().cargoStorage().commodityMassByIdKg().entrySet().stream()
-   .anyMatch(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=MINING_TARGET_KG);}
+   .anyMatch(e->e.getKey().startsWith("commodity.feedstock.") && e.getValue()>=MINING_TARGET_KG
+      && campaign.coordinator().runtime().freight().cargoLots().stream()
+         .filter(l->l.fleetId().equals(fleetId())&&l.commodityId().equals(e.getKey())
+           &&(l.orderId().equals(com.spacesim.persistence.Stage20FreightPersistentState.personalExtractionOrderId(fleetId()))
+             ||l.orderId().equals(com.spacesim.persistence.Stage20FreightPersistentState.manualCargoOrderId(fleetId()))))
+         .mapToDouble(com.spacesim.persistence.CargoLotFifo::availableMassKg).sum()>=MINING_TARGET_KG);}
  private static Optional<LocalPhysicalPosition> personalCoordinate(String id){
   return campaign.coordinator().runtime().discoveryState().knowledgeFor(Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID)
     .entries().stream().filter(k->k.object().objectId().equals(id)).flatMap(k->k.knownLocation().stream()).findFirst();
  }
  private static long action(String verb,String target,String subject,int amount){
   var p=campaign.previewPilotAction(verb,target,subject,amount);
-  if(!p.allowed())throw new IllegalStateException("Rejected "+verb+" target="+target+" at tick="+world().getAuthoritativeWorldTick());
+  if(!p.allowed()){
+   // Diagnostic only: reproduce rejection on an isolated restored copy, never bypass live confirmation.
+   try {
+    var isolated=Stage228CampaignAuthority.restore(campaign.captureState());
+    var execute=Stage228CampaignAuthority.class.getDeclaredMethod("executePilotAction",String.class,String.class,String.class,int.class);
+    execute.setAccessible(true);execute.invoke(isolated,verb,target,subject,amount);isolated.captureState();
+   }catch(java.lang.reflect.InvocationTargetException e){throw new IllegalStateException("Rejected "+verb+" target="+target,e.getCause());}
+   catch(ReflectiveOperationException e){throw new IllegalStateException("Cannot diagnose rejected action",e);}
+   throw new IllegalStateException("Rejected "+verb+" target="+target+" at tick="+world().getAuthoritativeWorldTick());
+  }
   campaign.submitPilotAction(p); System.out.println("ACTION "+verb+" "+target+" at tick="+world().getAuthoritativeWorldTick());
   return p.walletChangeMilliCredits();
  }
  private static void tick(){
+  if(Boolean.getBoolean("stage23b.qa.cooperativeStop"))throw new ProbePaused();
   if(budgetActive && world().getAuthoritativeWorldTick()-startedTick>=MAX_TICKS)throw new ProbePaused();
   campaign.coordinator().setPaused(false);campaign.advanceFrame(campaign.coordinator().session().fixedStepSeconds());campaign.coordinator().setPaused(true);
   if(world().getAuthoritativeWorldTick()%10_000==0)System.out.println("JOURNEY PROGRESS tick="+world().getAuthoritativeWorldTick()+" jump="+world().findFleetJump(fleetId()));
@@ -219,9 +473,19 @@ public final class Stage23BOrdinaryMiningJourney {
   paths.put(fleet().systemId(),List.of(fleet().systemId()));pending.add(fleet().systemId());
   while(!pending.isEmpty()&&!paths.containsKey(destination)){var current=pending.remove();for(var next:world().getTopology().neighbors(current))if(!paths.containsKey(next)){
    var path=new ArrayList<>(paths.get(current));path.add(next);paths.put(next,path);pending.add(next);}}
-  for(var hop:paths.get(destination).subList(1,paths.get(destination).size())){
+  boolean personalRoute=Boolean.getBoolean("stage23b.journey.materialSupply")
+    || Boolean.getBoolean("stage23b.journey.stationPurchase") || System.getProperty("stage23b.journey.saleStation")!=null;
+  var selected=personalRoute
+    ? new com.spacesim.player.PlayerFleetRoutePlanner(world(),campaign.coordinator().content(),campaign.playerState().orElseThrow())
+       .plan(fleetId(),fleet().systemId(),destination).orElseThrow(()->new IllegalStateException("No personally known feasible material route")).path()
+    : paths.get(destination);
+  if(personalRoute&&!campaign.playerState().orElseThrow().discoveredSystemIds().containsAll(selected))throw new AssertionError("Unowned navigation route");
+  for(var hop:selected.subList(1,selected.size())){
    for(int wait=0;!world().previewFittedFleetJump(fleetId()).orElseThrow().allowed()&&wait<10_000;wait++)tick();
-   if(world().findFleetJump(fleetId()).isEmpty())action("JUMP",Long.toString(hop.value()),"",0);
+   if(world().findFleetJump(fleetId()).isEmpty()){
+    if(Boolean.getBoolean("stage23b.journey.materialSupply"))System.out.println("ACTUAL DIRECT FUEL PLAN "+world().planFleetRouteFuel(fleetId(),List.of(fleet().systemId(),hop)));
+    action("JUMP",Long.toString(hop.value()),"",0);
+   }
    int ticks=0;while(world().findFleetJump(fleetId()).isPresent()&&ticks++<50_000_000){tick();if(ticks%10000==0)System.out.println("JUMP PROGRESS "+hop+" ticks="+ticks+" world="+world().getAuthoritativeWorldTick()+" state="+world().findFleetJump(fleetId()));}
    if(world().findFleetJump(fleetId()).isPresent()||!fleet().systemId().equals(hop))throw new IllegalStateException("Travel stalled "+hop+" world="+world().getAuthoritativeWorldTick()+" state="+world().findFleetJump(fleetId()));
    System.out.println("ARRIVAL "+hop+" tick="+world().getAuthoritativeWorldTick());
@@ -261,6 +525,7 @@ public final class Stage23BOrdinaryMiningJourney {
    if(i%10000==0)System.out.println("FLIGHT PROGRESS distance="+distance+" speed="+speed+" tick="+world().getAuthoritativeWorldTick());
    if(acceleration<=0 || engineering.reactionMassKg()<=0)throw new IllegalStateException("No finite flight capability");
   }
-  throw new IllegalStateException("Flight stalled target="+target);
+  System.out.println("FLIGHT SEGMENT BUDGET EXHAUSTED ticks="+MAX_FLIGHT_TICKS+" target="+target+"; physical progress retained");
+  throw new ProbePaused();
  }
 }

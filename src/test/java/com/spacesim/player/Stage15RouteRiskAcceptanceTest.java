@@ -31,6 +31,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @org.junit.jupiter.api.Tag("slow")
 class Stage15RouteRiskAcceptanceTest {
     @Test
+    void selectedRouteEvaluationMatchesSearchAndDoesNotExposeUnknownOrForeignPaths() {
+        var fixture = fixtureWithDirectAnchorFrontierLink(15_300L);
+        var planner = new PlayerFleetRoutePlanner(fixture.runtime());
+        var selected = planner.plan(fixture.fleetId(), DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                DemoGalaxyFactory.FRONTIER_SYSTEM_ID).orElseThrow();
+        assertEquals(selected, planner.evaluateKnownRoute(fixture.fleetId(), selected.path()).orElseThrow());
+        assertTrue(planner.evaluateKnownRoute(new FleetId(Long.MAX_VALUE), selected.path()).isEmpty());
+        assertTrue(planner.evaluateKnownRoute(fixture.fleetId(), List.of(new StarSystemId(Long.MAX_VALUE))).isEmpty());
+        assertTrue(planner.evaluateKnownRoute(fixture.fleetId(), List.of(DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                DemoGalaxyFactory.FRONTIER_SYSTEM_ID, DemoGalaxyFactory.ACTIVE_SYSTEM_ID)).isEmpty());
+        var before = fixture.runtime().world().snapshot();
+        long tick = fixture.runtime().world().getAuthoritativeWorldTick();
+        new PlayerThreatIntelService(fixture.runtime()).observeLink(DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                DemoGalaxyFactory.FRONTIER_SYSTEM_ID, 50f, 1f, tick);
+        var changed = planner.plan(fixture.fleetId(), DemoGalaxyFactory.ACTIVE_SYSTEM_ID,
+                DemoGalaxyFactory.FRONTIER_SYSTEM_ID).orElseThrow();
+        assertEquals(changed, planner.evaluateKnownRoute(fixture.fleetId(), changed.path()).orElseThrow());
+        assertEquals(before, fixture.runtime().world().snapshot());
+    }
+    @Test
     void dangerousDirectLinkMakesLongerWholeRoutePreferSaferIntermediateSystems() {
         Fixture fixture = fixtureWithDirectAnchorFrontierLink(15_301L);
         PlayerFleetRoutePlanner planner = new PlayerFleetRoutePlanner(fixture.runtime());

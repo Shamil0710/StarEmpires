@@ -26,6 +26,10 @@ class GeneratedCampaignNpcSupplyOffersTest {
                         < runtime.freight().findFreighter(o.fleetId()).orElseThrow().cargoCapacityKg()
                 && runtime.infrastructure().endpoint(o.destinationEndpointId()).storage().remainingCapacityKg(ontology.findCommodity(o.commodityId()).storageClassId()) >= 1
                 && runtime.infrastructure().endpoint(o.destinationEndpointId()).handlingCapability().supportedStorageClassIds().contains(ontology.findCommodity(o.commodityId()).storageClassId()))
+                .filter(o -> runtime.industry().sourceOutposts().sources().sources().stream().anyMatch(s ->
+                        s.sourceState().outputCommodityId().equals(o.commodityId())
+                                && s.sourceState().environment() == com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment.FREE_BODY
+                                && s.sourceState().requiredCapabilityTags().isEmpty() && s.sourceState().remainingAccessibleMassKg() >= 100))
                 .findFirst().orElseThrow();
         // A real destruction command triggers the loss. No shortage fact, warehouse stock or treasury is injected.
         runtime.destroyLocalFreighter(order.fleetId(), DestructionPolicy.destroyAll());
@@ -47,6 +51,7 @@ class GeneratedCampaignNpcSupplyOffersTest {
         var offered = campaign.captureState();
         assertEquals(offered, Stage228CampaignAuthority.restore(offered).captureState());
         verifySupplyPortionAndCircularTrade(offered, mission, npc.npcId());
+        verifyGeneratedOfferActualExtractionAndOrdinarySale(offered, mission, npc.npcId());
         verifyNewOfferDuringContact(offered, mission, npc.npcId());
         GeneratedCampaignNpcSupplyOffers.offer(coordinator, npc.npcId(), observations);
         assertEquals(offered, campaign.captureState());
@@ -117,6 +122,90 @@ class GeneratedCampaignNpcSupplyOffersTest {
         assertEquals(campaign.playerState().orElseThrow().walletMilliCredits() - beforeSale,
                 campaign.playerJournal().entries().stream().filter(e -> e.sequence() >= journal).mapToLong(e -> e.walletDeltaMilliCredits()).sum());
         var saved = campaign.captureState(); assertEquals(saved, Stage228CampaignAuthority.restore(saved).captureState());
+    }
+    private static void verifyGeneratedOfferActualExtractionAndOrdinarySale(
+            com.spacesim.persistence.Stage228GeneratedCampaignPersistentState offered,
+            com.spacesim.world.Stage21HNpcMissionState.MissionContract proposal, String npcId) {
+        var campaign = Stage228CampaignAuthority.restore(offered); var runtime = campaign.coordinator().runtime();
+        var npc = campaign.coordinator().npcMissions().npcs().stream().filter(n -> n.npcId().equals(npcId)).findFirst().orElseThrow();
+        String posting = npc.knowledge().stream().filter(k -> k.factId().equals(npcId + ":posting")).findFirst().orElseThrow().subjectId();
+        // Travel geometry and the original freight loss are fixtures. NPC, offer, stock and escrow are not injected.
+        dockWithExplicitTravelGeometry(campaign, posting);
+        var beforeAccept = campaign.captureState();
+        var accept = campaign.previewMissionCommand(com.spacesim.world.Stage21HNpcMissionService.PlayerCommand.ACCEPT, proposal.missionId(), 1);
+        assertTrue(accept.allowed()); assertEquals(beforeAccept, campaign.captureState());
+        var mission = campaign.submitMissionCommand(accept);
+        String destination = mission.objective().subjectId(), commodity = mission.objective().requiredState();
+        var miner = runtime.freight().capture().freighters().stream().filter(f -> f.fitId().equals(
+                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT))
+                .findFirst().orElseThrow();
+        dockWithExplicitTravelGeometry(campaign, "hub." + miner.currentSystemId().value());
+        var beforePurchase = campaign.captureState();
+        var purchase = campaign.previewPilotAction("PURCHASE", Long.toString(miner.fleetId().value()), "", 0);
+        assertTrue(purchase.allowed()); assertEquals(beforePurchase, campaign.captureState()); campaign.submitPilotAction(purchase);
+        campaign.submitPilotAction(campaign.previewPilotAction("UNDOCK", "", "", 0));
+        campaign.submitPilotAction(campaign.previewPilotAction("SWITCH", Long.toString(miner.fleetId().value()), "", 0));
+        var source = runtime.industry().sourceOutposts().sources().sources().stream().filter(s ->
+                s.sourceState().outputCommodityId().equals(commodity)
+                        && s.sourceState().environment() == com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment.FREE_BODY
+                        && s.sourceState().requiredCapabilityTags().isEmpty() && s.sourceState().remainingAccessibleMassKg() >= 100)
+                .findFirst().orElseThrow();
+        var fleet = runtime.world().findFleet(miner.fleetId()).orElseThrow();
+        if (!fleet.systemId().equals(source.systemId())) {
+            runtime.world().beginFleetTransfer(fleet.id(), source.systemId()); runtime.world().completeFleetTransfer(fleet.id(), 0, 0);
+            fleet = runtime.world().findFleet(fleet.id()).orElseThrow();
+        }
+        var local = runtime.arrival().materialization(fleet.systemId());
+        if (local.physicalState(fleet.localEntityId()).isEmpty()) local.registerPhysicalState(fleet.localEntityId(),
+                com.spacesim.world.LocalPhysicalKinematics.stationary(source.position()));
+        local.updatePhysicalState(fleet.localEntityId(),
+                com.spacesim.world.LocalPhysicalKinematics.stationary(source.position()));
+        runtime.world().activateSystem(source.systemId()); advanceOneTick(campaign);
+        double reserve = source.sourceState().remainingAccessibleMassKg();
+        var beforeMining = campaign.captureState(); var mining = campaign.previewPilotAction("START_MINING", source.sourceId(), "", 100);
+        assertTrue(mining.allowed()); assertEquals(beforeMining, campaign.captureState()); campaign.submitPilotAction(mining);
+        for (int i = 0; i < 5000 && !runtime.freight().personalMiningOrders().isEmpty()
+                && runtime.freight().cargoHoldSnapshot(miner.fleetId()).commodityMassByIdKg().getOrDefault(commodity, 0d) < 1; i++)
+            advanceOneTick(campaign);
+        if (!runtime.freight().personalMiningOrders().isEmpty())
+            campaign.submitPilotAction(campaign.previewPilotAction("STOP_MINING", "", "", 0));
+        assertTrue(runtime.freight().personalMiningOrders().isEmpty());
+        assertTrue(source.sourceState().remainingAccessibleMassKg() < reserve);
+        double cargo = runtime.freight().cargoHoldSnapshot(miner.fleetId()).commodityMassByIdKg().getOrDefault(commodity, 0d);
+        assertTrue(cargo >= 1);
+        assertTrue(runtime.freight().capture().cargoLots().stream().anyMatch(l -> l.commodityId().equals(commodity)
+                && l.sourceEndpointId().equals(source.sourceId()) && l.receiptSeries() != null));
+        dockWithExplicitTravelGeometry(campaign, destination);
+        var target = runtime.infrastructure().endpoint(destination).storage();
+        double targetStock = target.commodityMassKg(commodity);
+        long wallet = campaign.playerState().orElseThrow().walletMilliCredits();
+        long saleIncome = campaign.pilotCommodityPrice(destination, commodity, false);
+        long treasury = runtime.world().findFactionEconomicState(mission.issuerFactionId()).orElseThrow().treasuryMilliCredits();
+        var beforeSale = campaign.captureState(); var sell = campaign.previewPilotAction("SELL", destination, commodity, 1);
+        assertTrue(sell.allowed()); assertEquals(beforeSale, campaign.captureState()); campaign.submitPilotAction(sell);
+        var completed = campaign.coordinator().npcMissions().missions().stream()
+                .filter(m -> m.missionId().equals(mission.missionId())).findFirst().orElseThrow();
+        assertEquals(com.spacesim.world.Stage21HNpcMissionState.MissionStatus.COMPLETED, completed.status());
+        assertEquals(0, completed.escrowMilliCredits());
+        assertEquals(wallet + saleIncome + mission.rewardMilliCredits(), campaign.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(saleIncome + mission.rewardMilliCredits(), campaign.playerJournal().entries().stream()
+                .filter(e -> e.sequence() >= beforeSale.playerJournal().nextSequence())
+                .mapToLong(e -> e.walletDeltaMilliCredits()).sum());
+        assertEquals(targetStock + 1, target.commodityMassKg(commodity), 1e-8);
+        assertEquals(cargo - 1, runtime.freight().cargoHoldSnapshot(miner.fleetId()).commodityMassByIdKg().getOrDefault(commodity, 0d), 1e-8);
+        assertEquals(treasury, runtime.world().findFactionEconomicState(mission.issuerFactionId()).orElseThrow().treasuryMilliCredits());
+        assertEquals(1, campaign.coordinator().npcMissions().reputations().stream().flatMap(r -> r.events().stream())
+                .filter(e -> e.subjectId().equals(mission.missionId())
+                        && e.kind() == com.spacesim.world.Stage21HNpcMissionState.ReputationEventKind.CONTRACT_COMPLETED).count());
+        assertEquals(1, campaign.playerJournal().entries().stream().filter(e -> e.action().equals("COMPLETED")
+                && e.subject().equals(mission.missionId()) && e.walletDeltaMilliCredits() == mission.rewardMilliCredits()).count());
+        var done = campaign.captureState();
+        var restored = Stage228CampaignAuthority.restore(com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.decode(
+                com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.encode(done)));
+        assertEquals(done, restored.captureState()); advanceOneTick(restored);
+        assertEquals(done.playerState().walletMilliCredits(), restored.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(1, restored.playerJournal().entries().stream().filter(e -> e.action().equals("COMPLETED")
+                && e.subject().equals(mission.missionId())).count());
     }
     private static void verifyNewOfferDuringContact(com.spacesim.persistence.Stage228GeneratedCampaignPersistentState offered,
             com.spacesim.world.Stage21HNpcMissionState.MissionContract proposal, String npcId) {

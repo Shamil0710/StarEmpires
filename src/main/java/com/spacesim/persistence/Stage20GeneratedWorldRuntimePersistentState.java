@@ -138,6 +138,14 @@ public record Stage20GeneratedWorldRuntimePersistentState(
         if (worldState.nextFleetIdValue() < freight.nextFleetIdValue()) {
             throw new IllegalArgumentException("ordinary world FleetId watermark trails freight identity");
         }
+        var authorityClock = worldState.systems().stream().filter(s -> s.systemId().equals(activeSystemId))
+                .findFirst().orElseThrow().simulationState().clock();
+        for (var lot : freight.cargoLots()) if (lot.receiptSeries() != null) {
+            var series = lot.receiptSeries();
+            if (series.lastTick() > authorityClock.tick()
+                    || Double.doubleToLongBits(series.fixedStepSeconds()) != Double.doubleToLongBits((double) authorityClock.fixedStepSeconds()))
+                throw new IllegalArgumentException("Extraction receipt series differs from authoritative world time");
+        }
 
         Map<FleetId, FleetPlacementState> placements = new HashMap<>();
         for (FleetPlacementState placement : worldState.fleets()) {

@@ -28,7 +28,7 @@ public final class Stage18StationStorage {
     private final Stage18ResourceOntologyCatalog ontology;
     private final Stage18ManufacturingProductRegistry products;
     private final String stationId;
-    private final Map<String, Double> capacityByStorageClassKg;
+    private Map<String, Double> capacityByStorageClassKg;
     private final Map<String, Double> commodityMassByIdKg;
     private final Map<String, Integer> productCountById;
     // Process custody is persisted in Stage18 process orders, not duplicated in this snapshot.
@@ -39,6 +39,7 @@ public final class Stage18StationStorage {
     private Map<String, Double> refitReservationMassByStorageClassKg = Map.of();
     private Map<String, Double> constructionReservationMassByStorageClassKg = Map.of();
     private Map<String, Double> yardConstructionReservationMassByStorageClassKg = Map.of();
+    private Map<String, Double> craftBuildReservationMassByStorageClassKg = Map.of();
     // Finished goods remain in the physical count owner during pending handling.
     private Map<String, Integer> productHandlingReservedCounts = Map.of();
 
@@ -98,6 +99,24 @@ public final class Stage18StationStorage {
     }
 
     /**
+     * Applies a caller-proved monotonic structural expansion without replacing any contents or reserves.
+     * Persistence must independently derive and validate this exact map from completed structures.
+     * @param expectedCapacity complete proved capacity map, never a delta
+     */
+    public void expandProvedCapacity(Map<String, Double> expectedCapacity) {
+        var checked = new TreeMap<String, Double>();
+        Objects.requireNonNull(expectedCapacity).forEach((id, value) -> {
+            if (ontology.findStorageClass(id) == null || value == null || !Double.isFinite(value) || value <= 0d)
+                throw new IllegalArgumentException("Invalid proved physical storage capacity");
+            checked.put(id, value);
+        });
+        for (var entry : capacityByStorageClassKg.entrySet())
+            if (checked.getOrDefault(entry.getKey(), 0d) < entry.getValue())
+                throw new IllegalArgumentException("Structural capacity cannot shrink or remove an existing store");
+        capacityByStorageClassKg = Collections.unmodifiableMap(checked);
+    }
+
+    /**
      * Returns stored Stage-18 commodity mass.
      *
      * @param commodityId Stage-18 commodity ID
@@ -145,7 +164,8 @@ public final class Stage18StationStorage {
                 + repairReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
                 + refitReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
                 + constructionReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
-                + yardConstructionReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d);
+                + yardConstructionReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d)
+                + craftBuildReservationMassByStorageClassKg.getOrDefault(storageClassId, 0d);
     }
 
     /**
@@ -287,7 +307,8 @@ public final class Stage18StationStorage {
                     - repairReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
                     - refitReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
                     - constructionReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
-                    - yardConstructionReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)));
+                    - yardConstructionReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)
+                    - craftBuildReservationMassByStorageClassKg.getOrDefault(capacity.getKey(), 0d)));
         }
         return Collections.unmodifiableMap(result);
     }
@@ -306,9 +327,10 @@ public final class Stage18StationStorage {
                 (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
         yardConstructionReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
                 (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
+        craftBuildReservationMassByStorageClassKg.forEach((id, mass) -> result.compute(id,
+                (key, capacity) -> Math.max(0d, Objects.requireNonNull(capacity) - mass)));
         return result;
     }
-
     void validateModuleCustodyReservation(Map<String, Double> masses) {
         masses.forEach((id, mass) -> {
             requireKnownStorageClass(id);
@@ -326,6 +348,7 @@ public final class Stage18StationStorage {
     }
 
     Map<String, Double> moduleCustodyReservation() { return moduleCustodyMassByStorageClassKg; }
+    Map<String, Double> craftBuildReservation() { return craftBuildReservationMassByStorageClassKg; }
 
     void preflightRefitReservation(Map<String, Double> raw, Map<String, Integer> counts,
             Map<String, Double> reserved, Map<String, Double> custody) {
@@ -337,6 +360,7 @@ public final class Stage18StationStorage {
         proposed.refitReservationMassByStorageClassKg = refitReservationMassByStorageClassKg;
         proposed.constructionReservationMassByStorageClassKg = constructionReservationMassByStorageClassKg;
         proposed.yardConstructionReservationMassByStorageClassKg = yardConstructionReservationMassByStorageClassKg;
+        proposed.craftBuildReservationMassByStorageClassKg = craftBuildReservationMassByStorageClassKg;
         proposed.productHandlingReservedCounts = productHandlingReservedCounts;
         proposed.replaceContentsWithRefitReservation(raw, counts, reserved, custody);
     }
@@ -399,6 +423,19 @@ public final class Stage18StationStorage {
         yardConstructionReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
         try { replaceContents(commodities, productCounts); }
         catch (RuntimeException failure) { yardConstructionReservationMassByStorageClassKg = previous; throw failure; }
+    }
+
+    void replaceContentsWithCraftBuildReservation(Map<String, Double> commodities, Map<String, Integer> productCounts,
+            Map<String, Double> reservations) {
+        var checked = new TreeMap<String, Double>();
+        reservations.forEach((id, mass) -> {
+            requireKnownStorageClass(id); requireCapacityEntry(id, "craft build material");
+            requireNonNegative(mass, "craft build reservation"); checked.put(id, mass);
+        });
+        var previous = craftBuildReservationMassByStorageClassKg;
+        craftBuildReservationMassByStorageClassKg = Collections.unmodifiableMap(checked);
+        try { replaceContents(commodities, productCounts); }
+        catch (RuntimeException failure) { craftBuildReservationMassByStorageClassKg = previous; throw failure; }
     }
 
     void replaceContentsWithProcessReservation(Map<String, Double> commodities, Map<String, Integer> productCounts,

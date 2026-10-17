@@ -25,8 +25,8 @@ public final class GeneratedCampaignConstructionUi {
     public static List<ProductionUiSnapshot.Row> rows(Stage228CampaignAuthority campaign) {
         if (campaign.playerState().isEmpty()) return List.of();
         var runtime = campaign.coordinator().runtime();
-        var catalog = Stage18FacilityConstructionCatalogLoader.loadDefault();
-        var facilities = Stage18FacilityCatalogLoader.loadDefault();
+        var catalog = com.spacesim.content.Stage23StationStorageCatalog.construction();
+        var facilities = com.spacesim.content.Stage23StationStorageCatalog.facilities();
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
         var result = new ArrayList<ProductionUiSnapshot.Row>();
         for (var station : runtime.industry().industrial().stations()) {
@@ -38,14 +38,26 @@ public final class GeneratedCampaignConstructionUi {
                 fields.add("Установка"); fields.add(definition.displayName());
                 fields.add("Масса сооружения"); fields.add(String.format(Locale.ROOT, "%.0f кг", binding.installedMassKg()));
                 fields.add("Работа"); fields.add(String.format(Locale.ROOT, "%.0f рабочих секунд", catalog.totalWorkSeconds(definition.id())));
+                if (definition.id().equals(com.spacesim.content.Stage23BootstrapMaterialsCatalog.FACILITY_ID)) {
+                    fields.add("Переработка после ввода"); fields.add("Химические и расширенные материалы из сырья; секции и компоненты изготавливаются на отдельных линиях");
+                    fields.add("Штатная мощность"); fields.add(String.format(Locale.ROOT, "%.0f Вт; %.1f рабочих секунд / с; %.1f обслуживания / с",
+                            definition.ratedProcessPowerW(), definition.engineeringWorkRate(), definition.maintenanceWorkRate()));
+                    fields.add("Назначение"); fields.add("Периодическая переработка с низкой производительностью. Для строительства нужны базовые сплавы линии первичной переработки.");
+                }
                 fields.add("Строительная линия"); fields.add(campaign.hasFacilityConstructionLine(station.stationId(), definition.id())
                         ? "Есть действующая совместимая установка" : "Нет действующей совместимой установки");
+                if (definition.id().equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)) {
+                    fields.add("Ёмкость после завершения"); fields.add("10 000 000 кг жидкостей; без груза и повышения общей скорости обработки");
+                    fields.add("Место установки"); fields.add("Один внутренний пакет только на промышленной орбитальной станции");
+                }
                 catalog.requiredMassByCommodityKg(definition.id()).forEach((commodity, kg) -> {
                     fields.add(ontology.findCommodity(commodity).displayName());
                     fields.add(String.format(Locale.ROOT, "Нужно %.0f кг; доступно %.0f кг", kg, station.storage().commodityMassKg(commodity)));
                 });
                 fields.add("Условия"); fields.add("Собственная станция, физическая стыковка, весь запас материалов и конечная работа линии");
-                fields.add("Ввод в работу"); fields.add("Завершённая установка не получает энергию и персонал автоматически");
+                fields.add("Ввод в работу"); fields.add(definition.family() == com.spacesim.content.Stage18FacilityCatalog.FacilityFamily.STORAGE
+                        ? "Ёмкость доступна после завершения стройки; распределение энергии и персонала не требуется"
+                        : "Завершённая установка не получает энергию и персонал автоматически");
                 result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
                         "pilot-construction|" + station.stationId() + '|' + definition.id()), definition.displayName(),
                         "Строительство мощностей", "Заказать установку", List.of(InfoSection.of("Физический заказ", fields.toArray(String[]::new))),
@@ -68,9 +80,11 @@ public final class GeneratedCampaignConstructionUi {
                                 "Источник работы", "Существующая совместимая установка; изготовление использует тот же бюджет")),
                         "Сохраняемый заказ и завершённые такты физической службы", station.systemId(), 0,
                         runtime.world().getAuthoritativeWorldTick()));
-                if (complete) {
-                    var installed = station.facilities().stream().filter(f -> f.facilityInstanceId().equals(order.facilityInstanceId()))
-                            .findFirst().orElseThrow();
+            }
+            for (var installed : station.facilities()) {
+                    if (installed.definitionId().equals(com.spacesim.content.Stage23StationStorageCatalog.FACILITY_ID)) continue;
+                    var capability = station.facilityCapabilities().stream()
+                            .filter(c -> c.facilityInstanceId().equals(installed.facilityInstanceId())).findFirst().orElseThrow();
                     result.add(new ProductionUiSnapshot.Row(new UiSelection(SelectionKind.SURFACE_ROW,
                             "pilot-facility-resources|" + station.stationId() + '|' + installed.facilityInstanceId()),
                             "Ресурсы: " + facilities.findFacility(installed.definitionId()).displayName(), "Ввод мощности",
@@ -80,11 +94,12 @@ public final class GeneratedCampaignConstructionUi {
                                     "Теплоотвод", String.format(Locale.ROOT, "%.0f Вт", installed.availableHeatRejectionW()),
                                     "Персонал", String.format(Locale.ROOT, "%.1f", installed.availableLaborUnits()),
                                     "Обслуживание", String.format(Locale.ROOT, "%.1f рабочих секунд / с", installed.availableMaintenanceWorkRate()),
+                                    "Фактическая производительность", String.format(Locale.ROOT, "%.1f %% штатной", 100 * capability.effectiveThroughputFraction()),
                                     "Действие", "Перераспределить существующие ресурсы других установок этой станции до штатного уровня",
-                                    "Последствие", "Мощность прежних установок уменьшится; при недостатке ресурсов действие отклоняется")),
+                                    "50 % мощности", "Установить половину штатных ресурсов; избыток вернётся другим установкам. Работа и переработка замедлятся.",
+                                    "Последствие", "Ресурсы перераспределяются между установками; при недостатке ресурсов или отсутствии получателя избытка действие отклоняется")),
                             "Существующие распределения собственной станции; новые ресурсы не создаются", station.systemId(), 0,
                             runtime.world().getAuthoritativeWorldTick()));
-                }
             }
         }
         return List.copyOf(result);

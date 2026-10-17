@@ -24,6 +24,45 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @org.junit.jupiter.api.Tag("slow")
 class Stage228GeneratedCampaignPersistenceCodecTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {18, 19, 20})
+    void historicalMigrationDoesNotCreateRefiningWorkOrChangeExistingAssets(int version) throws IOException {
+        var current = Stage228GeneratedCampaignPersistentState.adoptStage21(
+                GeneratedCampaignCoordinator.create(Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).captureState());
+        assertEquals(com.spacesim.economy.ShipyardSmallCraftBuildQueueState.empty(), current.smallCraftBuilds(),
+                "Historical fixture cannot discard paid build custody");
+        byte[] historical = Stage228GeneratedCampaignPersistenceCodec.encode(current);
+        // Genuine v18-v20 keep fourteen payloads and exclude the v21 content declaration.
+        try (var in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(historical))) {
+            var legacy = new ByteArrayOutputStream();
+            try (var out = new DataOutputStream(legacy)) {
+                out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
+                out.writeInt(version); out.writeInt(version); out.writeUTF("m22.8.generated-campaign.v" + version);
+                for (int i = 0; i < 14; i++) {
+                    int size = in.readInt(); out.writeInt(size); out.write(in.readNBytes(size));
+                }
+            }
+            historical = legacy.toByteArray();
+        }
+        assertEquals(current, Stage228GeneratedCampaignPersistenceCodec.decode(historical));
+    }
+
+    @Test
+    void atomicFileWriteMatchesInMemoryBytesAndReplacesExistingCheckpoint(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws IOException {
+        var original = Stage228GeneratedCampaignPersistentState.adoptStage21(
+                GeneratedCampaignCoordinator.create(Stage20PlayableGeneratedWorldFactory.DEFAULT_WORLD_SEED).captureState());
+        var path = directory.resolve("pilot.s25");
+        java.nio.file.Files.writeString(path, "previous checkpoint");
+        Stage228GeneratedCampaignPersistenceCodec.write(path, original);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(Stage228GeneratedCampaignPersistenceCodec.encode(original),
+                java.nio.file.Files.readAllBytes(path));
+        assertEquals(original, Stage228GeneratedCampaignPersistenceCodec.read(path));
+        try (var files = java.nio.file.Files.list(directory)) {
+            assertEquals(List.of(path), files.toList(), "Atomic replacement leaves no temporary payload file");
+        }
+    }
+
     @Test
     void nativeBytesRoundTripNonEmptyIndividualCraftStateExactly() {
         GeneratedCampaignCoordinator coordinator = GeneratedCampaignCoordinator.create(

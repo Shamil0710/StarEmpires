@@ -19,6 +19,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class StrategicOperationSupplyAcceptanceTest {
     @Test
+    void retiredGroupClosesOnlyOperationOwnershipAndRetainsParticipantsAndTacticalReference() {
+        var fleet = new FleetId(10); var home = new StarSystemId(1);
+        var group = new FleetCommandState.CommandGroupState(1, 1, "Former", List.of(fleet), home, false, false, 2500);
+        var commands = FleetCommandState.empty().addGroup(group);
+        var contact = new StrategicOperationState.ContactState(new FleetId(20), new StarSystemId(2),
+                FactionActorObservationSnapshot.ObservationChannel.LOCAL_SENSOR_REPORT, "actual-report", 1, 20);
+        var encounter = new StrategicOperationState.TacticalEncounterState(5, contact.targetFleetId(), contact.observedSystemId(), 2, -1);
+        var original = operation(fleet, new SupplyPolicy(2000, 0, 100)).withLifecycle(OperationStatus.ENGAGED, 2, -1, contact, encounter);
+        var operations = StrategicOperationState.empty().add(original);
+        var service = new StrategicOperationService();
+        assertThrows(IllegalStateException.class, () -> service.failRetiredGroup(operations, commands, 1, 10));
+        var retired = commands.retireGroup(1, FleetCommandState.OrderStatus.CANCELLED);
+        var ended = service.failRetiredGroup(operations, retired, 1, 10);
+        var retained = ended.requireOperation(1);
+        assertEquals(OperationStatus.FAILED, retained.status());
+        assertEquals(original.participantFleetIds(), retained.participantFleetIds());
+        assertEquals(contact, retained.contact()); assertEquals(5, retained.encounter().encounterId());
+        assertEquals(2, retained.encounter().materializedAtTick()); assertEquals(10, retained.encounter().resolvedAtTick());
+        assertEquals(operations.nextOperationId(), ended.nextOperationId());
+        assertEquals(ended, service.failRetiredGroup(ended, retired, 1, 11));
+    }
+    @Test
     void unsuppliedOtherwiseReadyForceWithdrawsWithoutReceivingResources() {
         FleetId fleetId = new FleetId(10L);
         OperationState operation = operation(fleetId, new SupplyPolicy(2_000, 5_000, 0L));

@@ -28,12 +28,14 @@ import java.util.Map;
 @SuppressWarnings("doclint:missing")
 public final class Stage20GeneratedWorldRuntimePersistenceCodec {
     private static final int MAGIC = 0x53323552; // S25R
-    private static final int FILE_FORMAT_VERSION = 4;
+    private static final int FILE_FORMAT_VERSION = 5;
+    private static final int SCHEDULER_FILE_FORMAT_VERSION = 4;
     private static final int ENGINEERING_INSTANCE_FILE_FORMAT_VERSION = 3;
     private static final int PHYSICAL_SIDECAR_FILE_FORMAT_VERSION = 2;
     private static final int LEGACY_FILE_FORMAT_VERSION = 1;
     private static final int MAX_LOCAL_FLEETS = 1_000_000;
     private static final int MAX_ENGINEERING_INSTANCE_STATES = 1_000_000;
+    private static final int MAX_SENSOR_KNOWLEDGE_STATES = 1_000_000;
     private static final int MAX_BYTES = 512 * 1024 * 1024;
     private static final int MAX_TEXT_BYTES = 1024 * 1024;
     private static final int MAX_PAYLOAD_BYTES = 256 * 1024 * 1024;
@@ -68,6 +70,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                 writePayload(output, freight, "freight");
                 writeLocalFleetPhysicalStates(output, checked.localFleetPhysicalStates());
                 writeEngineeringInstanceStates(output, checked.worldState());
+                writeSensorKnowledgeStates(output, checked.worldState());
             }
             byte[] result = buffer.toByteArray();
             if (result.length <= 0 || result.length > MAX_BYTES) {
@@ -101,6 +104,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             }
             int fileVersion = input.readInt();
             if (fileVersion != FILE_FORMAT_VERSION
+                    && fileVersion != SCHEDULER_FILE_FORMAT_VERSION
                     && fileVersion != ENGINEERING_INSTANCE_FILE_FORMAT_VERSION
                     && fileVersion != PHYSICAL_SIDECAR_FILE_FORMAT_VERSION
                     && fileVersion != LEGACY_FILE_FORMAT_VERSION) {
@@ -111,7 +115,7 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             int expectedSchema;
             if (fileVersion == LEGACY_FILE_FORMAT_VERSION) {
                 expectedSchema = 1;
-            } else if (fileVersion < FILE_FORMAT_VERSION) {
+            } else if (fileVersion < SCHEDULER_FILE_FORMAT_VERSION) {
                 expectedSchema = 2;
             } else {
                 expectedSchema = Stage20GeneratedWorldRuntimePersistentState.CURRENT_VERSION;
@@ -122,10 +126,10 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
             }
             String bridgeVersion = readText(input, "bridgeVersion");
             StarSystemId activeSystemId = new StarSystemId(input.readLong());
-            int strategicStepTicks = fileVersion >= FILE_FORMAT_VERSION
+            int strategicStepTicks = fileVersion >= SCHEDULER_FILE_FORMAT_VERSION
                     ? input.readInt()
                     : WorldSimulation.DEFAULT_STRATEGIC_STEP_TICKS;
-            int remoteUpdateBudgetPerFrame = fileVersion >= FILE_FORMAT_VERSION
+            int remoteUpdateBudgetPerFrame = fileVersion >= SCHEDULER_FILE_FORMAT_VERSION
                     ? input.readInt()
                     : WorldSimulation.DEFAULT_REMOTE_UPDATE_BUDGET_PER_FRAME;
             Stage20GeneratedCampaignPersistentState campaign =
@@ -139,6 +143,9 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
                     : migrateLegacyLocalFleetPhysicalStates(world, freight);
             if (fileVersion >= ENGINEERING_INSTANCE_FILE_FORMAT_VERSION) {
                 world = readAndApplyEngineeringInstanceStates(input, world);
+            }
+            if (fileVersion >= FILE_FORMAT_VERSION) {
+                world = readAndApplySensorKnowledgeStates(input, world);
             }
             if (input.read() != -1) {
                 throw new IllegalArgumentException(
@@ -347,6 +354,107 @@ public final class Stage20GeneratedWorldRuntimePersistenceCodec {
         }
         return withSystems(world, systems);
     }
+
+    private static void writeSensorKnowledgeStates(
+            DataOutputStream output,
+            WorldState world) throws IOException {
+        List<SensorKnowledgeRow> rows = world.systems().stream()
+                .sorted(Comparator.comparing(StarSystemSimulationState::systemId))
+                .flatMap(system -> system.simulationState().entities().stream()
+                        .filter(entity -> entity.sensorKnowledge() != null)
+                        .sorted(Comparator.comparing(EntityState::id))
+                        .map(entity -> new SensorKnowledgeRow(
+                                system.systemId(),
+                                entity.id(),
+                                entity.sensorKnowledge())))
+                .toList();
+        if (rows.size() > MAX_SENSOR_KNOWLEDGE_STATES) {
+            throw new IllegalArgumentException("too many sensor knowledge states");
+        }
+        output.writeInt(rows.size());
+        for (SensorKnowledgeRow row : rows) {
+            output.writeLong(row.systemId().value());
+            output.writeLong(row.entityId().value());
+            ContentBoundSaveCodec.writeSensorKnowledge(output, row.knowledge());
+        }
+    }
+
+    private static WorldState readAndApplySensorKnowledgeStates(
+            DataInputStream input,
+            WorldState world) throws IOException {
+        int count = input.readInt();
+        if (count < 0 || count > MAX_SENSOR_KNOWLEDGE_STATES) {
+            throw new IllegalArgumentException(
+                    "sensor knowledge-state count is outside bounds");
+        }
+        Map<StarSystemId, Map<EntityId, EntityState.SensorKnowledgeState>> rowsBySystem =
+                new HashMap<>();
+        for (int index = 0; index < count; index++) {
+            StarSystemId systemId = new StarSystemId(input.readLong());
+            EntityId entityId = new EntityId(input.readLong());
+            EntityState.SensorKnowledgeState knowledge =
+                    ContentBoundSaveCodec.readSensorKnowledge(input);
+            var rows = rowsBySystem.computeIfAbsent(systemId, ignored -> new HashMap<>());
+            if (rows.putIfAbsent(entityId, knowledge) != null) {
+                throw new IllegalArgumentException(
+                        "duplicate sensor knowledge state: " + systemId + "/" + entityId);
+            }
+        }
+
+        List<StarSystemSimulationState> systems = new ArrayList<>(world.systems().size());
+        for (StarSystemSimulationState system : world.systems()) {
+            Map<EntityId, EntityState.SensorKnowledgeState> rows =
+                    rowsBySystem.remove(system.systemId());
+            if (rows == null) {
+                systems.add(system);
+                continue;
+            }
+            GameState state = system.simulationState();
+            List<EntityState> entities = new ArrayList<>(state.entities().size());
+            for (EntityState entity : state.entities()) {
+                EntityState.SensorKnowledgeState knowledge = rows.remove(entity.id());
+                if (knowledge == null) {
+                    entities.add(entity);
+                    continue;
+                }
+                entities.add(new EntityState(
+                        entity.id(),
+                        entity.identity(),
+                        entity.transform(),
+                        entity.inventory(),
+                        entity.wallet(),
+                        entity.market(),
+                        entity.production(),
+                        entity.priceHistory(),
+                        entity.faction(),
+                        entity.reputation(),
+                        entity.ship(),
+                        entity.tradeAi(),
+                        entity.mining(),
+                        entity.combat(),
+                        entity.asteroid(),
+                        entity.archetype(),
+                        entity.engineering(),
+                        knowledge));
+            }
+            if (!rows.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "sensor knowledge state references absent entities in "
+                                + system.systemId());
+            }
+            systems.add(new StarSystemSimulationState(
+                    system.systemId(),
+                    withEntities(state, entities)));
+        }
+        if (!rowsBySystem.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "sensor knowledge state references absent star systems");
+        }
+        return withSystems(world, systems);
+    }
+
+    private record SensorKnowledgeRow(StarSystemId systemId, EntityId entityId,
+            EntityState.SensorKnowledgeState knowledge) { }
 
     private static GameState withEntities(GameState state, List<EntityState> entities) {
         return new GameState(

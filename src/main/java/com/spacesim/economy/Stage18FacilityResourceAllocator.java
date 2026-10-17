@@ -30,7 +30,8 @@ public final class Stage18FacilityResourceAllocator {
         var target = ordered.stream().filter(f -> f.facilityInstanceId().equals(targetId)).findFirst().orElseThrow(
                 () -> new IllegalArgumentException("Resource target is not installed"));
         var definition = catalog.findFacility(target.definitionId());
-        if (definition == null || !definition.allowedLocationTags().contains(target.locationTag()) || target.conditionFraction() <= 0d)
+        if (definition == null || definition.family() == Stage18FacilityCatalog.FacilityFamily.STORAGE
+                || !definition.allowedLocationTags().contains(target.locationTag()) || target.conditionFraction() <= 0d)
             throw new IllegalArgumentException("Resource target has no compatible working physical installation");
         double[] requested = {definition.ratedProcessPowerW() * target.conditionFraction(),
                 definition.ratedProcessPowerW() * target.conditionFraction() * definition.heatRejectionWPerProcessW(),
@@ -62,6 +63,52 @@ public final class Stage18FacilityResourceAllocator {
     private static double[] values(InstalledFacilityState state) {
         return new double[]{state.allocatedProcessPowerW(), state.availableHeatRejectionW(),
                 state.availableLaborUnits(), state.availableMaintenanceWorkRate()};
+    }
+
+    /**
+     * Sets one target to a fraction of its rated allocation, returning excess to existing donors
+     * and withdrawing deficits from them. The target keeps its actual condition and location.
+     * @param installed exact states from one station
+     * @param targetId existing target installation
+     * @param fraction positive rated fraction at most one
+     * @return immutable installations conserving all four resource totals
+     */
+    public List<InstalledFacilityState> allocateFraction(List<InstalledFacilityState> installed, String targetId, double fraction) {
+        if (!Double.isFinite(fraction) || fraction <= 0 || fraction > 1)
+            throw new IllegalArgumentException("Invalid operating fraction");
+        var ordered = new ArrayList<>(List.copyOf(installed));
+        ordered.sort(Comparator.comparing(InstalledFacilityState::facilityInstanceId));
+        if (ordered.stream().map(InstalledFacilityState::facilityInstanceId).distinct().count() != ordered.size())
+            throw new IllegalArgumentException("Duplicate installed resource owner");
+        var target = ordered.stream().filter(f -> f.facilityInstanceId().equals(targetId)).findFirst().orElseThrow(
+                () -> new IllegalArgumentException("Resource target is not installed"));
+        var definition = catalog.findFacility(target.definitionId());
+        if (definition == null || definition.family() == Stage18FacilityCatalog.FacilityFamily.STORAGE
+                || !definition.allowedLocationTags().contains(target.locationTag()) || target.conditionFraction() <= 0)
+            throw new IllegalArgumentException("Resource target has no working physical installation");
+        double[] requested = {fraction * definition.ratedProcessPowerW() * target.conditionFraction(),
+                fraction * definition.ratedProcessPowerW() * target.conditionFraction() * definition.heatRejectionWPerProcessW(),
+                fraction * definition.requiredLaborUnitsAtFullRate(), fraction * definition.maintenanceWorkRate() * target.conditionFraction()};
+        var donors = ordered.stream().filter(f -> !f.facilityInstanceId().equals(targetId)).toList();
+        var allocations = donors.stream().map(Stage18FacilityResourceAllocator::values).toList();
+        double[] current = values(target);
+        for (int r = 0; r < 4; r++) {
+            double delta = requested[r] - current[r];
+            double available = 0;
+            for (var donor : allocations) available += donor[r];
+            if (!Double.isFinite(available) || delta > available || delta < 0 && donors.isEmpty())
+                throw new IllegalStateException("Insufficient existing station resources or surplus recipient");
+            if (delta < 0) allocations.get(0)[r] -= delta;
+            else for (var donor : allocations) {
+                double take = Math.min(donor[r], delta);
+                donor[r] -= take; delta -= take;
+            }
+        }
+        var result = new ArrayList<InstalledFacilityState>();
+        for (int i = 0; i < donors.size(); i++) result.add(withValues(donors.get(i), allocations.get(i), donors.get(i).enabled()));
+        result.add(withValues(target, requested, true));
+        result.sort(Comparator.comparing(InstalledFacilityState::facilityInstanceId));
+        return List.copyOf(result);
     }
 
     private static InstalledFacilityState withValues(InstalledFacilityState state, double[] values, boolean enabled) {

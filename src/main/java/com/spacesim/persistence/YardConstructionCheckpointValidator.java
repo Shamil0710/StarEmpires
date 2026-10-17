@@ -36,7 +36,7 @@ final class YardConstructionCheckpointValidator {
                     .noneMatch(f -> f.state().locationTag().equals(order.locationTag())))
                 throw new IllegalArgumentException("Yard construction requires the actual station installation location");
             stores.computeIfAbsent(order.stationId(), ignored -> Stage18StationStorage.restore(ontology,
-                    Stage22CivilianMiningProductionPath.loadProducts(), storage));
+                    com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(), storage));
             boolean complete = order.completedWorkSeconds() == catalog.find(order.yardDefinitionId()).requiredWorkSeconds();
             var installed = industry.yards().stream().filter(y -> y.state().yardInstanceId().equals(order.yardInstanceId())).toList();
             if (complete) {
@@ -49,15 +49,15 @@ final class YardConstructionCheckpointValidator {
         // Restore the facility/material reserve first: both physical queues share this storage capacity.
         var facilityWork = new com.spacesim.economy.Stage18FacilityConstructionWorkQueue(
                 new com.spacesim.economy.Stage18FacilityConstructionRuntime(
-                        com.spacesim.content.Stage18FacilityConstructionCatalogLoader.loadDefault(),
-                        com.spacesim.content.Stage18FacilityCatalogLoader.loadDefault(), ontology),
+                        com.spacesim.content.Stage23StationStorageCatalog.construction(),
+                        com.spacesim.content.Stage23StationStorageCatalog.facilities(), ontology),
                 ontology, industry.constructionOrders(), industry.simulationTick());
         java.util.function.Function<String, Stage18StationStorage> storeResolver = id -> stores.computeIfAbsent(id,
-                ignored -> Stage18StationStorage.restore(ontology, Stage22CivilianMiningProductionPath.loadProducts(),
+                ignored -> Stage18StationStorage.restore(ontology, com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(),
                         industry.stationStorages().stream().filter(s -> s.stationId().equals(id)).findFirst().orElseThrow()));
         facilityWork.bindReservations(storeResolver);
         var manufacturing = new com.spacesim.economy.Stage18ManufacturingWorkQueue(ontology,
-                Stage22CivilianMiningProductionPath.loadManufacturing(), Stage22CivilianMiningProductionPath.loadProducts(),
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.manufacturing(), com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(),
                 industry.processOrders(), industry.simulationTick());
         manufacturing.restoreReservations(storeResolver);
         queue.bindReservations(stores::get);

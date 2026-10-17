@@ -22,7 +22,7 @@ public final class GeneratedCampaignModuleCustodyUi {
     public static List<ProductionUiSnapshot.Row> rows(Stage228CampaignAuthority campaign) {
         if (campaign.moduleCustody().modules().isEmpty() || campaign.playerState().isEmpty()) return List.of();
         var result = new ArrayList<ProductionUiSnapshot.Row>();
-        var products = Stage22CivilianMiningProductionPath.loadProducts();
+        var products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
         var engineering = Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
         for (var module : campaign.moduleCustody().modules()) {
             var carrier = campaign.moduleCarrier(module.stationId());

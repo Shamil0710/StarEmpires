@@ -96,6 +96,30 @@ class ShipWeaponEngineeringAdapterTest {
                         "weapon_spinal", "kinetic_magazine_feed", "ammo.interceptor_1t_v1")))));
     }
 
+    @Test
+    void servicingOneBoundMountDoesNotRequireAnUnrelatedMountToHaveAValidBinding() throws Exception {
+        var engineering = ShipEngineeringCatalogLoader.loadDefault();
+        var derived = new DerivedShipCalculator(engineering).deriveDemonstrator(
+                "fit.escort_destroyer_schema_v1", ammunitionState(0), DamageState.pristine());
+        var capabilities = new java.util.ArrayList<>(derived.installedCapabilities());
+        var original = capabilities.stream().filter(c -> c.mountId().equals("weapon_spinal")).findFirst().orElseThrow();
+        // Explicit second-capability projection isolates per-mount servicing eligibility.
+        capabilities.add(new com.spacesim.ship.ShipEngineeringState.InstalledCapability(
+                "unbound_weapon", original.moduleId(), original.family(), original.parameters()));
+        var fields = DerivedShipState.class.getRecordComponents();
+        var types = new Class<?>[fields.length]; var values = new Object[fields.length];
+        for (int i = 0; i < fields.length; i++) {
+            types[i] = fields[i].getType();
+            values[i] = fields[i].getName().equals("installedCapabilities") ? capabilities : fields[i].getAccessor().invoke(derived);
+        }
+        var mixed = DerivedShipState.class.getDeclaredConstructor(types).newInstance(values);
+        var ammo = WeaponAmmunitionCatalogLoader.loadDefault(); var launchers = WeaponLauncherCatalogLoader.loadDefault();
+        var loadout = new WeaponLoadoutState(List.of(new FeedBinding("weapon_spinal", "kinetic_magazine_feed", "ammo.rail_dart_150kg_v1")));
+        var adapter = new ShipWeaponEngineeringAdapter();
+        assertThrows(IllegalArgumentException.class, () -> adapter.deriveKineticMounts(mixed, ammo, launchers, loadout));
+        assertEquals("weapon_spinal", adapter.deriveKineticMounts(mixed, ammo, launchers, loadout, "weapon_spinal").get(0).mountId());
+    }
+
     private static ConsumableState ammunitionState(long rounds) {
         double mass = rounds * 150d;
         return new ConsumableState(

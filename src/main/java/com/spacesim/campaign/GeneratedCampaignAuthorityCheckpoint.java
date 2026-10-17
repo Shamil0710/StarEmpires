@@ -111,6 +111,15 @@ public final class GeneratedCampaignAuthorityCheckpoint {
      * @return independent restored campaign handoff
      */
     public static RestoredAuthorities restore(Stage21IGeneratedWorldRuntimePersistentState checkpoint) {
+        return restore(checkpoint, java.util.Map.of());
+    }
+
+    /**
+     * @param checkpoint exact saved campaign
+     * @param admissions explicit existing-station operators
+     * @return restored authority retaining admitted industrial stations
+     */
+    public static RestoredAuthorities restore(Stage21IGeneratedWorldRuntimePersistentState checkpoint, java.util.Map<String, String> admissions) {
         Stage21IGeneratedWorldRuntimePersistentState saved = Objects.requireNonNull(checkpoint, "checkpoint");
         Stage21HGeneratedWorldRuntimePersistentState stage21H = saved.stage21HRuntime();
         Stage21GGeneratedWorldRuntimePersistentState stage21G = stage21H.stage21GRuntime();
@@ -122,7 +131,7 @@ public final class GeneratedCampaignAuthorityCheckpoint {
         Stage21AGeneratedWorldRuntimePersistentState stage21A = stage21B.stage21ARuntime();
 
         return new RestoredAuthorities(
-                GeneratedCampaignSession.restore(stage21A.stage20Runtime()),
+                GeneratedCampaignSession.restore(stage21A.stage20Runtime(), java.util.Map.copyOf(admissions)),
                 FactionLivingActorRuntime.restore(stage21A.livingActors()),
                 stage21B.strategicIntents(),
                 stage21C.diplomacyLifecycle(),

@@ -2,6 +2,25 @@
 
 Status: **FROZEN FOR v0.7 RC TRAIN**
 
+Current development identity (2026-10-16): `campaign=29` / `m22.8.generated-campaign.v29`.
+Native v29 appends paid small-craft build custody and content declaration as payload 20; historical v1–28 receive an empty non-granting queue. New finished small-craft module stock/production requires v29.
+Native v28 declares paid passive storage content separately; historical v21–27 retain their original content declaration and receive no storage expansion.
+Native v27 retains explicit admission of existing infrastructure to industrial runtime; historical v1–26 receive no inferred admissions or operating resources.
+Native v26 retains explicit personal craft property independently of hosts and legal operators.
+Native v1–25 restore an empty property register without inferring acquisitions from wings.
+Native v25 retains exact local craft positions/velocities and completed world-interval watermarks.
+Native v1–24 receive no inferred positions, materializations or launch work during migration.
+This supersedes the historical development entries below. Native v23 appends bounded explicit
+crew observations; genuine v1–22 restore unknown staffing without commissioning grants.
+Native v24 retains retired group membership and terminal order history; native v1–23 cannot
+claim retirement metadata. Loading creates no group, retirement event or replacement fleet.
+Native v22 admits exact consecutive extraction receipts, and v21 declares additive industrial
+catalog identities. The Stage-20.5 child file format is 5 for exact sensor knowledge, with
+formats 1–4 still supported. Stage-22 freeze manifest v4 separately pins that format change
+while retaining every historical content/balance pin and the original manifest v3.
+See [checkpoint change control](stage23b_player_checkpoint_change_control.md).
+The product RC train is unchanged. 23B remains ACTIVE/PARTIAL without final acceptance.
+
 Current development identity (2026-10-06): `campaign=16` / `m22.8.generated-campaign.v16`.
 This supersedes the historical development entries below. The separately versioned initial
 NPC mining manifest is admitted only from native v16; older manifests restore exactly.

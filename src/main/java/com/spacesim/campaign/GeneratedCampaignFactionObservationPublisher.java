@@ -38,14 +38,20 @@ final class GeneratedCampaignFactionObservationPublisher {
             Stage20GeneratedWorldRuntimePersistentState stage20,
             String factionContentId,
             long observedAtTick) {
-        Stage20GeneratedWorldRuntimePersistentState state = Objects.requireNonNull(stage20, "stage20");
+        return publish(Objects.requireNonNull(stage20, "stage20").freight(), factionContentId, observedAtTick);
+    }
+
+    static FactionActorObservationSnapshot publish(
+            com.spacesim.persistence.Stage20FreightPersistentState freight,
+            String factionContentId, long observedAtTick) {
+        var state = Objects.requireNonNull(freight, "freight");
         String factionId = requireText(factionContentId, "factionContentId");
         if (observedAtTick < 0L) {
             throw new IllegalArgumentException("observedAtTick must be non-negative");
         }
 
         ArrayList<ActorObservation> economic = new ArrayList<>();
-        state.freight().orders().stream()
+        state.orders().stream()
                 .filter(order -> factionId.equals(order.stableFactionId()))
                 .sorted(java.util.Comparator.comparing(TransportOrderState::orderId))
                 .map(order -> toObservation(state, order, observedAtTick))
@@ -61,10 +67,10 @@ final class GeneratedCampaignFactionObservationPublisher {
     }
 
     private static ActorObservation toObservation(
-            Stage20GeneratedWorldRuntimePersistentState state,
+            com.spacesim.persistence.Stage20FreightPersistentState state,
             TransportOrderState order,
             long observedAtTick) {
-        FreightPhase phase = state.freight().freighters().stream()
+        FreightPhase phase = state.freighters().stream()
                 .filter(freighter -> freighter.fleetId().equals(order.fleetId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(

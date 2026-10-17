@@ -14,6 +14,65 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("slow")
 class GeneratedCampaignPersonalSupplyTest {
+    @Test void paidStationSupplyConservesStockMoneyAndTankWithoutCreatingCargoAndSharesHandlingAfterRestore() {
+        var c = dockedFixture(false);
+        c.coordinator().setPaused(false); c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        c.coordinator().setPaused(true);
+        var r = c.coordinator().runtime(); var world = r.world(); var player = c.playerState().orElseThrow();
+        var fitted = fitted(c); var binding = binding(fitted);
+        var mount = fitted.fit.installedModules().stream().filter(m -> m.moduleId().equals(binding.moduleId())).findFirst().orElseThrow().mountId();
+        var endpoint = r.infrastructure().endpoints().stream().filter(e -> c.pilotMarketReference(e.stationId())
+                .filter(player.dockedAt()::equals).isPresent()).findFirst().orElseThrow();
+        var stationWallet = world.findSession(player.dockedAt().systemId()).orElseThrow().getEntityRegistry()
+                .require(player.dockedAt().entityId()).getComponent(com.spacesim.components.WalletComponent.class);
+        long stationMoney = stationWallet.getBalanceMilliCredits();
+        long quotedPrice = c.pilotCommodityPrice(endpoint.stationId(), binding.commodityId(), true);
+        double stock = endpoint.storage().commodityMassKg(binding.commodityId());
+        var freight = r.freight().capture(); var old = fitted.runtimeState;
+        double mass = new com.spacesim.ship.ProductionEngineeringRuntimeResolver().derive(fitted).reactionMassKg();
+        var before = c.captureState();
+        var preview = c.previewPilotAction("BUY_CONSUMABLE", binding.id(), mount, 1);
+        assertTrue(preview.allowed()); assertTrue(preview.walletChangeMilliCredits() < 0);
+        assertEquals(before, c.captureState());
+        c.submitPilotAction(preview);
+        assertEquals(stock - 1, endpoint.storage().commodityMassKg(binding.commodityId()));
+        assertEquals(mass + 1, new com.spacesim.ship.ProductionEngineeringRuntimeResolver().derive(fitted).reactionMassKg(), 1e-7);
+        assertEquals(player.walletMilliCredits() + preview.walletChangeMilliCredits(), c.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(stationMoney + quotedPrice, stationWallet.getBalanceMilliCredits());
+        assertEquals(freight.cargoLots(), r.freight().capture().cargoLots());
+        assertEquals(freight.nextCargoLotOrdinal(), r.freight().capture().nextCargoLotOrdinal());
+        assertEquals(old.sharedBusEnergyJ(), fitted.runtimeState.sharedBusEnergyJ());
+        assertEquals(old.shipHeatStoredJ(), fitted.runtimeState.shipHeatStoredJ());
+        assertThrows(IllegalStateException.class, () -> c.submitPilotAction(preview));
+        var saved = c.captureState();
+        var restored = Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
+                Stage228GeneratedCampaignPersistenceCodec.encode(saved)));
+        assertEquals(saved, restored.captureState());
+        assertFalse(restored.previewPilotAction("BUY_CONSUMABLE", binding.id(), mount, 1).allowed());
+        assertFalse(restored.previewPilotAction("BUY", endpoint.stationId(), binding.commodityId(), 1).allowed());
+        assertEquals(saved, restored.captureState());
+        restored.coordinator().setPaused(false); restored.advanceFrame(restored.coordinator().session().fixedStepSeconds());
+        restored.coordinator().setPaused(true);
+        assertTrue(restored.previewPilotAction("BUY_CONSUMABLE", binding.id(), mount, 1).allowed());
+    }
+
+    @Test void rejectedPaidStationServiceCannotSpendStockMoneyOrFillAnUnavailableInterface() {
+        var c = dockedFixture(false);
+        c.coordinator().setPaused(false); c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        c.coordinator().setPaused(true);
+        var binding = binding(fitted(c));
+        var mount = fitted(c).fit.installedModules().stream().filter(m -> m.moduleId().equals(binding.moduleId())).findFirst().orElseThrow().mountId();
+        var before = c.captureState();
+        assertFalse(c.previewPilotAction("BUY_CONSUMABLE", binding.id(), mount, 3).allowed());
+        assertFalse(c.previewPilotAction("BUY_CONSUMABLE", binding.id(), "missing-mount", 1).allowed());
+        assertFalse(c.previewPilotAction("BUY_CONSUMABLE", "unknown-binding", mount, 1).allowed());
+        assertEquals(before, c.captureState());
+        c.submitPilotAction(c.previewPilotAction("UNDOCK", "", "", 0));
+        before = c.captureState();
+        assertFalse(c.previewPilotAction("BUY_CONSUMABLE", binding.id(), mount, 1).allowed());
+        assertEquals(before, c.captureState());
+    }
+
     @Test void purchasedCargoLoadsTankWithConservedMassMoneyAndPersistentProvenance() {
         var c = dockedFixture(true);
         var fleet = c.playerState().orElseThrow().activeFleetId();

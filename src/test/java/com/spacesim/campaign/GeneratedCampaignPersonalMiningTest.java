@@ -16,6 +16,65 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("slow")
 class GeneratedCampaignPersonalMiningTest {
+    @Test void actualMiningReceiptsRoundTripAsSeriesAndCannotClaimAnOlderNativeHeader() {
+        var c = equipped(); var source = localSource(c); var r = c.coordinator().runtime();
+        position(c, LocalPhysicalKinematics.stationary(source.position())); r.world().activateSystem(source.systemId());
+        c.submitPilotAction(c.previewPilotAction("START_MINING", source.sourceId(), "", 10));
+        for (int i = 0; i < 3; i++) c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        var actual = r.freight().cargoLots().stream().filter(l -> l.fleetId().equals(c.playerState().orElseThrow().activeFleetId())).toList();
+        assertEquals(3, actual.stream().mapToLong(l -> l.receiptSeries().receiptCount()).sum());
+        var before = c.captureState(); assertEquals(before, roundtrip(c).captureState());
+        byte[] forged = Stage228GeneratedCampaignPersistenceCodec.encode(before);
+        java.nio.ByteBuffer.wrap(forged).putInt(4, 21).putInt(8, 21);
+        byte[] runtime = com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        forged[14 + runtime.length - 1] = (byte) '1';
+        var error = assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(forged));
+        assertTrue(error.getMessage().contains("receipt series"));
+        assertEquals(before, c.captureState());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void anArchivedIndicationDoesNotSuppressOwnSampleOrRefreshAStrongerEstimate(boolean estimated) throws Exception {
+        var c = equipped(); var source = localSource(c); var r = c.coordinator().runtime();
+        position(c, LocalPhysicalKinematics.stationary(source.position()));
+        r.world().activateSystem(source.systemId());
+        var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
+                com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, source.sourceId());
+        var archive = r.discoveryState();
+        var owner = com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID;
+        var received = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(archive.knowledgeFor(owner),
+                new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                        com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                        java.util.Optional.of(source.sourceState().outputCommodityId()), java.util.Optional.of(source.position()),
+                        new com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge(
+                                estimated ? com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.ESTIMATED_GRADE_RESERVE
+                                        : com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION,
+                                estimated ? java.util.Optional.of(source.sourceState().outputCommodityId()) : java.util.Optional.empty(), estimated ? java.util.Optional.of(new com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceEstimate(
+                                        .1, .8, 10, 1000, .5)) : java.util.Optional.empty()),
+                        new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE,
+                                "explicit-archived-resource-fixture", 0, java.util.OptionalDouble.of(1))));
+        var owners = new java.util.ArrayList<>(archive.knowledgeStates()); owners.removeIf(k -> k.ownerId().equals(owner)); owners.add(received);
+        var field = r.getClass().getDeclaredField("discovery"); field.setAccessible(true);
+        field.set(r, new com.spacesim.persistence.Stage20DiscoveryPersistentState(archive.envelopeVersion(), archive.rootSeed(),
+                archive.worldGenerationVersion(), archive.worldFingerprint(), owners));
+        var archived = received.knowledge(object).orElseThrow();
+        c.submitPilotAction(c.previewPilotAction("START_MINING", source.sourceId(), "", 1));
+        c.advanceFrame(c.coordinator().session().fixedStepSeconds());
+        var actual = r.discoveryState().knowledgeFor(owner).knowledge(object).orElseThrow();
+        if (estimated) assertEquals(archived, actual, "A physical sample is not a new grade/reserve survey");
+        else {
+            assertTrue(actual.evidence().containsAll(archived.evidence()));
+            assertTrue(actual.evidence().stream().anyMatch(e -> e.provenanceId().startsWith("personal-extraction-sample:")));
+            assertEquals(archived.firstObservedSeconds(), actual.firstObservedSeconds());
+            assertTrue(actual.resourceKnowledge().estimate().isEmpty());
+            assertTrue(personalResourceIntelligence(c).get(0).summary().contains("образец"));
+        }
+        var after = c.captureState();
+        r.recordPersonalExtractionSample(c.playerState().orElseThrow(), source.sourceId());
+        assertEquals(after, c.captureState());
+        assertEquals(after, roundtrip(c).captureState());
+    }
     @Test void miningUsesOnlyCompletedTicksAndContinuesExactlyAfterSaveLoad() {
         var c = equipped(); var source = localSource(c); position(c, LocalPhysicalKinematics.stationary(source.position()));
         c.coordinator().runtime().world().activateSystem(source.systemId());
@@ -45,9 +104,13 @@ class GeneratedCampaignPersonalMiningTest {
         assertEquals(source.position(), sample.knownLocation().orElseThrow());
         assertEquals(step, sample.firstObservedSeconds(), 1e-9);
         assertPersonalInspectorHasNoPhysicalReserve(c, source);
+        var beforeProjection = c.captureState();
         var intelligence = personalResourceIntelligence(c);
+        assertEquals(beforeProjection, c.captureState(), "Sample inspection must not mutate the checkpoint");
         assertEquals(1, intelligence.size());
         assertEquals("Получен физический образец", intelligence.get(0).summary());
+        assertTrue(intelligence.get(0).sections().stream()
+                .anyMatch(section -> section.title().equals("Добытый образец в собственных трюмах")));
         assertTrue(intelligence.get(0).sections().get(0).lines().stream()
                 .anyMatch(line -> line.label().equals("Извлекаемая масса") && line.value().equals("Оценка отсутствует")));
         for (var owner : beforeKnowledge.knowledgeStates())

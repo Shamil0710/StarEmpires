@@ -19,7 +19,7 @@ final class GeneratedCampaignNpcPlacement {
                 n.npcId().startsWith("npc.stage23b.dispatcher:") && n.factionContentId().equals(faction)
                         && n.availability() == NpcAvailability.AVAILABLE).toList();
         if (recipients.isEmpty()) return;
-        var snapshot = GeneratedCampaignFactionObservationPublisher.publish(coordinator.runtime().captureState(), faction, tick);
+        var snapshot = GeneratedCampaignFactionObservationPublisher.publish(coordinator.runtime().captureFreightState(), faction, tick);
         for (var npc : recipients) {
             for (var observation : snapshot.currentObservations())
                 coordinator.npcMissionService().refreshActorObservation(npc.npcId(), snapshot, observation,
@@ -30,6 +30,10 @@ final class GeneratedCampaignNpcPlacement {
 
     /** Installs a local dispatcher at each existing archived civilian station on new-game authoring only. */
     static void install(GeneratedCampaignCoordinator coordinator) {
+        install(coordinator, GeneratedCampaignInitialStationLegalCapital.Plan.baseline());
+    }
+
+    static void install(GeneratedCampaignCoordinator coordinator, GeneratedCampaignInitialStationLegalCapital.Plan capital) {
         var snapshot = coordinator.runtime().captureState();
         var roster = new ArrayList<NpcState>();
         var factions = new HashSet<String>();
@@ -37,10 +41,11 @@ final class GeneratedCampaignNpcPlacement {
         var service = coordinator.npcMissionService();
         var runtime = coordinator.runtime();
         for (var station : runtime.infrastructure().endpoints().stream()
-                .sorted(java.util.Comparator.comparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::generatedIndustrial)
-                        .reversed().thenComparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::stationId)).toList()) {
-            var owner = runtime.industry().industrial().stations().stream().filter(s -> s.stationId().equals(station.stationId()))
-                    .map(s -> s.stableFactionId()).findFirst().or(() -> runtime.world().controllingFaction(station.systemId()));
+                .sorted(java.util.Comparator.comparing((com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint e) ->
+                        capital.assignments().containsKey(e.stationId()))
+                        .thenComparing(java.util.Comparator.comparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::generatedIndustrial).reversed())
+                        .thenComparing(com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint::stationId)).toList()) {
+            var owner = GeneratedCampaignInitialStationLegalCapital.owner(runtime, station, capital);
             if (owner.isEmpty()) continue;
             String faction = owner.orElseThrow();
             if (GeneratedCampaignStationSalePolicy.priceMilliCredits(station.stationArchetypeId()) == 0

@@ -2,6 +2,87 @@
 
 Status: **IMPLEMENTED PERSISTENCE SLICE / 23B ACTIVE/PARTIAL**.
 
+## Stage-22 freeze follow-up for sensor persistence, 2026-10-11
+
+Full regression identified the earlier sensor persistence change to Stage-20.5 file format 5
+against the historical schema-3 Stage-22 freeze, which still expected format 4. Exact diff
+confirmed only the file-format version and supported-format list had changed; all content,
+balance, scenario and weapon pins matched. The current manifest is now separately versioned
+as `stage22.core_pair_freeze_manifest.v4`, fingerprint
+`e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`.
+It retains checkpoint value schema 3 and migration contract v1 and explicitly admits formats 1–5.
+The unchanged historical schema-3 manifest remains available through `historicalV3()` with its
+original fingerprint `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`.
+Old human-review packets still identify that historical candidate; this update supplies no
+human sign-off and changes no package or balance content. The regression compares every
+remaining field against the historical snapshot rather than accepting a new observed baseline.
+
+## Current native v23: explicit commissioning crew observations (2026-10-11)
+
+Writer/schema/runtime advances to `m22.8.generated-campaign.v23`. One bounded schema-1
+crew-manifest payload follows the existing content declaration. It records sorted, unique
+ordinary FleetIds and explicitly observed available crew; invalid profiles, duplicate IDs,
+negative counts, truncation and trailing bytes reject. No engineering or world child format changes.
+
+The new-game civilian mining-reserve policy explicitly commissions initial fitted local hulls
+at tick zero with their required crew, checked against their installed supported capacity.
+This is an initial staffing policy, separate from hull capacity and readiness evaluation.
+The historical BASELINE policy records no staffing observations. Restoration never commissions
+ships: genuine native v1–22 files receive an empty unobserved manifest, and existing v23 rows
+remain exact. Older headers cannot claim the appended payload. Acquisition and affiliation
+preserve existing observations without creating extra crew. Newly built hulls receive no crew
+from this manifest. The independent actor proves at most one pilot on the active personal hull;
+it cannot prove a full crew or staff another inactive vessel.
+
+Pure group formation now passes these bounded observations to the existing Stage-21D evaluator.
+Formation itself changes only command metadata, not readiness, assets, consumables or money.
+The production panel distinguishes observed staffing from an unknown historical roster.
+Recruitment, transfers, supply authority and group-order execution remain separate open work.
+Regression evidence: `target/stage23b-crew-native23-verify.log`, BUILD SUCCESS including native
+v22 migration, forged older-header rejection, new-game persistence and group formation checks.
+Coverage was skipped for this targeted build; it is not the final full-stage verification.
+
+## Native v22: exact extraction receipt series (2026-10-10)
+
+Freight schema 8 adds optional consecutive physical receipt metadata: original ordinal/tick,
+fixed step, actual per-receipt mass, remaining FIFO head and original allocation anchors.
+Only newly committed personal extraction appends consecutive compatible receipts. Historical
+point lots retain their individual identity, mass and date; loading creates no cargo or capital.
+Freight without metadata still encodes schema 7. Native v1–21 admission rejects series under
+a forged older header. The existing v21 content declaration and industrial catalog fingerprints
+remain unchanged. FIFO consumers preserve original receipt identities and dates with bounded
+descriptions, including partial consumption.
+
+Actual historical checkpoint audit: `target/stage23b-extraction-series-historical-migration-audit.log`,
+46940 unchanged point rows, 34413.99387795392 kg ore, wallet 84967000 milliCredits.
+Actual v22 audit: `target/stage23b-actual-extraction-series-audit.log`, 22 series / 12978 new
+physical receipts and 43929.94295490357 kg ore; exact restore/freight round trip passed.
+The >100000-receipt run and million-kilogram extraction now passed exact ordinary audits:
+49133 cargo rows / 2188 series / 1316882 new receipts, freight payload 15390976 bytes,
+1000000.5289471328 kg ore, tick 14928418, wallet 84967000 milliCredits, heap 3 GB.
+The conserved sale remains pending: hub.14 lacked finite funds, and the earning continuation
+is physically approaching the personally known hub.16 to sell a bounded 1000 kg portion. Follow
+[receipt scaling evidence](../ui/stage23b_extraction_receipt_scaling.md) for the numerical
+hold-validation issue found by the actual continuation and its regression.
+
+## Native v21: additive batch-materials construction (2026-10-09)
+
+Writer/schema/runtime advances to `m22.8.generated-campaign.v21`. A bounded schema-1 payload
+after the existing time-skip sidecar declares the runtime facility and construction catalog
+fingerprints. Unknown schema, altered fingerprints, malformed size, truncation and trailing
+bytes reject. Existing child payload framing and canonical generated source fingerprints remain
+unchanged. Native v1–20 migrate without issuing structures, stock, work or operating resources;
+they cannot declare the new batch workshop construction/installation identity.
+
+`facility.processing.bootstrap_batch_materials_v1` is a separately paid 25-million-kg orbital
+batch workshop, with a 60/25/15 structural/light/conductor-alloy bill and four million engineering
+work-seconds. Historical default facilities/bills are retained exactly. Runtime restoration
+requires the same completed construction evidence and actual station structure as other builds.
+Completion starts disabled; explicit allocation conserves real station power/heat/labor/maintenance.
+New blueprint visibility or historical loading creates no installation. Ordinary material
+acquisition and full construction remain incomplete. Earlier current-version headings below
+describe their historical slices.
+
 ## Current native v16: explicit initial NPC mining manifest (2026-10-06)
 
 The current schema/file/runtime is v16 (`m22.8.generated-campaign.v16`). Root payload framing
@@ -604,3 +685,359 @@ Native v14 и старше читаются без выдачи новых ко�
 личным supply predicate отклоняется. Receipt transient и никогда не восстанавливается
 как право на повторную выплату; в checkpoint остаются escrow/status/reputation договора.
 Производственная генерация supply offers и ordinary journey ещё не завершены.
+
+# Native v19: личная физическая переработка (2026-10-09)
+
+Текущий writer — `m22.8.generated-campaign.v19`. Framing и порядок sidecars сохраняются:
+новые исполняемые `player-refining:v1:` заказы используют прежние Stage-18 process snapshots
+с kind REFINING, gross requestedAmount, точным reservedCommodityMass и completedFraction.
+Native v1–18 читаются без создания переработки, сырья, материала или выполненной работы.
+Новые refining rows с подменённым заголовком v18 отклоняются; потеря личного владельца
+станции также отклоняет pending custody. Обычные исторические process rows не исполняются
+только по их наличию, без нового префикса.
+
+Резерв, частичная работа, возврат сырья и расход общего интервала проверены; runtime
+продолжает запись физического склада и очереди совместно. 27 целевых тестов прошли.
+Настоящая приобретённая база дала 63 кг conductor_metal из 100 кг существующей руды
+за 50 тактов с partial/completed reload; 37 кг отходов не поступили в полезный склад.
+GPU-прогон подтвердил клавиатурный выбор 200 кг, резерв, F8/F9 и точный возврат при отмене.
+Финальный реальный checkpoint v19 на 224 572 777 байт записан с лимитом 3 ГБ побайтно точно.
+Это не закрывает изготовление компонентов/секции, подходящую верфь или весь этап 23B.
+
+# Native v20: личные компонентные партии (2026-10-09)
+
+Writer — `m22.8.generated-campaign.v20`. Порядок sidecars и framing не меняются;
+исполняемые `player-components:v1:` process rows используют COMPONENT_MANUFACTURING,
+requestedAmount как массу выпуска, точный reservedCommodityMass и completedFraction.
+Native v1–19 читаются без создания заказов или материалов. Новая компонентная custody
+с заголовком v19 отклоняется; pending заказ требует сохранённого личного владельца станции.
+Физический резерв занимает складское место, отмена возвращает материалы, завершение
+выдаёт только авторский выход после общей конечной работы. Проверки с явными fixtures
+подтверждают partial reload; реальная база пока подтверждает только отказ при дефиците.
+23B остаётся ACTIVE/PARTIAL.
+
+## 2026-10-09: production supply projection and kilogram settlement
+
+Native writer stays v20; no payload, content fingerprint, opening stock or migration change.
+The supply plan is a pure own-station dependency projection and has no persisted orders of its own.
+Refining/component/product reservations use the same 1e-9 kg settlement precision already used
+by station storage and yard delivery, preventing binary subtraction residue from rejecting an
+otherwise complete bill. Exact authored order custody and completed-work watermarks stay intact.
+Existing incomplete orders do not gain progress, resources or output during restore.
+
+## 2026-10-09: partial facility resource allocation
+
+Native writer remains v20, with unchanged installation snapshot framing and fingerprints.
+The explicit own-station HALF command conserves the existing allocations of power, heat
+rejection, labor and maintenance; it creates no installation, stock or operating resource.
+Half operation and its actual throughput survive exact native save/load. Loading historical
+saves does not enable facilities or redistribute their resources. Original acquired installations
+now have the same owner-bound UI controls as personally constructed installations.
+
+## 2026-10-10: ordinary archived material navigation
+
+Paid resource and route purchases use existing seller archives at the actual own-station berth.
+The separate v21 material-navigation checkpoint retains the original world tick, industrial
+installations and owned fleets; its wallet is 14,767 credits after two ordinary 100-credit
+purchases. Public commodity labels convey the seller's archived classification only. Loading
+does not grant knowledge, refresh measurements, refuel ships or populate missing offers.
+Native framing remains v21. START_MINING now records requested kg in its existing journal field.
+The separate conductor-supply checkpoint records only the ordinary UNDOCK before a rejected
+fuel preflight; it is not evidence of extraction or completed delivery.
+
+The subsequent fuel-access checkpoint is an ordinary redocking at the already owned industry.2.
+The contacted historical operator has no station-map offers, so wallet and physical stocks stay
+unchanged (zero purchases). The read-only hub.2 stock/price audit does not grant its coordinates or
+authorize a remote transaction. First-hop onboard fuel diagnostics are transient preview fields;
+native v21 framing and content fingerprints are unchanged. Large consumable quantity steps affect
+presentation only; loading still requires existing own cargo, actual docking and a compatible tank.
+
+The full local-search continuation subsequently reached hub.2 through 3,625,671 additional
+ordinary ticks and real DOCK at tick 38,299,312. Only that physical visit added its personal
+location; the original acquired station and wallet are preserved. Exact native restore passed.
+The separate previously earned branch has 34,413.99387795392 kg of real metallic ore at tick
+13,213,991, with unchanged 84,967-credit wallet. Its QA runner was cooperatively saved at an
+ordinary tick boundary before rebuilding, then continued exactly for 10,000 more ticks.
+No world object was edited by the pause agent and no unpersisted progress was rolled back.
+Immutable catalog sharing and read-only carrier UI binding introduce no save framing change;
+native remains v21. Large per-tick extraction provenance still requires a new bounded lossless
+representation and explicit historical/native admission before the full million-kg continuation.
+
+## 2026-10-14: measured contact map navigation
+
+Native writer remains v24; no content, physical law, equipment, opening stock or migration
+change. Anonymous sensor markers use only the active personally owned ship's received range
+evidence, measured TrackState position/covariance and freshness. Bearing-only or missing range
+evidence cannot become a focusable coordinate. Projection and keyboard focus create no knowledge.
+The existing static archive remains separate; only an ordinary physical DOCK records a station visit.
+
+The isolated ordinary seed-1 pilot start uses the unchanged authored opening and paid ship
+purchase. A subsequent real radar-guided search reached previously unknown hub.16 and docked
+at tick 63766, with exact native restore and graphical F8/F9. Neither the historical earning
+checkpoint nor its limited fuel/stock/money was rewritten. QA contact-attempt budgets affect only
+how long the probe searches; sensor, propulsion, resource and handling rules are unchanged.
+
+### 2026-10-14: native v25 local craft physical sidecar
+
+The writer now emits v25. Genuine v1–24 layouts remain readable with an empty physical-flight
+sidecar; migration never infers craft positions from mission intent. The new bounded payload
+retains individual identity, original launch mission, exact cell coordinates/offsets/velocity
+and the shared-world watermark. Native validation rejects embarked, missing, foreign-owner,
+future-dated or mission-inconsistent flights. Relabeling v25 as v24 leaves trailing bytes and
+is rejected. Exact codec and composed campaign restore are covered by targeted tests.
+
+The immutable merged engineering vocabulary preserves the accepted freight/craft definitions
+and finite consumables. No opening money, stock, craft, equipment or historical checkpoint
+is granted or rewritten. The graphical local-flight proof uses explicit produced/deployed
+craft and physical geometry fixtures; it is not evidence of ordinary acquisition or launch.
+
+Physical recovery now follows the existing finite deck owner on the same world tick: queued
+outside craft retains its exact motion; RECOVERING possession removes the independent pose;
+finished SERVICING work completes the pending mission. No replenishment or replacement is
+created. Pending outside positions require an actual queued recovery request. The personal
+recovery journal event is emitted once on physical possession, not on projection or restore.
+
+Current full verification: target/stage23b-native25-final-full-verify.log, 2661 tests,
+0 failures/errors, 1 ordinary skip; JaCoCo checks, Javadoc and package PASS in 11:07.
+Actual historical graphical migration and explicit deployed-craft graphical F8/F9 both PASS.
+The whole Stage 23B acceptance gate remains open.
+
+### 2026-10-14: personal queued-craft cancellation
+
+The personal cancellation surface delegates to the existing shared PLAYER/AI mission/deck
+validator. Current personally owned host, legal operator and wing association are checked.
+Single-use previews preserve the entire checkpoint; stale or foreign confirmations and deployed
+craft cancellation are rejected. Actual cancellation retains identity/consumables, clears queued
+work and records one personal journal event. No native schema or content fingerprint changed.
+Full command regression: 2663 tests, zero failures/errors, one ordinary skip; coverage,
+Javadoc/package PASS. The subsequent presentation-only labels passed 21 targeted tests and
+renewed graphical keyboard preview/confirm/exact F8/F9. Explicit queue fixtures are identified;
+ordinary carrier acquisition or completed sorties are not claimed.
+
+### 2026-10-14: personal ammunition replenishment
+
+LOAD_AMMUNITION transfers existing countable stock into an already bound fitted kinetic feed
+through Stage19WarfareSupplyService. It preserves the weapon identity and uses the existing
+ConsumableState and product-count storage representation; no new native field or schema is
+introduced. Its actual journal commit retains round count and station identity, so the same
+handling interval remains unavailable after restoration. Preview, stale confirmation, foreign
+station and incompatible feed cannot create a stock transfer or journal entry.
+
+The Stage-22 owning runtime product registry now admits the already authored core/small-craft
+ammunition catalog via STAGE22_AUTHORED registration. The Stage-18 default registry and its
+historical industrial fingerprint remain unchanged. Registration creates no station stock,
+recipe, physical round, staffing or starting asset. The focused native round trip and historical
+replenishment acceptance passed; complete current regression is recorded in
+target/stage23b-personal-ammunition-full-verify.log: 2673 tests, zero failures/errors,
+one ordinary skip, coverage/Javadoc/package PASS, BUILD SUCCESS in 15:04.
+The own-station, weapon, stock and berth
+used by the targeted/GPU fixture are explicit and do not prove ordinary acquisition.
+
+### 2026-10-15: personal whole-round manufacturing batches
+
+The current manufacturing composition appends the existing Empire 150 kg ammunition binding
+to the already admitted kinetic-ammunition profile; the Union 140 kg binding remains unchanged.
+The default Stage18 catalog, recipes and industrial fingerprint are unchanged. There are no new
+native fields: the existing PRODUCT_MANUFACTURING process row already stores requestedUnits,
+reserved material maps and completedFraction. The UI's whole-round selector is transient; an
+existing order always projects its own persisted count. No facilities, resources or stock appear
+on creation or restore from this composition change.
+
+The targeted verify passed 24 tests with strict Javadoc/package (56.935 s, JaCoCo skipped).
+Both authored batches preserve complete material reservation across partial native restoration;
+completion adds their integer stock count, cancellation refunds custody only once, and an
+actually manufactured Empire round loads through the previous physical servicing command.
+The RTX 4070 keyboard probe passed count/preview invalidation/confirm/partial tick/F8/F9/cancel.
+All construction-work, material, ownership and berth fixtures remain explicit. Full regression
+and global coverage of this new source state have not been run; Stage23B remains ACTIVE/PARTIAL.
+
+## Продолжение 2026-10-15: отдельное личное владение аппаратами
+
+Native v26 хранит отдельный ограниченный реестр personalCraftOwnership. Связь крыла,
+юридический оператор и владение носителем больше не создают право собственности на аппарат.
+Смена/потеря носителя сохраняет личный аппарат на карте и в списке; командная доступность
+по-прежнему проверяет существующий законный носитель и физическое состояние.
+Утрата самого аппарата сохраняет историческое право без создания замены. Передача права
+отзывает доступ и инвалидирует старое подтверждение. Журнал launch/recovery/loss проверяет
+право на аппарат и допускает отсутствие собственного носителя. Player/world composition
+сохраняет реестр. Не выделенные allocator ID и дубликаты отклоняются; v1–25 получают пустой
+реестр, без вывода приобретений из чужих/старых wings. Trusted composition boundary принимает
+явный результат приобретения/передачи; обычный игровой путь приобретения ещё требуется.
+
+Проверка: `target/stage23b-personal-craft-property-verify.log`, **21 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, строгий Javadoc/package, целевой прогон без JaCoCo. Независимое ревью
+выявило и исправлено стирание реестра при world transition и допуск будущих craft ID.
+RTX 4070: `target/stage23b-personal-property-local-flight-graphics-v26.log`, **PASS**:
+keyboard focus собственного аппарата, F8/F9 до/после общего физического такта. Аппарат,
+вылет и координата в этой проверке явно заданы fixture; обычное получение/вылет не заявлены.
+
+Обычная навигация: предыдущий вывод об отсутствии промышленной цели у нового пилота
+исправлен. В личном seller briefing уже присутствует `industry.2` (system 2), цена 70 000 кр.
+при кошельке 75 000 кр. QA ошибочно искал только текущую систему 16. Исправленная проверка
+использует существующий личный архив независимо от системы: 0 покупок карт, точный native
+reload, `target/stage23b-ordinary-new-pilot-industrial-map-audit-v26.log`, **PASS**. Полный
+личный маршрут пока отсутствует: известны системы [2,16]. Нулевые station map offers здесь
+корректно подавляют повторную продажу уже известных координат. Полёт/покупка этим логом
+не доказываются. Новый journey исследует только опубликованные production UI выходы,
+затем использует планировщик по лично открытым системам; скрытый topology itinerary не передаётся.
+
+23B остаётся ACTIVE/PARTIAL: обычные supply/bootstrap, новые промышленные станции,
+quantitative surveys, реальные carrier missions, strategic operations и финальная регрессия
+должны быть завершены отдельно. Ручная приёмка остаётся после всего этапа 23.
+Полная регрессия после v26 и исправления historical fixtures завершена:
+`target/stage23b-personal-property-full-verify-fixed.log` — **2680 tests, 0 failures/errors,
+1 штатный skip, BUILD SUCCESS**, JaCoCo thresholds, строгий Javadoc и desktop package PASS
+(2026-10-15 13:52:38 +03:00). Первый диагностический полный прогон выявил 9 падений framing/
+release-doc checks; они исправлены, повторный прогон полностью зелёный. Основной код после
+этого прогона не изменён. Проверена текущая рабочая копия с незакоммиченными изменениями;
+это не exact-head CI и не финальный isolated clean verify всего завершённого 23B.
+## 2026-10-16: physical module handling at an existing civilian endpoint
+
+Native v27 fields and frozen content remain unchanged. Pending individual-module handling
+now validates the existing station's actual persisted ECS operator, faction economy and
+canonical civilian placement instead of requiring an industrial-specialization row. Exact
+owned-ship berth, module custody and work reservations remain mandatory. Repair, refit
+and paid-product validation retain their previous specialization requirements.
+
+The frontier admission acceptance checks partial historical handling, native reload,
+cancellation and completion with the same storage/custody/condition and conserved money.
+Missing operator, undocked player and a ship 5000 m away are rejected. These historical
+fixtures do not prove ordinary initial loading or station acquisition.
+
+Targeted regression: target/stage23b-admission-physical-handling-regression.log,
+23 tests, zero failures/errors. Full current regression is recorded separately in
+target/stage23b-pending-admission-full-verify.log; its final result must be checked before
+claiming the complete gate. Stage23B remains ACTIVE/PARTIAL.
+
+### Подтверждённые результаты 2026-10-16, 00:25 +03:00
+
+Полная регрессия handling/admission завершена: `target/stage23b-pending-admission-full-verify.log`,
+**2688 tests, 0 failures/errors, 1 штатный skip, BUILD SUCCESS** (13:22), coverage,
+строгий Javadoc и package PASS. Это текущая рабочая копия до следующей политики initial
+station legal capital, а не финальный isolated clean verify всего 23B.
+
+Реальный ordinary пилот из сохранения v26 продолжил путь в runtime v27: опубликованные
+UI exits и лично известные маршруты привели в system 2 на tick 26357162; exact native reload
+PASS (`target/stage23b-ordinary-industrial-navigation-v27-continuation.log`). Затем физическое
+сближение по уже полученным личным координатам, dock и обычный `PURCHASE_STATION` завершились
+на tick 27200080: `industry.2`, цена 70000 кр., остаток 5000 кр., conserved seller treasury,
+неизменная физическая industry/fleet, exact reload PASS
+(`target/stage23b-ordinary-industry2-acquisition-v27.log`). Денег, координат и berth fixture
+в этом продолжении нет. Обычный ввод химической цепочки и строительство yard ещё открыты.
+## 2026-10-16: separately versioned initial NPC station associations
+
+`stage23b.initial-npc-station-legal-capital.v1` authors bounded existing refinery/frontier
+ownership only for explicitly selected fresh campaigns. Default fresh creation selects it;
+the explicit historical reserve-policy overload keeps baseline station ownership. Existing
+physical/financial capital and market liquidity do not change. Owner-local station reports
+and NPC desks follow one shared immutable plan. The pilot receives no new free map grant.
+Preview passes that plan explicitly through its isolated restored candidate.
+
+The resulting ordinary faction component and discovery/NPC rows use existing native v27
+fields. No schema migration or restore backfill occurs. Saved owner absence is preserved.
+Later territorial control does not supersede a separately authored economic asset owner.
+See `docs/ui/stage23b_initial_station_legal_capital.md` for the exact bounded authoring
+rule, validation evidence and historical compatibility boundary. This is a new initial
+policy, not an inference about an old station's missing legal history. Stage23B remains
+ACTIVE/PARTIAL and requires the ordinary operating-resource and yard chains.
+### 2026-10-16: initial station legal capital — full gate
+
+Отдельная политика `stage23b.initial-npc-station-legal-capital.v1` реализована для новых
+кампаний: ограниченные существующие refinery/frontier получают настоящих NPC-операторов,
+только owner-local архив и местного диспетчера. Старый explicit baseline и restore сохраняют
+отсутствие владельца; деньги/stock/geometry/operating allocations не создаются. Один план
+используется в preview и commit; условия старта показывают только число назначений.
+Назначенный экономический владелец не меняется вслед за поздним territorial fallback.
+
+`target/stage23b-initial-station-capital-full-verify.log`: **2690 tests, 0 failures/errors,
+1 штатный skip, BUILD SUCCESS**, 14:52, 2026-10-16 09:27:48 +03:00; JaCoCo thresholds,
+строгий Javadoc и desktop package PASS. Независимое read-only ревью без блокирующих находок.
+Реальный acquired checkpoint `industry.2` проверен после этой policy: exact restore и один
+общий такт без изменения кошелька/флота, `target/stage23b-real-acquired-station-current-policy-integrity.log`.
+Этот gate относится к initial legal capital до последующих storage v28/FIFO изменений. Рабочая копия содержит inherited uncommitted changes,
+не exact-head CI и не финальный isolated clean gate всего 23B.
+
+Подробности: `docs/ui/stage23b_initial_station_legal_capital.md`. Следующий промышленный
+разрыв — оплачиваемое расширение liquid storage работающей станции; контракт зафиксирован
+в `docs/ui/stage23b_paid_liquid_storage_expansion.md`, **реализация ещё отсутствует**.
+Обычный ресурсный маршрут с low-fuel шахтёром остаётся PARTIAL, безопасные выходы не найдены;
+QA не выдаёт топливо/координаты. Все восемь широких блоков остатка 23B остаются открытыми.
+## 2026-10-16: native v28 paid passive storage extension
+
+Current writer/schema/runtime advances to28 with the same19 owning payloads. Content
+declaration schema2 records the separately additive facility/construction vocabulary and
+typed storage-effect fingerprint. Genuine v21–27 require their unchanged schema1 bootstrap
+fingerprints; older headers cannot claim storage orders/installations. Historical test
+converters validate current declarations and absence of new storage content before dropping
+or replacing a sidecar. No initial stock, facility, capacity, money or operating resources
+are supplied on create/restore.
+
+One explicit internal liquid package may be built on an orbital industrial station: 1M kg
+installed mass,10M kg liquid capacity,700k kg structural alloy +200k kg light alloy +100k kg
+conductor metal,160k engineering work-seconds. This is separately authored bounded content,
+not free volume inferred from frozen station radius. Passive STORAGE has no production work
+or operating allocations. Only a complete paid order paired with its exact installed state
+authorizes derived capacity and a liquid interface. Handler identity/rate/unit limit stay
+unchanged. Live batch adoption validates all proofs before expanding the existing store;
+stock and every reservation retain their owners. Restore requires exact base-plus-proof
+capacity and binds node/station/endpoint to one store.
+
+Composed tests cover refusal without bill, cancellation, partial native restoration, paid
+completion/repeated adoption, real finite liquid handling, wrong host/location, duplicate
+COMPLETE identities and atomic mixed invalid batch. A100 kg chemical batch→66 kg runs on
+common ticks after a constructed bootstrap plant, conserving all4 existing operating totals.
+Materials/berth/ownership and prior construction work are explicit fixtures; full ordinary
+bill supply and construction work are not claimed. The real acquired station passed a pure
+UI/shortage audit without fixtures. Full gate is recorded in
+`target/stage23b-storage-extension-native28-full-verify.log` (running at this entry).
+Stage23B remains ACTIVE/PARTIAL; detailed evidence is in
+`docs/ui/stage23b_paid_liquid_storage_expansion.md`.
+2026-10-16 final storage/FIFO gate: `target/stage23b-storage-fifo-native28-full-verify.log`
+— **2698 tests, 0 failures, 0 errors, 1 skip; BUILD SUCCESS**, 17:17,
+10:20:56 +03:00. Coverage thresholds, Javadoc and package passed. This supersedes the
+pending gate status above and includes the passive-storage UI clarification and FIFO fix.
+The ordinary ore-for-propellant continuation also passed with exact native reload:
+`target/stage23b-actual-ore-for-propellant-complete-v28.log`. Its continuation purchased
+832786 kg of water, sold 115755 kg of already mined ore, and ended with
+1999999.8836804298 kg of onboard propellant and 119494.494 credits. Purchases funded
+the market's subsequent purchases of ore; no money or materials were granted.
+Stage23B remains ACTIVE/PARTIAL: the ordinary construction bill and remaining broad
+acceptance journeys are not completed by these results.
+Full gate completed: `target/stage23b-small-craft-catalog-full-verify.log` —
+**2701 tests, 0 failures, 0 errors, 1 skip; BUILD SUCCESS**, 25:12,
+2026-10-16 14:53:00 +03:00. Coverage thresholds, strict Javadoc and package passed.
+This result supersedes the running gate status above. Independent catalog review found
+no blockers. No production source changed after this gate started; later changes were
+QA journey code and documentation. Stage23B remains ACTIVE/PARTIAL: this catalog slice
+does not complete persistent small-craft construction, physical delivery or the other
+remaining acceptance blocks. Native format remains v28.
+
+## 2026-10-16: native v29 paid small-craft build custody
+
+Current writer appends the small-craft build queue as payload 20 after industrial admissions.
+Previous payload positions and the existing content-declaration envelope remain unchanged;
+the new queue has its own bounded schema and declaration fingerprint. Historical v1–28
+migration supplies an empty queue. New production stock cannot be smuggled under a historical
+header. No migration grants inventory, work, identity, money, delivery or readiness.
+
+Actual preserved v28 input: target/stage23b-ordinary-resource3-origin-search-complete-v28.s25.
+New output: target/stage23b-ordinary-hub3-native29-migration.s25.
+Audit: target/stage23b-ordinary-hub3-native29-migration.log, PASS, exact reload at tick
+43523559, wallet 4900000 milli-credits, fleet:7, zero small craft. Input was not overwritten.
+Targeted negative/completion and strict Javadoc gates passed. Full current verify is running
+in target/stage23b-small-craft-build-native29-full-verify.log; the older v28 catalog result
+is not a full gate for this new queue. Whole Stage23B remains ACTIVE/PARTIAL.
+
+## Current native29 production gate — 2026-10-16 20:13:13 +03:00
+
+Full mvn -Ptest-parallel verify completed: target/stage23b-small-craft-build-native29-full-verify.log,
+2714 tests, 0 failures, 0 errors, 1 expected skip, BUILD SUCCESS, 18:11.
+Both coverage files were merged, JaCoCo thresholds passed, strict Javadoc and desktop package passed.
+This supersedes preceding in-progress entries and includes the central typed/file legacy guard,
+module-card names, cancelled-order cache reuse fix and conserved available-yard allocation.
+Independent reviews found no remaining blockers for these slices. Builder affiliation stays locked
+until CLAIM or valid cancellation; ordinary affiliation preview refuses safely without live mutation.
+No production source changed after the successful gate began. Subsequent changes are QA/test
+continuation and documentation. This dirty working-copy gate is not exact-head CI or whole23B RC
+acceptance. Stage23B remains ACTIVE/PARTIAL; ordinary material chains, delivery and other broad
+acceptance blocks remain open.

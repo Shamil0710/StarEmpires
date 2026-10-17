@@ -22,6 +22,21 @@ public final class Stage18YardResourceAllocator {
      * @return immutable states conserving all four totals
      */
     public List<InstalledYardState> allocateRated(List<InstalledYardState> installed, String targetId) {
+        return allocate(installed, targetId, false);
+    }
+
+    /**
+     * Transfers the largest balanced fraction of rated resources supported by existing station totals.
+     * Integer staffing rounds upward within the conserved totals; no resource is created.
+     * @param installed actual states from one station
+     * @param targetId installed target identity
+     * @return immutable states with a partially supplied target
+     */
+    public List<InstalledYardState> allocateAvailable(List<InstalledYardState> installed, String targetId) {
+        return allocate(installed, targetId, true);
+    }
+
+    private List<InstalledYardState> allocate(List<InstalledYardState> installed, String targetId, boolean available) {
         var ordered = new ArrayList<>(List.copyOf(installed));
         ordered.sort(Comparator.comparing(InstalledYardState::yardInstanceId));
         if (ordered.stream().map(InstalledYardState::yardInstanceId).distinct().count() != ordered.size())
@@ -40,6 +55,20 @@ public final class Stage18YardResourceAllocator {
         for (var yard : ordered) if (!yard.yardInstanceId().equals(targetId)) {
             power += yard.allocatedIntegrationPowerW(); work += yard.availableIntegrationWorkRate();
             availableLabor += yard.availableLaborCapacity(); availableAutomation += yard.availableAutomationCapacity();
+        }
+        if (available) {
+            double ratedPower = definition.ratedIntegrationPowerW() * target.conditionFraction();
+            double ratedWork = definition.ratedEngineeringWorkRate() * target.conditionFraction();
+            double fraction = Math.min(1d, Math.min((power + current[0]) / ratedPower,
+                    Math.min((work + current[1]) / ratedWork, Math.min(
+                            definition.laborCapacity() == 0 ? 1d : (availableLabor + labor) / (double) definition.laborCapacity(),
+                            definition.automationCapacity() == 0 ? 1d : (availableAutomation + automation) / (double) definition.automationCapacity()))));
+            if (!Double.isFinite(fraction) || fraction <= 0)
+                throw new IllegalStateException("Insufficient existing yard resources at this station");
+            deficit[0] = Math.min(power, Math.max(0, ratedPower * fraction - current[0]));
+            deficit[1] = Math.min(work, Math.max(0, ratedWork * fraction - current[1]));
+            needLabor = (int) Math.min(availableLabor, Math.max(0, Math.ceil(definition.laborCapacity() * fraction) - labor));
+            needAutomation = (int) Math.min(availableAutomation, Math.max(0, Math.ceil(definition.automationCapacity() * fraction) - automation));
         }
         if (!Double.isFinite(power) || !Double.isFinite(work) || power < deficit[0] || work < deficit[1]
                 || availableLabor < needLabor || availableAutomation < needAutomation)

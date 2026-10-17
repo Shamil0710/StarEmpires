@@ -21,7 +21,7 @@ public final class GeneratedCampaignStationAcquisitionUi {
         if (campaign.playerState().isEmpty()) return List.of();
         var result = new ArrayList<ProductionUiSnapshot.Row>();
         var runtime = campaign.coordinator().runtime();
-        for (var station : runtime.industry().industrial().stations()) {
+        for (var station : runtime.infrastructure().endpoints()) {
             long price = campaign.stationSalePriceMilliCredits(station.stationId()); if (price <= 0) continue;
             var endpoint = runtime.infrastructure().endpoint(station.stationId());
             String name = switch (station.stationArchetypeId()) {

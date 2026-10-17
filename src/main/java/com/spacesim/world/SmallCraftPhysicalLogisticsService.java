@@ -189,6 +189,42 @@ public final class SmallCraftPhysicalLogisticsService {
     }
 
     /**
+     * Publishes an already fully worked hull from a trusted queue's single-use physical escrow.
+     * Registry, pristine state, allocator and logistics are preflighted before custody is consumed.
+     * @param logistics current pending deliveries
+     * @param permit completed physical build proof; cannot be constructed by callers
+     * @return unserviced craft with empty consumables, outside every bay
+     */
+    public BuildResult completeEscrowedBuild(LogisticsState logistics,
+            com.spacesim.economy.ShipyardSmallCraftBuildWorkQueue.CompletionPermit permit) {
+        Objects.requireNonNull(logistics); Objects.requireNonNull(permit);
+        var o = permit.order();
+        long nextId = craftRegistry.nextIdValue();
+        if (nextId == Long.MAX_VALUE || craftRegistry.size() >= 100_000 || logistics.pendingDeliveries().size() >= 1_000_000)
+            throw new IllegalStateException("Small-craft identity or publication capacity exhausted");
+        var fit = com.spacesim.content.Stage23SmallCraftProductionCatalogs.fit(o.designId());
+        var id = new SmallCraftId(nextId);
+        var produced = pristineUnservicedState(id, o.builderFactionId(), o.designId(), fit);
+        var next = logistics.add(new PendingDelivery(id, o.stationId(), o.designId()));
+        if (craftRegistry.find(id).isPresent()) throw new IllegalStateException("Build identity already exists");
+        var inputs = new TreeMap<String, Double>();
+        var workPlan = permit.workPlan();
+        workPlan.requirements().inputs().forEach(i -> inputs.merge(i.contentId(), i.amount(), Double::sum));
+        var compatibility = new com.spacesim.ship.ShipyardEngineeringService.WorkSettlement(inputs, o.requiredWorkSeconds());
+        var completed = shipyardEngineering.completeBuild(new EntityId(nextId), workPlan, compatibility);
+        if (!completed.fit().equals(fit)) throw new IllegalArgumentException("Completed build differs from authored fit");
+        // The permit was issued only from actual accumulated work and exact retained materials.
+        permit.consume();
+        if (!id.equals(craftRegistry.reserveIdentityForCompletedProduction())) throw new IllegalStateException("Build allocator changed during publication");
+        craftRegistry.registerProducedCraft(produced);
+        // Compatibility evidence is not used as authorization: that role belongs exclusively to the consumed permit.
+        var settlement = new SettlementResult(Stage18ShipyardRuntime.SettlementStatus.SETTLED, o.designId(),
+                compatibility,
+                o.reservedCommodityMassKg(), o.reservedProductCounts(), Map.of());
+        return new BuildResult(next, settlement, produced);
+    }
+
+    /**
      * Confirms ordinary physical transport and assigns the arrived craft to a compatible bay.
      *
      * <p>Arrival never makes a craft combat-ready. The craft enters {@code SERVICING}; ordinary

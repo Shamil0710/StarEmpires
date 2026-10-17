@@ -22,6 +22,7 @@ import com.spacesim.world.LocalPhysicalPosition;
 import com.spacesim.world.StarSystemId;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -617,9 +618,17 @@ public final class GeneratedWorldCommandUiRenderer {
     }
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
+    private boolean ownCommodityHandling;
+
+    /**
+     * Selects own-storage transfer controls for the current commodity row.
+     * @param selected whether an owned station commodity row is selected
+     */
+    public void bindOwnCommodityHandling(boolean selected) { ownCommodityHandling = selected; }
     private boolean physicalPilotJump;
     private boolean physicalPilotSupply;
     private boolean physicalPilotReport;
+    private boolean physicalPilotScan;
     private String physicalPilotMining = "";
     private String physicalPilotManufacturing = "";
     private String physicalPilotRepair = "";
@@ -653,6 +662,9 @@ public final class GeneratedWorldCommandUiRenderer {
      * @param action loading, unloading, cancellation, or empty selection
      */
     public void bindProductTransferAction(String action) { physicalProductTransfer = action; }
+    /** @param selected whether the personal radar pulse row is selected */
+    public void bindPilotScanAction(boolean selected) { physicalPilotScan = selected; }
+
     /** @param action START_MINING, STOP_MINING or empty */
     public void bindPilotMiningAction(String action) { physicalPilotMining = action; }
     /** @param report whether the selected row submits a personal discovery report */
@@ -674,6 +686,12 @@ public final class GeneratedWorldCommandUiRenderer {
     private boolean physicalPilotRouteMap;
     /** @param supply whether the selected row supplies an existing installed interface */
     public void bindPilotSupplyAction(boolean supply) { physicalPilotSupply = supply; }
+    /** @param selected whether a bound magazine at an own physical station is selected */
+    public void bindPilotAmmunitionAction(boolean selected) { physicalPilotAmmunition = selected; }
+    private boolean physicalPilotAmmunition;
+    /** @param selected whether a new ammunition manufacturing batch is selected */
+    public void bindAmmunitionManufacturingAction(boolean selected) { ammunitionManufacturing = selected; }
+    private boolean ammunitionManufacturing;
     private String physicalPilotAssetAction = "";
     private boolean physicalPilotConfirmation;
     private int physicalPilotKilograms;
@@ -750,6 +768,19 @@ public final class GeneratedWorldCommandUiRenderer {
                 : new String[]{"pilot.dock", "pilot.undock", "focus"};
         String[] labels = physicalPilotSupply ? new String[]{"- КГ", "+ КГ", "ЗАГРУЗИТЬ " + physicalPilotKilograms + " КГ"} : foundation ? new String[]{"ОСНОВАТЬ"} : finance ? new String[]{"ВНЕСТИ 1 000", "ВЕРНУТЬ 1 000"} : !physicalPilotAssetAction.isEmpty() ? new String[]{physicalPilotAssetAction.equals("PURCHASE") ? "КУПИТЬ" : "УПРАВЛЕНИЕ", "НА КАРТЕ"} : physicalPilotJump ? new String[]{"ВЫЛЕТ"} : physicalPilotTrade ? new String[]{"- КГ", "+ КГ", "КУПИТЬ " + physicalPilotKilograms + " КГ"}
                 : new String[]{"СТЫКОВКА", "ОТСТЫКОВКА", "НА КАРТЕ"};
+        if (physicalPilotSupply) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.load-consumable", "pilot.buy-consumable"};
+            labels = new String[]{"- КГ", "+ КГ", "ИЗ ТРЮМА " + physicalPilotKilograms + " КГ", "КУПИТЬ В МОДУЛЬ"};
+            width = (inspectorRect.width() - 44f * scale) / 4f;
+        }
+        if (physicalPilotAmmunition) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.load-ammunition"};
+            labels = new String[]{"- ШТ.", "+ ШТ.", "ЗАГРУЗИТЬ " + physicalPilotKilograms + " ШТ."};
+        }
+        if (physicalPilotTrade && ownCommodityHandling) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.load-commodity"};
+            labels = new String[]{"- КГ", "+ КГ", "ПОГРУЗИТЬ " + physicalPilotKilograms + " КГ"};
+        }
         if (physicalPilotAssetAction.equals("PURCHASE_STATION")) {
             ids = new String[]{"pilot.purchase-station", "focus"}; labels = new String[]{"КУПИТЬ СТАНЦИЮ", "НА КАРТЕ"};
             width = (inspectorRect.width() - 36f * scale) / 2f;
@@ -770,11 +801,15 @@ public final class GeneratedWorldCommandUiRenderer {
             ids = new String[]{"pilot.buy-route-map"}; labels = new String[]{"КУПИТЬ МАРШРУТ"};
             width = inspectorRect.width() - 32f * scale;
         }
+        if (physicalPilotScan) {
+            ids = new String[]{"pilot.scan"}; labels = new String[]{"ИМПУЛЬС РАДАРА"};
+            width = inspectorRect.width() - 32f * scale;
+        }
         if (!physicalPilotMining.isEmpty()) {
             boolean start = physicalPilotMining.equals("START_MINING");
-            ids = new String[]{start ? "pilot.start-mining" : "pilot.stop-mining"};
-            labels = new String[]{start ? "НАЧАТЬ ДОБЫЧУ" : "ОСТАНОВИТЬ ДОБЫЧУ"};
-            width = inspectorRect.width() - 32f * scale;
+            ids = start ? new String[]{"pilot.less", "pilot.more", "pilot.start-mining"} : new String[]{"pilot.stop-mining"};
+            labels = start ? new String[]{"- КГ", "+ КГ", "ЛИМИТ " + physicalPilotKilograms + " КГ"} : new String[]{"ОСТАНОВИТЬ ДОБЫЧУ"};
+            width = (inspectorRect.width() - 32f * scale - (start ? 16f * scale : 0)) / (start ? 3 : 1);
         }
         if (!physicalPilotManufacturing.isEmpty()) {
             boolean yardAllocation = physicalPilotManufacturing.equals("ALLOCATE_YARD_RESOURCES");
@@ -787,12 +822,44 @@ public final class GeneratedWorldCommandUiRenderer {
                     : start ? "pilot.start-manufacturing" : "pilot.cancel-manufacturing"};
             labels = new String[]{allocation ? "ПЕРЕРАСПРЕДЕЛИТЬ РЕСУРСЫ" : yardConstruction && start ? "ПОСТРОИТЬ ВЕРФЬ"
                     : construction ? start ? "ПОСТРОИТЬ УСТАНОВКУ" : "ОТМЕНИТЬ СТРОИТЕЛЬСТВО"
-                    : start ? "ИЗГОТОВИТЬ СЕКЦИЮ" : "ОТМЕНИТЬ ИЗГОТОВЛЕНИЕ"};
+                    : start ? "ИЗГОТОВИТЬ ОБОРУДОВАНИЕ" : "ОТМЕНИТЬ ЗАКАЗ"};
             width = inspectorRect.width() - 32f * scale;
+        }
+        if (physicalPilotManufacturing.equals("ALLOCATE_YARD_RESOURCES")) {
+            ids = new String[]{"pilot.allocate-yard-resources", "pilot.allocate-yard-resources-available"};
+            labels = new String[]{"ШТАТНЫЕ РЕСУРСЫ", "ДОСТУПНЫЕ РЕСУРСЫ"};
+            width = (inspectorRect.width() - 36f * scale) / 2f;
+        }
+        if (physicalPilotManufacturing.endsWith("SMALL_CRAFT_BUILD")) {
+            ids = new String[]{physicalPilotManufacturing.startsWith("START_") ? "pilot.start-craft-build"
+                    : physicalPilotManufacturing.startsWith("CLAIM_") ? "pilot.claim-craft-build" : "pilot.cancel-craft-build"};
+            labels = new String[]{physicalPilotManufacturing.startsWith("START_") ? "ПОСТРОИТЬ АППАРАТ"
+                    : physicalPilotManufacturing.startsWith("CLAIM_") ? "ПРИНЯТЬ ГОТОВЫЙ АППАРАТ" : "ОТМЕНИТЬ ДО РАБОТЫ"};
+            width = inspectorRect.width() - 32f * scale;
+        }
+        if (ammunitionManufacturing) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.start-manufacturing"};
+            labels = new String[]{"- ШТ.", "+ ШТ.", "ИЗГОТОВИТЬ " + physicalPilotKilograms + " ШТ."};
+            width = (inspectorRect.width() - 40f * scale) / 3f;
+        }
+        if (physicalPilotManufacturing.equals("ALLOCATE_FACILITY_RESOURCES")) {
+            ids = new String[]{"pilot.allocate-facility-resources", "pilot.allocate-facility-resources-half"};
+            labels = new String[]{"ШТАТНЫЕ РЕСУРСЫ", "50 % РЕСУРСОВ"};
+            width = (inspectorRect.width() - 36f * scale) / 2f;
         }
         if (physicalPilotJournal) {
             ids = new String[]{"pilot.acknowledge-journal"}; labels = new String[]{"ОТМЕТИТЬ ПРОЧИТАННЫМ"};
             width = inspectorRect.width() - 32f * scale;
+        }
+        if (physicalPilotManufacturing.equals("START_REFINING")) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.start-refining"};
+            labels = new String[]{"- КГ", "+ КГ", "ПЕРЕРАБОТАТЬ " + physicalPilotKilograms + " КГ"};
+            width = (inspectorRect.width() - 40f * scale) / 3f;
+        }
+        if (physicalPilotManufacturing.equals("START_COMPONENT_MANUFACTURING")) {
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.start-components"};
+            labels = new String[]{"- КГ", "+ КГ", "ИЗГОТОВИТЬ " + physicalPilotKilograms + " КГ"};
+            width = (inspectorRect.width() - 40f * scale) / 3f;
         }
         if (!physicalPilotRepair.isEmpty()) {
             boolean start = physicalPilotRepair.equals("START_REPAIR");
@@ -839,8 +906,8 @@ public final class GeneratedWorldCommandUiRenderer {
         Rect second = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 58f * scale,
                 inspectorRect.width() - 32f * scale, 36f * scale);
         if (physicalPilotTrade) {
-            button(second, "ПРОДАТЬ " + physicalPilotKilograms + " КГ", true);
-            hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.sell", null, second));
+            button(second, (ownCommodityHandling ? "ВЫГРУЗИТЬ " : "ПРОДАТЬ ") + physicalPilotKilograms + " КГ", true);
+            hitTargets.add(new HitTarget(HitKind.ACTION, ownCommodityHandling ? "pilot.unload-commodity" : "pilot.sell", null, second));
         }
         Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
         button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
@@ -1094,7 +1161,9 @@ public final class GeneratedWorldCommandUiRenderer {
                 "Неопределённость", String.format(Locale.ROOT, "%.2f условных единиц", route.uncertaintyExposure()),
                 "Сведения об опасности", "Сохранённые личные наблюдения; неизвестные участки не считаются безопасными. Оценка не является вероятностью",
                 "Граница оценки времени", "Модель времени переходов; не включает дозаправку и ожидание готовности двигателя",
-                "Первый вылет", personalRouteConfirmation ? "Проверен; требуется подтверждение" : "Недоступен: проверьте стыковку, топливо и FTL",
+                "Первый вылет", personalRouteConfirmation ? "Проверен; требуется подтверждение"
+                        : !preview.firstHopFuel().feasible() ? "Недостаточно бортового топлива; требуется физическое снабжение" : "Недоступен: проверьте стыковку и FTL",
+                "Бортовое топливо", preview.firstHopFuel().feasible() ? "Достаточно для первого прыжка" : "Недостаточно для первого прыжка с резервом",
                 "Дальнейший путь", "Проверять после каждого прибытия; дозаправка только вручную существующими ресурсами",
                 "Источник", "Общий PlayerFleetRoutePlanner, личные открытия и обычная проверка топлива; подтверждается только первый прыжок"));
     }
@@ -1687,8 +1756,12 @@ public final class GeneratedWorldCommandUiRenderer {
             Map<String, Point> points,
             UiSelection selection,
             Rect map) {
+        var ordered = new ArrayList<>(objects);
+        ordered.sort(Comparator.comparingInt(object -> selection.kind() == SelectionKind.LOCAL_OBJECT
+                && selection.stableId().equals(object.stableId()) ? 0 : 1));
+        var labels = new ArrayList<Rect>();
         batch.begin();
-        for (LocalObjectView object : objects) {
+        for (LocalObjectView object : ordered) {
             boolean selected = selection.kind() == SelectionKind.LOCAL_OBJECT
                     && selection.stableId().equals(object.stableId());
             boolean important = selected || object.kind() == ObjectKind.STATION
@@ -1700,9 +1773,16 @@ public final class GeneratedWorldCommandUiRenderer {
             if (point == null || !map.contains(point.x(), point.y())) {
                 continue;
             }
+            float labelX = point.x() + markerSize(object.kind()) * 0.65f;
+            float labelY = point.y() + fonts.small().getLineHeight() * 0.35f;
+            glyph.setText(fonts.small(), object.name());
+            var bounds = new Rect(labelX, labelY - fonts.small().getLineHeight(),
+                    glyph.width + 4f * metrics.scale(), fonts.small().getLineHeight());
+            if (labels.stream().anyMatch(prior -> bounds.x() < prior.right() && bounds.right() > prior.x()
+                    && bounds.y() < prior.top() && bounds.top() > prior.y())) continue;
+            labels.add(bounds);
             fonts.small().setColor(selected ? ImperialUiPalette.BRASS : ImperialUiPalette.IVORY);
-            fonts.small().draw(batch, object.name(), point.x() + markerSize(object.kind()) * 0.65f,
-                    point.y() + fonts.small().getLineHeight() * 0.35f);
+            fonts.small().draw(batch, object.name(), labelX, labelY);
         }
         batch.end();
     }

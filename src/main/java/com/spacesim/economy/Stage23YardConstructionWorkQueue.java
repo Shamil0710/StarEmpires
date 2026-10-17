@@ -150,9 +150,9 @@ public final class Stage23YardConstructionWorkQueue {
                 if (context != null) {
                     var capacities = new TreeMap<String, Double>();
                     spec.requiredMassByCommodityKg().forEach((id, kg) -> capacities.merge(ontology.findCommodity(id).storageClassId(), kg, Double::sum));
-                    var site = new Stage18StationStorage(ontology, com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts(),
+                    var site = new Stage18StationStorage(ontology, com.spacesim.content.Stage23SmallCraftProductionCatalogs.products(),
                             "yard-construction-site:" + order.orderId(), capacities, order.deliveredMassByCommodityKg(), Map.of());
-                    var logistics = new Stage18LogisticsRuntime(ontology, com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                    var logistics = new Stage18LogisticsRuntime(ontology, com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
                     for (var input : spec.requiredMassByCommodityKg().entrySet()) {
                         double amount = Math.min(input.getValue() - site.commodityMassKg(input.getKey()),
                                 Math.min(storage.commodityMassKg(input.getKey()), context.budget().remainingMassKg()));
@@ -225,7 +225,7 @@ public final class Stage23YardConstructionWorkQueue {
     private void validate(Order order) {
         var spec = catalog.find(order.yardDefinitionId());
         if (spec == null || order.completedWorkSeconds() > spec.requiredWorkSeconds()
-                || !com.spacesim.content.Stage22CivilianMiningProductionPath.loadRuntimeShipyards().findYard(order.yardDefinitionId()).allowedLocationTags().contains(order.locationTag()))
+                || !com.spacesim.content.Stage23SmallCraftProductionCatalogs.shipyards().findYard(order.yardDefinitionId()).allowedLocationTags().contains(order.locationTag()))
             throw new IllegalArgumentException("Invalid physical yard construction target, work or location");
         if (!order.stagedAtSite() && !order.deliveredMassByCommodityKg().isEmpty())
             throw new IllegalArgumentException("Historical warehouse custody cannot claim a second material site");

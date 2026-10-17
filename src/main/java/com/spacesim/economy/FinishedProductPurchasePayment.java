@@ -26,7 +26,7 @@ public record FinishedProductPurchasePayment(String sellerFactionId, long reserv
      * @return exact total milli-credits, rounded upward once
      */
     public static long quote(String productId, int count) {
-        var product = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts().findProduct(productId);
+        var product = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products().findProduct(productId);
         if (product == null || count <= 0 || count > 4096) throw new IllegalArgumentException("Invalid product purchase bill");
         try {
             return BigDecimal.valueOf(product.unitMassKg()).multiply(BigDecimal.valueOf(count))

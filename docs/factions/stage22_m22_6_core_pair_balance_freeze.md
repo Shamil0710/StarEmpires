@@ -1,5 +1,12 @@
 # Stage 22 M22.6 — core pair balance / freeze
 
+Current persistence follow-up (23B, 2026-10-11): manifest v4,
+`e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`,
+explicitly admits sensor checkpoint file format 5 and historical formats 1–4.
+All content/balance/scenario pins remain those of v3. `historicalV3()` retains the exact
+candidate described below. See [checkpoint change control](../release/stage23b_player_checkpoint_change_control.md).
+Historical human-review packets do not acquire new sign-off from this persistence update.
+
 > Status: **FROZEN MACHINE CANDIDATE — HUMAN SIGN-OFF PENDING**  
 > Pair: `core.empire` / `core.industrial_union`  
 > Stable identities: `faction.imperial_directorate` / `faction.industrial_combine`  

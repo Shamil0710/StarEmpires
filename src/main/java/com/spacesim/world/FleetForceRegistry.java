@@ -87,6 +87,58 @@ public final class FleetForceRegistry {
     }
 
     /**
+     * Projects live fleet payloads without capturing unrelated economy, history or system objects.
+     * The result uses the same entity mapper and readiness evaluator as persistent reconstruction.
+     * @param world authoritative live fleet placements and entity registries
+     * @param evaluator fitted readiness evaluator
+     * @param availabilityByFleet bounded observations; absent entries remain unavailable
+     * @return immutable force registry in canonical fleet identity order
+     */
+    public static FleetForceRegistry reconstruct(
+            WorldSimulation world, FleetReadinessEvaluator evaluator,
+            Map<FleetId, FleetOperationalAvailability> availabilityByFleet) {
+        Objects.requireNonNull(world, "world");
+        return reconstructSelected(world, evaluator, availabilityByFleet,
+                world.getFleetPlacements().stream().map(FleetPlacementState::id).toList());
+    }
+
+    /**
+     * Projects only the fleets participating in a live command, avoiding unrelated fitted evaluations.
+     * @param world authoritative live fleet placements and entity registries
+     * @param evaluator fitted readiness evaluator
+     * @param availabilityByFleet bounded observations; absent entries remain unavailable
+     * @param fleetIds existing fleet identities to project
+     * @return immutable canonical selected force registry
+     */
+    public static FleetForceRegistry reconstructSelected(
+            WorldSimulation world, FleetReadinessEvaluator evaluator,
+            Map<FleetId, FleetOperationalAvailability> availabilityByFleet,
+            java.util.Collection<FleetId> fleetIds) {
+        Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(evaluator, "evaluator");
+        var availability = availabilityByFleet == null ? Map.<FleetId, FleetOperationalAvailability>of()
+                : Map.copyOf(availabilityByFleet);
+        List<Entry> result = new ArrayList<>();
+        for (var id : new java.util.TreeSet<>(Objects.requireNonNull(fleetIds, "fleetIds"))) {
+            var placement = world.findFleet(id).orElseThrow(() -> new IllegalStateException("Missing selected fleet: " + id));
+            var entity = placement.locationKind() == FleetLocationKind.IN_TRANSIT
+                    ? placement.transitState().entityState()
+                    : com.spacesim.persistence.EntityStateMapper.capture(world.findSession(placement.systemId())
+                            .orElseThrow().getEntityRegistry().require(placement.localEntityId()));
+            if (entity.identity() == null || !"FLEET".equals(entity.identity().kindName()))
+                throw new IllegalStateException("FleetId points to non-fleet entity: " + placement.id());
+            result.add(new Entry(placement.id(), entity.faction() == null ? -1 : entity.faction().factionId(),
+                    placement.locationKind(), placement.systemId(),
+                    placement.transitState() == null ? null : placement.transitState().originSystemId(),
+                    placement.transitState() == null ? null : placement.transitState().destinationSystemId(),
+                    entity, evaluator.evaluate(entity, availability.getOrDefault(placement.id(),
+                            FleetOperationalAvailability.unavailable()))));
+        }
+        result.sort(java.util.Comparator.comparing(Entry::fleetId));
+        return new FleetForceRegistry(result);
+    }
+
+    /**
      * Returns all reconstructed fleets in canonical identity order.
      *
      * @return immutable force entries

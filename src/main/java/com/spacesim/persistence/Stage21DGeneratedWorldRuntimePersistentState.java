@@ -74,6 +74,11 @@ public record Stage21DGeneratedWorldRuntimePersistentState(
                 throw new IllegalArgumentException("Stage-21D group references unknown home system: " + group.id());
             }
             for (FleetId fleetId : group.memberFleetIds()) {
+                if (group.retired()) {
+                    if (fleetId.value() >= world.nextFleetIdValue())
+                        throw new IllegalArgumentException("Retired group references a never-issued FleetId: " + fleetId);
+                    continue;
+                }
                 Integer authoritativeFaction = fleetFactionById.get(fleetId);
                 if (authoritativeFaction == null) {
                     throw new IllegalArgumentException("Stage-21D group references missing or unaffiliated FleetId: " + fleetId);

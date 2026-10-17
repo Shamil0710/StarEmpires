@@ -1,5 +1,12 @@
 # M22.6 acceptance ledger
 
+Persistence follow-up, 2026-10-11: current machine manifest v4 is
+`e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`.
+It retains every historical content/balance/scenario pin and admits sensor file format 5
+alongside 1–4. The historical schema-3 candidate and fingerprint below remain available via
+`historicalV3()`. This adds no human-gate result. Stage 23B is currently ACTIVE/PARTIAL;
+the original ledger status below records the Stage-22 handoff chronology.
+
 Status: active; machine acceptance candidate is frozen, but Stage 22 is **not complete** while B18–B20 human gates and final exact-SHA RC/sign-off remain open. Stage 23 implementation has not started.
 
 Authorities: `faction_implementation_roadmap.md` §13, `faction_balance_validation_framework.md`,

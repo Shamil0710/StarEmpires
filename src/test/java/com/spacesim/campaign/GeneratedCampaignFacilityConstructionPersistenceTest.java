@@ -48,6 +48,8 @@ class GeneratedCampaignFacilityConstructionPersistenceTest {
                 .filter(s -> byStorageClass.entrySet().stream().allMatch(e -> s.storage().remainingCapacityKg(e.getKey()) >= e.getValue()))
                 .findFirst().orElseThrow();
         var baseline = campaign.captureState();
+        assertFalse(campaign.previewPilotAction("ALLOCATE_FACILITY_RESOURCES_HALF", station.stationId(),
+                station.facilities().get(0).facilityInstanceId(), 1).allowed());
         assertFalse(campaign.previewPilotAction("START_FACILITY_CONSTRUCTION", station.stationId(), definition, 1).allowed());
         assertEquals(baseline, campaign.captureState(), "A foreign-station preview cannot reserve materials");
         var ref = campaign.pilotMarketReference(station.stationId()).orElseThrow();

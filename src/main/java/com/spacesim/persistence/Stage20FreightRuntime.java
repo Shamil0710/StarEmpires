@@ -43,7 +43,7 @@ public final class Stage20FreightRuntime {
                 com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault();
     }
     private static final class ModuleCargoCatalog {
-        private static final Stage18ManufacturingProductRegistry PRODUCTS = com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts();
+        private static final Stage18ManufacturingProductRegistry PRODUCTS = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
     }
 
     private final Stage18ResourceOntologyCatalog ontology;
@@ -59,6 +59,7 @@ public final class Stage20FreightRuntime {
     private final TreeMap<FleetId, FreighterState> freighters = new TreeMap<>();
     private final TreeMap<FleetId, Stage18StationStorage> holds = new TreeMap<>();
     private final TreeMap<String, CargoLotState> lots = new TreeMap<>();
+    private final java.util.Map<FleetId, String> extractionTails = new java.util.HashMap<>();
     private final TreeMap<String, Stage20FreightPersistentState.ProductCargoLotState> productLots = new TreeMap<>();
     private final TreeMap<String, TransportOrderState> orders = new TreeMap<>();
     private final TreeMap<FleetId, Stage20FreightPersistentState.PersonalMiningOrder> mining = new TreeMap<>();
@@ -87,6 +88,12 @@ public final class Stage20FreightRuntime {
                     ontology, products, value.cargoStorage()));
         });
         saved.cargoLots().forEach(value -> lots.put(value.lotId(), value));
+        for (var lot : saved.cargoLots()) if (lot.receiptSeries() != null) {
+            String previousId = extractionTails.get(lot.fleetId());
+            var previous = previousId == null ? null : lots.get(previousId);
+            if (previous == null || previous.receiptSeries().lastOrdinal() < lot.receiptSeries().lastOrdinal())
+                extractionTails.put(lot.fleetId(), lot.lotId());
+        }
         saved.productLots().forEach(value -> productLots.put(value.lotId(), value));
         saved.orders().forEach(value -> orders.put(value.orderId(), value));
         saved.personalMiningOrders().forEach(value -> mining.put(value.fleetId(), value));
@@ -102,7 +109,7 @@ public final class Stage20FreightRuntime {
         return new Stage20FreightRuntime(
                 state,
                 Stage18ResourceOntologyLoader.loadDefault(),
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts());
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products());
     }
 
     /**
@@ -214,6 +221,10 @@ public final class Stage20FreightRuntime {
         FreighterState state = freighters.get(fleetId);
         return state == null ? Optional.empty() : Optional.of(copyFreighter(
                 state, holds.get(state.fleetId()).snapshot()));
+    }
+    /** @return immutable current fleet rows without copying or revalidating every cargo receipt */
+    public List<FreighterState> freighterStates() {
+        return freighters.values().stream().map(state -> copyFreighter(state, requireHold(state.fleetId()).snapshot())).toList();
     }
 
     /**
@@ -330,6 +341,36 @@ public final class Stage20FreightRuntime {
             String methodId, double requestedSourceMassKg,
             com.spacesim.economy.Stage18ExtractionRuntime.ExtractionCapability capability,
             com.spacesim.economy.Stage18ExtractionRuntime.IntervalBudget budget, double seconds) {
+        return extractPersonalCommodityAt(fleetId, source, methodId, requestedSourceMassKg, capability, budget, seconds, -1, 0);
+    }
+
+    /** Commits ordinary extraction while recording its actual world tick and interval.
+     * @param fleetId carrying owned fleet
+     * @param source finite physical source
+     * @param methodId installed extraction method
+     * @param requestedSourceMassKg requested source kilograms
+     * @param capability existing physical equipment
+     * @param budget finite interval budget
+     * @param tick actual completed world tick
+     * @param fixedStepSeconds actual physical interval
+     * @return unchanged ordinary extraction result
+     */
+    public com.spacesim.economy.Stage18ExtractionRuntime.ExtractionResult extractPersonalCommodity(
+            FleetId fleetId, com.spacesim.economy.Stage18ExtractionRuntime.PhysicalSourceState source,
+            String methodId, double requestedSourceMassKg,
+            com.spacesim.economy.Stage18ExtractionRuntime.ExtractionCapability capability,
+            com.spacesim.economy.Stage18ExtractionRuntime.IntervalBudget budget, long tick, double fixedStepSeconds) {
+        if (tick < 0 || !Double.isFinite(fixedStepSeconds) || fixedStepSeconds <= 0 || !Double.isFinite(tick * fixedStepSeconds))
+            throw new IllegalArgumentException("Invalid actual extraction time");
+        return extractPersonalCommodityAt(fleetId, source, methodId, requestedSourceMassKg, capability, budget,
+                tick * fixedStepSeconds, tick, fixedStepSeconds);
+    }
+
+    private com.spacesim.economy.Stage18ExtractionRuntime.ExtractionResult extractPersonalCommodityAt(
+            FleetId fleetId, com.spacesim.economy.Stage18ExtractionRuntime.PhysicalSourceState source,
+            String methodId, double requestedSourceMassKg,
+            com.spacesim.economy.Stage18ExtractionRuntime.ExtractionCapability capability,
+            com.spacesim.economy.Stage18ExtractionRuntime.IntervalBudget budget, double seconds, long tick, double step) {
         var fleet = requireFreighter(fleetId); requirePhase(fleet, FreightPhase.IDLE);
         Objects.requireNonNull(source, "source");
         requireNonNegativeFinite(seconds, "seconds");
@@ -356,10 +397,24 @@ public final class Stage20FreightRuntime {
                 requireHold(fleetId), capability, budget);
         if (result.committed()) {
             if (result.outputMassStoredKg() > 0) {
-                String id = "freight-lot:" + nextCargoLotOrdinal++;
-                lots.put(id, new CargoLotState(id, fleetId, Stage20FreightPersistentState.personalExtractionOrderId(fleetId),
-                        source.outputCommodityId(), result.outputMassStoredKg(), source.sourceId(),
-                        "player-extraction:" + source.sourceId(), seconds));
+                long ordinal = nextCargoLotOrdinal++;
+                String id = "freight-lot:" + ordinal;
+                String tailId = extractionTails.get(fleetId);
+                var tail = tailId == null ? null : lots.get(tailId);
+                if (tick >= 0 && tail != null && tail.sourceEndpointId().equals(source.sourceId())
+                        && tail.commodityId().equals(source.outputCommodityId()) && tail.receiptSeries() != null
+                        && tail.receiptSeries().canAppend(ordinal, tick, step, result.outputMassStoredKg())) {
+                    var extended = tail.receiptSeries().append(ordinal, tick, step, result.outputMassStoredKg());
+                    lots.put(tailId, new CargoLotState(tail.lotId(), fleetId, tail.orderId(), tail.commodityId(),
+                            tail.massKg() + result.outputMassStoredKg(), tail.sourceEndpointId(), tail.sourceProvenanceId(),
+                            tail.loadedAtSimulationSeconds(), extended));
+                } else {
+                    var series = tick < 0 ? null : new ExtractionReceiptSeries(ordinal, tick, step, result.outputMassStoredKg(), 1, result.outputMassStoredKg());
+                    lots.put(id, new CargoLotState(id, fleetId, Stage20FreightPersistentState.personalExtractionOrderId(fleetId),
+                            source.outputCommodityId(), result.outputMassStoredKg(), source.sourceId(),
+                            "player-extraction:" + source.sourceId(), seconds, series));
+                    if (series != null) extractionTails.put(fleetId, id);
+                }
             }
             refreshFreighterHold(fleetId);
         }
@@ -391,7 +446,7 @@ public final class Stage20FreightRuntime {
         if (!buying && lots.values().stream().filter(l -> l.fleetId().equals(fleetId)
                 && (l.orderId().equals(order) || l.orderId().equals(Stage20FreightPersistentState.personalExtractionOrderId(fleetId)))
                 && l.commodityId().equals(commodityId))
-                .mapToDouble(CargoLotState::massKg).sum() + EPSILON < massKg) return false;
+                .mapToDouble(CargoLotFifo::availableMassKg).sum() + EPSILON < massKg) return false;
         var hold = requireHold(fleetId);
         var result = logistics.transferCommodity(buying ? endpoint : hold, buying ? hold : endpoint,
                 commodityId, massKg, handling, budget);
@@ -459,9 +514,8 @@ public final class Stage20FreightRuntime {
         double remaining = massKg;
         for (var lot : matchingCargoLots(fleetId, Stage20FreightPersistentState.manualCargoOrderId(fleetId), commodityId, true)) {
             if (remaining <= EPSILON) break;
-            double portion = Math.min(remaining, lot.massKg());
-            deliveredLots.add(new CargoLotState(lot.lotId(), lot.fleetId(), lot.orderId(), lot.commodityId(), portion,
-                    lot.sourceEndpointId(), lot.sourceProvenanceId(), lot.loadedAtSimulationSeconds()));
+            double portion = Math.min(remaining, CargoLotFifo.availableMassKg(lot));
+            deliveredLots.addAll(CargoLotFifo.split(lot, portion).delivered());
             remaining -= portion;
         }
         if (!exchangeManualCommodity(fleetId, endpoint, commodityId, massKg, false, seconds, handling, budget))
@@ -593,7 +647,7 @@ public final class Stage20FreightRuntime {
         String order = Stage20FreightPersistentState.manualCargoOrderId(fleetId);
         if (!Double.isFinite(massKg) || massKg <= 0 || lots.values().stream()
                 .filter(l -> l.fleetId().equals(fleetId) && l.orderId().equals(order) && l.commodityId().equals(commodityId))
-                .mapToDouble(CargoLotState::massKg).sum() + EPSILON < massKg)
+                .mapToDouble(CargoLotFifo::availableMassKg).sum() + EPSILON < massKg)
             throw new IllegalStateException("Personal cargo provenance or amount is unavailable");
         var result = new com.spacesim.economy.Stage18ShipConsumableService(bindings, engineering)
                 .load(bindingId, mountId, massKg, fit, current, requireHold(fleetId));
@@ -1090,26 +1144,25 @@ public final class Stage20FreightRuntime {
 
     private void consumeMatchingLots(FleetId fleetId, String orderId, String commodityId, double massKg, boolean personal) {
         double remaining = massKg;
+        double certifiedRoundoff = EPSILON;
         List<CargoLotState> matching = matchingCargoLots(fleetId, orderId, commodityId, personal);
         for (CargoLotState lot : matching) {
             if (remaining <= EPSILON) {
                 break;
             }
-            double consumed = Math.min(remaining, lot.massKg());
-            double retained = lot.massKg() - consumed;
-            if (retained <= EPSILON) {
-                lots.remove(lot.lotId());
-            } else {
-                lots.put(lot.lotId(), new CargoLotState(
-                        lot.lotId(), lot.fleetId(), lot.orderId(), lot.commodityId(), retained,
-                        lot.sourceEndpointId(), lot.sourceProvenanceId(),
-                        lot.loadedAtSimulationSeconds()));
-            }
+            double consumed = Math.min(remaining, CargoLotFifo.availableMassKg(lot));
+            var retained = CargoLotFifo.split(lot, consumed).retained();
+            if (lot.receiptSeries() != null) certifiedRoundoff += Math.max(lot.receiptSeries().massRoundoffBoundKg(),
+                    lot.receiptSeries().producedReceiptCount() * Math.ulp(requireFreighter(fleetId).cargoCapacityKg()));
+            lots.remove(lot.lotId());
+            if (retained != null) lots.put(retained.lotId(), retained);
             remaining -= consumed;
         }
         if (remaining > EPSILON) {
             throw new IllegalStateException("physical hold mass exceeded cargo-lot provenance");
         }
+        if (lots.values().stream().noneMatch(l -> l.fleetId().equals(fleetId) && l.commodityId().equals(commodityId)))
+            com.spacesim.economy.ExtractionReceiptRoundoff.clearEmptyLedgerResidue(requireHold(fleetId), commodityId, certifiedRoundoff);
     }
 
     private List<CargoLotState> matchingCargoLots(FleetId fleetId, String orderId, String commodityId, boolean personal) {

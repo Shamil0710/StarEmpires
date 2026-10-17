@@ -29,7 +29,7 @@ final class ShipyardModuleCustodyCheckpointValidator {
         if (custody.modules().stream().anyMatch(module -> module.removedAtTick() > tick))
             throw new IllegalArgumentException("Module removal cannot occur in the future");
         var ontology = Stage18ResourceOntologyLoader.loadDefault();
-        var products = Stage22CivilianMiningProductionPath.loadProducts();
+        var products = com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
         var stations = new TreeMap<String, Stage18StationStorage>();
         var affected = custody.modules().stream().map(ShipyardModuleCustodyState.StoredModule::stationId)
                 .collect(java.util.stream.Collectors.toSet());
@@ -86,17 +86,12 @@ final class ShipyardModuleCustodyCheckpointValidator {
                 throw new IllegalArgumentException("Handling requires station ownership or actual private equipment ownership");
             if (!owner) {
                 var placement = stage20.worldState().fleets().stream().filter(f -> f.id().equals(ship.fleetId())).findFirst().orElseThrow();
-                String operator = stage20.campaign().materializedWorld().worldRows().stream()
-                        .filter(row -> row.domain().equals("INDUSTRIAL_SPECIALIZATION") && row.values().size() >= 4
-                                && row.values().get(1).equals(stationId)
-                                && row.values().get(0).equals(Long.toString(placement.systemId().value())))
-                        .findFirst().orElseThrow().values().get(2);
-                ShipyardRepairCheckpointValidator.validateCivilianBerth(stationId, operator, stage20, player, placement);
+                ShipyardRepairCheckpointValidator.validateCivilianHandlingBerth(stationId, stage20, player, placement);
             }
         }
         var orders = industry.processOrders().stream().filter(Stage18ManufacturingWorkQueue::managed)
                 .filter(order -> affected.contains(order.stationId())).toList();
-        var queue = new Stage18ManufacturingWorkQueue(ontology, Stage22CivilianMiningProductionPath.loadManufacturing(),
+        var queue = new Stage18ManufacturingWorkQueue(ontology, com.spacesim.content.Stage23SmallCraftProductionCatalogs.manufacturing(),
                 products, orders, industry.simulationTick());
         queue.restoreReservations(stations::get);
         ShipyardModuleCustodyStorage.bind(custody, products, stations::get);

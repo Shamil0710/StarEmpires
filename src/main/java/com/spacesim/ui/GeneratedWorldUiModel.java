@@ -151,7 +151,7 @@ public final class GeneratedWorldUiModel {
     GeneratedWorldUiSnapshot restrictToPersonalKnowledge(GeneratedWorldUiSnapshot raw) {
         var player = personalPlayer.get();
         return new GeneratedWorldUiSnapshot(raw.worldSeed(), raw.worldTick(), raw.activeSystemId(), raw.activeSystemName(),
-                personalGalaxy(raw.galaxy(), player), personalLocalObjects(raw.localObjects(), player),
+                personalGalaxy(raw.galaxy(), player), personalLocalObjects(raw.localObjects(), player, raw.activeSystemId()),
                 player == null ? List.of() : raw.freight().stream()
                         .filter(f -> player.ownedFleetIds().contains(new FleetId(f.fleetId()))).toList(),
                 player == null ? List.of() : raw.military().stream()
@@ -178,7 +178,7 @@ public final class GeneratedWorldUiModel {
     }
 
     private List<LocalObjectView> personalLocalObjects(List<LocalObjectView> raw,
-            com.spacesim.player.PlayerState player) {
+            com.spacesim.player.PlayerState player, StarSystemId active) {
         if (player == null) return List.of();
         var knowledge = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
         List<LocalObjectView> result = new ArrayList<>();
@@ -229,6 +229,9 @@ public final class GeneratedWorldUiModel {
                     object.kind() == ObjectKind.STATION && personallyOwnsStation(id) ? object.factionName() : "Нет личных сведений о владельце",
                     object.sprite(), sections, object.physicalLengthM(), object.physicalWidthM(), 0d, 0d));
         }
+        result.addAll(GeneratedCampaignSensorContactUi.localObjects(runtime, player, active));
+        result.addAll(carrierUiSource.localObjects(active));
+        result.sort(Comparator.naturalOrder());
         return List.copyOf(result);
     }
 
@@ -777,6 +780,12 @@ public final class GeneratedWorldUiModel {
          * @return current carrier operations projection when that FleetId is a bound carrier
          */
         Optional<CarrierOperationsUiProjection.CarrierView> find(FleetId fleetId);
+
+        /**
+         * @param systemId displayed physical system
+         * @return actor-bounded exact positions of personally owned deployed craft
+         */
+        default List<LocalObjectView> localObjects(StarSystemId systemId) { return List.of(); }
 
         /** @return empty fail-closed source for campaigns without M22.8J carrier bindings */
         static CarrierUiSource none() {

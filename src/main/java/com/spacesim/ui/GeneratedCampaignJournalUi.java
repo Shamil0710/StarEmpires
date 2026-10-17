@@ -36,13 +36,17 @@ public final class GeneratedCampaignJournalUi {
         for (int i = journal.entries().size() - 1; i >= 0; i--) {
             var e = journal.entries().get(i);
             boolean unread = e.sequence() > journal.acknowledgedThroughSequence();
-            String measure = e.action().equals("BUY") || e.action().equals("SELL") || e.action().equals("LOAD_CONSUMABLE")
+            String measure = e.action().equals("BUY") || e.action().equals("SELL") || e.action().equals("LOAD_CONSUMABLE") || e.action().equals("BUY_CONSUMABLE")
+                    || e.action().equals("LOAD_COMMODITY") || e.action().equals("UNLOAD_COMMODITY")
+                    || e.action().equals("START_REFINING") || e.action().equals("START_MINING")
+                    || e.action().equals("START_COMPONENT_MANUFACTURING") || e.action().equals("COMPONENT_MANUFACTURING_COMPLETED")
                     || e.action().equals("YARD_MATERIAL_DELIVERED") || e.action().equals("SUPPLY_OFFER_AVAILABLE")
-                    ? " кг" : e.action().equals("TIME_SKIP_MINUTES_STARTED") ? " мин."
+                    ? " кг" : e.action().startsWith("REFINING_") ? " кг (округлено)"
+                    : e.action().equals("TIME_SKIP_MINUTES_STARTED") ? " мин."
                     : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
                     || e.action().equals("LOAD_PRODUCT") || e.action().equals("UNLOAD_PRODUCT")
                     || java.util.Set.of("BUY_PRODUCT", "PRODUCT_PURCHASE_SETTLED", "PRODUCT_PURCHASE_REFUNDED").contains(e.action())
-                    || e.action().equals("PRODUCT_TRANSFER_COMPLETED") ? " шт."
+                    || e.action().equals("PRODUCT_TRANSFER_COMPLETED") || e.action().equals("LOAD_AMMUNITION") ? " шт."
                     : java.util.Set.of("REPAIR_SERVICE_SETTLED", "REFIT_SERVICE_SETTLED").contains(e.action()) ? " мкр." : "";
             result.add(new Row(new UiSelection(SelectionKind.SURFACE_ROW, "personal-event:" + e.sequence()),
                     description(e), "Личный журнал", unread ? "Новое событие" : "Прочитано",
@@ -78,6 +82,13 @@ public final class GeneratedCampaignJournalUi {
             default -> "Статус контракта изменён";
         };
         return switch (e.action()) {
+            case "ALLOCATE_FACILITY_RESOURCES_HALF" -> "Установке выделено 50 % штатных ресурсов";
+            case "SENSOR_CONTACT_DETECTED" -> "Сенсоры обнаружили контакт";
+            case "SCAN" -> "Выполнен активный импульс радара";
+            case "SMALL_CRAFT_LAUNCHED" -> "Малый аппарат покинул ангар";
+            case "SMALL_CRAFT_LOST" -> "Малый аппарат утрачен";
+            case "SMALL_CRAFT_RECOVERED" -> "Малый аппарат принят в ангар";
+            case "SMALL_CRAFT_LAUNCH_CANCELLED" -> "Запуск малого аппарата отменён";
             case "TIME_SKIP_MINUTES_STARTED" -> "Начат пропуск на " + e.quantity() + " игровых минут";
             case "TIME_SKIP_EVENT_STARTED" -> "Начат пропуск до следующего события";
             case "TIME_SKIP_STOPPED" -> "Пропуск остановлен: " + e.subject();
@@ -98,6 +109,8 @@ public final class GeneratedCampaignJournalUi {
             case "UNDOCK" -> "Отстыковка выполнена";
             case "BUY" -> "Груз куплен";
             case "SELL" -> "Груз продан";
+            case "LOAD_COMMODITY" -> "Собственный груз погружен со склада";
+            case "UNLOAD_COMMODITY" -> "Личный груз выгружен на собственный склад";
             case "PURCHASE" -> "Корабль приобретён";
             case "PURCHASE_STATION" -> "Существующая станция приобретена";
             case "SWITCH" -> "Управление кораблём передано";
@@ -105,9 +118,22 @@ public final class GeneratedCampaignJournalUi {
             case "CAPITALIZE" -> "Средства внесены в собственную казну";
             case "WITHDRAW" -> "Средства возвращены из собственной казны";
             case "LOAD_CONSUMABLE" -> "Расходник загружен из собственного груза";
+            case "BUY_CONSUMABLE" -> "Расходник оплачен станции и загружен в установленный модуль";
+            case "LOAD_AMMUNITION" -> "Боезапас загружен из собственного склада в магазин";
+            case "FORM_COMMAND_GROUP" -> "Командная группа сформирована";
+            case "GROUP_GUARD" -> "Группа приступила к локальной охране";
+            case "GROUP_GUARD_STOPPED" -> "Локальная охрана завершена; история сохранена";
+            case "GROUP_GUARD_INTERRUPTED" -> "Локальная охрана прервана: готовность, состав или полномочия изменились";
+            case "RETIRE_COMMAND_GROUP" -> "Командная группа расформирована; история сохранена";
+            case "GROUP_AUTHORITY_LOST" -> "Группа закрыта после потери корабля или его юридической принадлежности";
             case "START_MINING" -> "Задание на добычу принято";
             case "STOP_MINING" -> "Добыча остановлена игроком";
             case "START_MANUFACTURING" -> "Материалы зарезервированы для изготовления";
+            case "START_REFINING" -> "Сырьё зарезервировано для переработки";
+            case "START_COMPONENT_MANUFACTURING" -> "Материалы зарезервированы для компонентов";
+            case "COMPONENT_MANUFACTURING_COMPLETED" -> "Компоненты изготовлены и поступили на склад";
+            case "REFINING_COMPLETED" -> "Переработка завершена; материал поступил на склад";
+            case "REFINING_TAILINGS_DISCARDED" -> "Отходы переработки отделены от полезного материала";
             case "START_FACILITY_CONSTRUCTION" -> "Материалы зарезервированы для строительства";
             case "CANCEL_FACILITY_CONSTRUCTION" -> "Строительство отменено; материалы возвращены";
             case "FACILITY_CONSTRUCTION_COMPLETED" -> "Промышленная установка построена";
@@ -116,6 +142,7 @@ public final class GeneratedCampaignJournalUi {
             case "YARD_CONSTRUCTION_COMPLETED" -> "Структура верфи построена; рабочие ресурсы ещё не выделены";
             case "YARD_MATERIAL_DELIVERED" -> "Материалы перевезены со склада на стройплощадку верфи";
             case "ALLOCATE_YARD_RESOURCES" -> "Существующие ресурсы верфей станции перераспределены";
+            case "ALLOCATE_YARD_RESOURCES_AVAILABLE" -> "Верфи выделена доступная доля существующих ресурсов станции";
             case "SELLER_STATION_BRIEFING" -> "Получены координаты гражданских станций из архива продавца корабля";
             case "BUY_RESOURCE_MAP" -> "Карта ресурсного участка куплена у местного оператора";
             case "BUY_STATION_MAP" -> "Навигационная карта станции куплена у местного оператора";
@@ -123,7 +150,7 @@ public final class GeneratedCampaignJournalUi {
             case "REPAIR_SERVICE_SETTLED" -> "Денежный резерв ремонта перечислен владельцу верфи";
             case "REFIT_SERVICE_SETTLED" -> "Денежный резерв переоснащения перечислен владельцу верфи";
             case "ALLOCATE_FACILITY_RESOURCES" -> "Ресурсы станции перераспределены между установками";
-            case "CANCEL_MANUFACTURING" -> "Изготовление отменено, материалы возвращены";
+            case "CANCEL_MANUFACTURING" -> "Производственный заказ отменён, материалы возвращены";
             case "REPORT_DISCOVERY" -> "Личное открытие передано получателю";
             case "FOUND_FACTION" -> "Собственная фракция основана";
             case "POLICY" -> "Фракционная политика принята";

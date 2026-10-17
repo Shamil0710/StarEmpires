@@ -18,8 +18,35 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ProductionFittedJumpResolverTest {
+    @Test void repeatedReadinessQueriesFollowCooldownDamageAndFitChangesExactly() {
+        var catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();
+        var doctrine = Stage175IFleetDoctrineCatalog.all().get(0);
+        var fit = InstalledFit.fromDemonstrator(catalog.findDemonstratorFit(
+                Stage175ICombatTestContentPack.stage21StrategicFitId(doctrine.fitId())));
+        var state = new ShipEngineeringRuntime(catalog).initialize(fit, doctrine.initialConsumables(), DamageState.pristine());
+        var pristine = ShipInstanceRuntimeState.legacyNeutral();
+        var component = new EngineeringComponent(fit, state, pristine);
+        var resolver = new ProductionFittedJumpResolver();
+        var initial = resolver.plan(component);
+        assertTrue(initial.allowed());
+        assertEquals(initial, resolver.plan(component));
+        component.setRuntimeState(resolver.commit(component, initial));
+        assertEquals(JumpFailure.COOLDOWN_ACTIVE, resolver.plan(component).failure());
+        assertEquals(new ProductionFittedJumpResolver().plan(component), resolver.plan(component));
+        component.setRuntimeState(state);
+        component.setInstanceState(new ShipInstanceRuntimeState(new Snapshot(Map.of(), new DamageState(Map.of(initial.mountId(), 0d))),
+                pristine.shieldStatesByMount(), pristine.maintenance(), pristine.weaponLoadout(), pristine.weaponMountRuntime()));
+        assertEquals(JumpFailure.NO_FTL_MODULE, resolver.plan(component).failure());
+        assertEquals(new ProductionFittedJumpResolver().plan(component), resolver.plan(component));
+        component.setInstanceState(pristine);
+        assertEquals(initial, resolver.plan(component));
+        // An invalid refit cannot inherit the former hull's cached permission.
+        component.fit = new InstalledFit("hull.fixture.missing", fit.installedModules());
+        assertThrows(IllegalArgumentException.class, () -> resolver.plan(component));
+    }
     @Test
     void productionResolverUsesStage21CatalogAndCommitsTheSamePhysicalPlan() {
         ShipEngineeringCatalog catalog = Stage175ICombatTestContentPack.loadStage21StrategicDoctrines();

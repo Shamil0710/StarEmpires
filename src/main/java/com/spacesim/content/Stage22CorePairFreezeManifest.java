@@ -23,10 +23,11 @@ import com.spacesim.persistence.Stage20GeneratedWorldRuntimePersistenceContract;
  */
 public final class Stage22CorePairFreezeManifest {
     /** Freeze schema version. */
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     /** Semantic freeze-manifest version. */
-    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v3";
+    public static final String MANIFEST_VERSION = "stage22.core_pair_freeze_manifest.v4";
 
+    private static final Snapshot HISTORICAL_V3 = buildHistoricalV3();
     private static final Snapshot EXPECTED_FREEZE = buildExpectedFreeze();
 
     private Stage22CorePairFreezeManifest() {
@@ -100,7 +101,7 @@ public final class Stage22CorePairFreezeManifest {
     }
 
     /**
-     * Requires the current semantic surface to equal the exact schema-3 release-candidate pins.
+     * Requires the current semantic surface to equal the exact schema-4 release-candidate pins.
      *
      * @return current snapshot when every literal pin matches
      * @throws IllegalStateException when any frozen field drifts
@@ -115,12 +116,37 @@ public final class Stage22CorePairFreezeManifest {
         return current;
     }
 
-    /** @return literal aggregate fingerprint of the schema-3 semantic freeze candidate */
+    /** @return literal aggregate fingerprint of the schema-4 semantic freeze candidate */
     public static String frozenFingerprint() {
         return EXPECTED_FREEZE.freezeFingerprint();
     }
 
     private static Snapshot buildExpectedFreeze() {
+        var h = HISTORICAL_V3;
+        var expected = new Snapshot(4, "stage22.core_pair_freeze_manifest.v4",
+                h.scenarioSuiteVersion(), h.empireFactionId(), h.unionFactionId(),
+                h.empirePackageFingerprint(), h.unionPackageFingerprint(),
+                h.empireProductionFingerprint(), h.unionProductionFingerprint(),
+                h.empireEngineeringFingerprint(), h.unionEngineeringFingerprint(),
+                h.empireManufacturingFingerprint(), h.unionManufacturingFingerprint(),
+                h.empireShipyardFingerprint(), h.unionShipyardFingerprint(),
+                h.empireStationFingerprint(), h.unionStationFingerprint(),
+                h.empireProfileFingerprint(), h.coreProfileCatalogFingerprint(),
+                h.empireCharacterFingerprint(), h.unionCharacterFingerprint(),
+                h.empireProfileSchemaVersion(), h.coreProfileSchemaVersion(), h.unionProductionStateVersion(),
+                h.generatedRuntimeBridgeVersion(), h.generatedRuntimeCheckpointSchemaVersion(), 5,
+                h.generatedRuntimeMigrationVersion(), List.of(1, 2, 3, 4, 5),
+                h.scenarioVersions(), h.runtimeContentFingerprints(),
+                "e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729");
+        if (!expected.freezeFingerprint().equals(computeFingerprint(expected)))
+            throw new ExceptionInInitializerError("Pinned schema-4 freeze fields do not match their fingerprint");
+        return expected;
+    }
+
+    /** @return unchanged schema-3 manifest used by historical Stage-22 acceptance packets */
+    public static Snapshot historicalV3() { return HISTORICAL_V3; }
+
+    private static Snapshot buildHistoricalV3() {
         Snapshot expected = new Snapshot(
                 3,
                 "stage22.core_pair_freeze_manifest.v3",

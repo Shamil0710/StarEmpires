@@ -121,6 +121,24 @@ public final class FleetOrderExecutionService {
             FleetCommandState commandState,
             FleetForceRegistry forces,
             long orderId) {
+        return dispatchMovementHop(world, commandState, forces, orderId, false);
+    }
+
+    /**
+     * Dispatches through the same jump owner using only already aboard propellant.
+     * @param world authoritative physical world
+     * @param commandState accepted command history
+     * @param forces current participating physical fleets
+     * @param orderId accepted movement order
+     * @return updated command state without automatic station stock consumption
+     */
+    public FleetCommandState dispatchMovementHopOnboardOnly(WorldSimulation world,
+            FleetCommandState commandState, FleetForceRegistry forces, long orderId) {
+        return dispatchMovementHop(world, commandState, forces, orderId, true);
+    }
+
+    private FleetCommandState dispatchMovementHop(WorldSimulation world, FleetCommandState commandState,
+            FleetForceRegistry forces, long orderId, boolean onboardOnly) {
         Objects.requireNonNull(world, "world");
         List<Operation> operations = planNextOperations(commandState, forces, orderId);
         if (operations.isEmpty()) return commandState;
@@ -150,15 +168,20 @@ public final class FleetOrderExecutionService {
             if (waitingForFittedCooldown(force)) {
                 continue;
             }
-            var preparation = world.prepareFleetPropellantDeparture(
-                    movement.fleetId(), remainingRoute);
-            if (!preparation.ready()) {
+            if (onboardOnly) {
+                var plan = world.planFleetRouteFuel(movement.fleetId(), remainingRoute);
+                if (!plan.supported() || !plan.feasible())
+                    throw new IllegalStateException("Aboard propellant cannot complete the remaining route");
+            } else {
+              var preparation = world.prepareFleetPropellantDeparture(movement.fleetId(), remainingRoute);
+              if (!preparation.ready()) {
                 throw new IllegalStateException(
                         "fleet cannot start route without a safe finite-propellant plan: "
                                 + movement.fleetId() + " reason=" + preparation.reason()
                                 + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()
                                 + " projectedRemainingReactionMassKg="
                                 + preparation.journey().projectedRemainingReactionMassKg());
+              }
             }
             world.requestFleetJump(movement.fleetId(), movement.destinationSystemId(), 0f, 0f);
         }

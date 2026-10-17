@@ -47,6 +47,6 @@ public record ShipyardRefitServicePayment(String sellerFactionId, long reservedM
 
     private static final class Products {
         private static final com.spacesim.content.Stage18ManufacturingProductRegistry CATALOG =
-                com.spacesim.content.Stage22CivilianMiningProductionPath.loadProducts();
+                com.spacesim.content.Stage23SmallCraftProductionCatalogs.products();
     }
 }

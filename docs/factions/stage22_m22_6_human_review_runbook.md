@@ -3,8 +3,13 @@
 > Status: **PROTOCOL ONLY — NO HUMAN GATE RESULT RECORDED**  
 > Scope: execution and evidence format for the mandatory M22.6 B18, B19 and B20 human lanes.  
 > Authority: `faction_balance_validation_framework.md` Gate E and the canonical B18–B20 scenario definitions.  
-> Frozen manifest: `stage22.core_pair_freeze_manifest.v3`  
-> Frozen fingerprint: `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`
+> Frozen manifest: `stage22.core_pair_freeze_manifest.v4`
+> Frozen fingerprint: `e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`
+
+The 2026-10-11 persistence follow-up changes only the admitted sensor file format, from 4 to 5,
+and retains every content/balance/scenario pin. Historical packets remain identified by manifest
+v3 / `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`;
+they do not acquire acceptance for a different candidate. See [change control](../release/stage23b_player_checkpoint_change_control.md).
 
 This document does **not** lower, redefine or satisfy the canonical thresholds. It exists so a later
 human review is reproducible, blinded where required, tied to an exact release-candidate checkout and
@@ -31,8 +36,8 @@ reviewCompletedAtUtc
 ```
 
 For the current M22.6 frozen machine candidate, `freezeManifestVersion` must be
-`stage22.core_pair_freeze_manifest.v3` and `freezeFingerprint` must be
-`6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`. `buildSha` must be the exact
+`stage22.core_pair_freeze_manifest.v4` and `freezeFingerprint` must be
+`e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`. `buildSha` must be the exact
 candidate commit that passed the final normal CI and 100-pair RC workflow; it is intentionally not
 hard-coded in this protocol before those workflows finish.
 
@@ -252,8 +257,8 @@ required nor desirable.
 A human-gate result may be referenced by the M22.6 balance report only when all boxes are true:
 
 - [ ] review packet uses the final candidate `buildSha`;
-- [ ] packet uses `stage22.core_pair_freeze_manifest.v3`;
-- [ ] packet uses frozen fingerprint `6705d39d21d234335d55a33d22460e6750941cf8a57719c24b88c1e4a659d6d4`;
+- [ ] packet uses `stage22.core_pair_freeze_manifest.v4`;
+- [ ] packet uses frozen fingerprint `e9d7027bb7c777a04715f6a12234aa98bfb0abae4633154324f63c4ad1884729`;
 - [ ] B18 answers were collected before answer-key disclosure;
 - [ ] B19 samples were genuinely grayscale/blinded and not label-leaking screenshots;
 - [ ] B20 judgments were made on actual reviewed character samples;

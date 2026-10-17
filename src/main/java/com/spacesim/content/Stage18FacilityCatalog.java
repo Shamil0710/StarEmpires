@@ -99,7 +99,9 @@ public final class Stage18FacilityCatalog {
         /** Facility that refines, separates, processes or recycles physical feedstock. */
         PROCESSING,
         /** Facility that fabricates components, ammunition or finished equipment. */
-        FABRICATION
+        FABRICATION,
+        /** Passive installed containment; never supplies process work or operating resources. */
+        STORAGE
     }
 
     /**
@@ -155,10 +157,17 @@ public final class Stage18FacilityCatalog {
             requireText(displayName, "facility displayName");
             Objects.requireNonNull(family, "family");
             capabilityTags = immutableNonEmptySet(capabilityTags, "capabilityTags", id);
-            requirePositive(ratedProcessPowerW, "ratedProcessPowerW");
-            requirePositive(engineeringWorkRate, "engineeringWorkRate");
-            requirePositive(maintenanceWorkRate, "maintenanceWorkRate");
-            requirePositive(heatRejectionWPerProcessW, "heatRejectionWPerProcessW");
+            if (family == FacilityFamily.STORAGE) {
+                if (ratedProcessPowerW != 0d || engineeringWorkRate != 0d || maintenanceWorkRate != 0d
+                        || heatRejectionWPerProcessW != 0d || requiredLaborUnitsAtFullRate != 0d
+                        || automationFloorFraction != 0d || capabilityTags.stream().anyMatch(t -> !t.startsWith("capability.storage.")))
+                    throw new IllegalArgumentException("Passive storage cannot supply process or operating capability");
+            } else {
+                requirePositive(ratedProcessPowerW, "ratedProcessPowerW");
+                requirePositive(engineeringWorkRate, "engineeringWorkRate");
+                requirePositive(maintenanceWorkRate, "maintenanceWorkRate");
+                requirePositive(heatRejectionWPerProcessW, "heatRejectionWPerProcessW");
+            }
             requireNonNegative(requiredLaborUnitsAtFullRate, "requiredLaborUnitsAtFullRate");
             requireFractionInclusive(automationFloorFraction, "automationFloorFraction");
             storageClassInterfaces = immutableNonEmptySet(storageClassInterfaces, "storageClassInterfaces", id);

@@ -45,7 +45,7 @@ class GeneratedCampaignStockProductionCommandsTest {
         assertEquals(before,new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,after.stage21Runtime(),after.smallCraft(),after.hangars(),
                 after.flightDeck(),after.operations(),after.playerState(),before.playerJournal(),after.moduleCustody(),after.repairQueue(),
-                after.refitQueue(),after.moduleTransfers(),after.productTransfers(),after.yardConstruction()));
+                after.refitQueue(),after.moduleTransfers(),after.productTransfers(),after.yardConstruction(),after.timeSkip(),after.crewManifest()));
         assertEquals(before.playerJournal().nextSequence()+1,after.playerJournal().nextSequence());
         var receipt=after.playerJournal().entries().get(after.playerJournal().entries().size()-1);
         assertEquals(com.spacesim.player.PlayerJournalState.Kind.GOVERNMENT_COMMAND,receipt.kind());

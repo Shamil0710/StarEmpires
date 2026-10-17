@@ -1,9 +1,221 @@
 # Исполнение полного завершения 23B
 
+## Продолжение интеграции палубы, 2026-10-13
+
+Обычный `Stage228CampaignAuthority.advanceFrame` теперь обрабатывает существующие
+launch/recovery cycles связанных carrier wings через реальные установленные отсеки.
+`GeneratedCampaignCarrierBays` разделяет физическую проекцию между UI и world progression;
+личные права видимости не останавливают NPC-палубу. Проекция вычисляется заново после
+каждого world tick. Нулевое повреждённое состояние, отсутствующий отсек, прыжок или
+несогласованный оператор не предоставляют работу. Не связанные с wings host IDs по-прежнему
+требуют explicit physical provider до продвижения времени.
+
+`GeneratedCampaignCarrierTickTest` проверяет паузу, ровно один обычный такт, замедление
+при 50% integrity, остановку при нулевой integrity/снятом ангаре, точный codec/restore
+незавершённой палубной работы и окончание в AWAITING_HANDOFF с прежним LAUNCHING occupancy.
+Проверка использует явный carrier/craft fixture и отдельный sidecar; обычное получение,
+физический handoff/миссии и composed native/content admission остаются открыты.
+Первый целевой прогон: `target/stage23b-carrier-ordinary-tick-test.log`, 11 tests,
+0 failures/errors/skips, BUILD SUCCESS. Итоговый лог после добавления проверки снятого
+ангара: `target/stage23b-carrier-ordinary-tick-verify.log`, **11 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, строгий Javadoc и desktop packaging. Проверка целевая, JaCoCo отключён;
+это не полный coverage/clean verify gate.
+Статус этапа остаётся **23B ACTIVE/PARTIAL**.
+
+## Активное полное завершение, 2026-10-11
+
+Запрос «до полного завершения 23B» повторно подтверждён. Цель охватывает весь канонический
+остаток и остаётся активной; промежуточные тесты/сохранения не являются её завершением.
+Ручная приёмка пользователя после этапа 23 не заменяется и не блокирует текущую разработку.
+
+- Добыт миллион кг, выполнены native round trip и настоящий возврат/DOCK hub.14.
+  Продажа отвергнута из-за конечных денег: станция 8 кр., казна Союза 0; капитал не получен.
+- Единственный действующий writer earning продолжения: `Stage23BOrdinaryMiningJourney`,
+  output `target/stage23b-million-known-buyer-continuation.s25`, лог
+  `target/stage23b-million-known-buyer-native23-resume.log`, immutable classpath
+  `target/qa/stage23b-native23-flight-runtime.jar`. Session 60630; старт resume tick 23600000.
+  Параметры: sellOnly=true, saleStation=hub.16, saleKg=1000, saleBatchKg=500,
+  miningKg=1000000, maxTicks=10000000, checkpointInterval=100000. Все три hop 14→19→11→16 завершены;
+  идёт настоящий локальный подход к лично известной hub.16. Не запускать второй writer
+  к этому output. Следующие сборки не заменяют immutable jar работающего процесса.
+  Предыдущий процесс с heap 3 ГБ получил OOM при checkpoint на tick 23600000;
+  сохранение прочитано и точно восстановлено. В QA освобождён уже проверенный snapshot
+  перед длительным полётом, новый процесс имеет heap 6 ГБ. Последний исходный файл отдельно
+  сохранён в `target/stage23b-million-known-buyer-before-resume.s25`. Продажа пока не доказана.
+- Native v23 сохраняет явный initial commissioning crew manifest. Старые v1–22 файлы и
+  BASELINE получают неизвестный состав, загрузка не выдаёт экипаж. Приобретение/аффилиация
+  не меняют roster; активный независимый пилот подтверждает только одного человека.
+  `target/stage23b-crew-native23-verify.log`: BUILD SUCCESS, targeted verification,
+  Javadoc/package, без покрытия. Контракт зафиксирован в release change control.
+- Новая radar station reflection composition и coasting scan проверены: 10 tests,
+  BUILD SUCCESS (`target/stage23b-static-radar-coasting-verify.log`). Реальный отдельный
+  input прибытия сохранён; output `target/stage23b-ordinary-station-radar.s25`,
+  `ORDINARY STATION RADAR PASS`, range 4900.026190682875, tick 14931824.
+  Последующее shared-interval scan/thrust продолжение: **19 tests, BUILD SUCCESS**, Javadoc/package,
+  `target/stage23b-radar-thrust-shared-interval-verify.log`. Реальный output
+  `target/stage23b-ordinary-station-radar-with-thrust.s25` имеет range 4900.0279686494805,
+  tick 14931825, thrust=true и **ORDINARY STATION RADAR PASS**, точный composed reload на 3 ГБ.
+  Управление/топливо совпадают с обычным PlayerDirectControlSystem без второго такта.
+- Формирование личных Stage-21D групп подключено к production UI/preview/confirm/journal/native;
+  7 tests, BUILD SUCCESS (`target/stage23b-player-command-group-verify.log`). Отдельный
+  real-input QA: `Stage23BActualCommandGroupJourney`, output
+  `target/stage23b-actual-player-command-group.s25`, лог
+  `target/stage23b-actual-player-command-group-memory-fixed.log`: **ACTUAL COMMAND GROUP PASS**,
+  tick 14928418, wallet 84967000 milliCredits, fleet:26, home 14, groups=1.
+  Первоначальный QA удерживал уже проверенные большие snapshots и previews до файловой записи
+  и получил OOM на heap 3 ГБ; его log сохранён. После освобождения ненужных ссылок точная
+  запись/reload прошли на **тех же 3 ГБ**, без изменения production codec или limits.
+  Этот отдельный output не является writer earning ветки и не выдаёт crew/readiness или боевые возможности.
+  `target/stage23b-actual-command-group-graphics.log`: **graphical probe passed**, RTX 4070,
+  heap 4 ГБ, клавиатурные formation preview/confirm, неизменные player assets/money и F8/F9.
+  Проверено добавление второго ранее не назначенного собственного корабля в новую группу.
+  Снимки preview/complete сохранены в target. Панель формирования после визуального просмотра
+  получает отдельное пояснение состава/регистрации/домашней системы вместо сведений автопилота.
+  Обновлённая панель повторно прошла реальный graphical probe на native v23:
+  `target/stage23b-native23-command-group-graphics.log`, keyboard preview/confirm и F8/F9.
+  Снимки `target/stage23b-native23-command-group-preview.png` и `...-complete.png` сохранены;
+  preview визуально проверен: фактическая регистрация и отсутствие исторического crew observation.
+- Живая проекция FleetForceRegistry не копирует экономику/историю/прочие объекты мира при
+  формировании группы. Результат идентичен persistent reconstruction до/после реального
+  jump request; мир не изменяется. `target/stage23b-live-force-registry-verify.log`:
+  9 tests, BUILD SUCCESS. Личный composed transition также удерживает timeSkip и crewManifest;
+  `target/stage23b-crew-transition-verify.log`: 4 tests, BUILD SUCCESS.
+- Общая регрессия `target/stage23b-current-full-verify.log` выявила устаревшее удаление
+  current sidecars в тестовой historical framing fixture и пропуск adjacent owners в
+  тестовом сравнении stock policy. Они исправлены с сохранением строгой валидации payload.
+  Выявлен отдельно Stage-22 freeze drift только по child file format 4→5 и supported formats:
+  текущий manifest намеренно versioned v4, исторический v3 сохранён неизменным. Оба требуют
+  проверки обновлёнными тестами; этот первый full run не является успешной финальной проверкой.
+  `target/stage23b-native23-regression-repair-verify.log`: **36 tests, BUILD SUCCESS**.
+  Повторный полный `target/stage23b-current-full-recheck-verify.log`: **2640 tests,
+  0 failures/errors, 1 configured skip, BUILD SUCCESS**, 15:42; все coverage thresholds,
+  упаковка и строгий Javadoc прошли. Это подтверждает текущий код, не закрывает игровые gaps.
+  Свежий `clean verify` запущен в отдельной копии
+  `target/stage23b-clean-verify-workspace`; лог `target/stage23b-isolated-clean-verify.log`.
+  Исходная папка target с реальными сохранениями и runtime работающего writer не очищается.
+- Отдельный обычный radar approach QA: `target/stage23b-unknown-station-observed-approach.log`,
+  output `target/stage23b-unknown-station-observed-approach.s25`, tick 14960012.
+  Оплаченный импульс и 8 реальных подходов выбраны только по measured contact estimates;
+  неизвестная станция не достигнута. Результат **PAUSED / NOT PROVEN**, не PASS.
+  Поиск не подменяется координатами endpoint/source и не закрывает ordinary discovery seam.
+
+Следующие обязательные seams: личные групповые приказы/операции с действительной crew/supply
+authority, носители и малые аппараты на обычных world ticks и их native/content admission,
+физическая количественная разведка ресурсов, обычное снабжение/промышленность/работающая верфь,
+полная причинная NPC-поставка, новая станция, окончательные UI/графические и полные проверки.
+Не маркировать 23B COMPLETE и не переходить к 23C до закрытия этих критериев.
+
+### Решение по статическим радарным контактам
+
+Существующие station archetypes не имеют fitted ship signature. Для активного отражения
+используется явный transient контракт `stage23b.station-footprint-radar.v1`: RCS = 0.01 ×
+authored footprintLengthM × footprintWidthM из существующего Stage20StationPhysicalGeometryProfile.
+Это номинальная модель отражения, а не гарантированный нижний предел реального RCS.
+Она не выводит сигнатуру из массы склада/установок и не создаёт источник тепла или радиоэнергии.
+Импульс оплачивается тем же ShipEngineeringGrantService.IntervalBudget один раз для каждого
+реального radar mode; mobile и static targets получают измерения одного импульса через тот
+же ShipObservationService. При недостатке power/heat нет частичной траты или новых наблюдений.
+Для simultaneous thrust scan используются actual TickResult powerSupplyW/powerDemandW,
+потраченный discharge rate и actual recharge того же completed interval, дополнительно ограниченные
+номинальным аппаратным margin. Новый beginAfterPropulsion не начисляет энергию и не повторяет
+охлаждение/движение; pulse применяет лишь surviving interval headroom. Превью переносит transient
+ввод в изолированную candidate authority, а confirmation сравнивает axis/braking до live tick,
+так что смена ввода не может сделать подтверждённый бюджет устаревшим после mutation.
+Только настоящий pulse создаёт анонимные SensorKnowledgeComponent measurements/tracks;
+presentation и restore ничего не измеряют. Сенсорные поля уже сохраняются в world v5/native v22;
+новый payload, объект станции, бюджет или изменение geometry/content fingerprints не вводятся.
+Динамическая позиционная оценка не помещается в immutable static-location archive: там
+по-прежнему нужны физическая стыковка либо действительно принятые advertised coordinates.
+
 Запрос пользователя от 2026-10-05: продолжать до полного завершения 23B.
 Канонический остаток — [stage23b_remaining_work.md](stage23b_remaining_work.md).
 Ветка: `stage23b-production-ui-consolidation`. Существующие незакоммиченные изменения сохраняются.
 Ручная приёмка назначена после всего этапа 23; автоматическая проверка её не заменяет.
+Запрос 2026-10-10 «до полного завершения 23B» принят как активная цель всего остатка.
+Ограниченный QA-отрезок и сохранение промежуточного полёта не являются концом этой цели.
+Для полного прибытия localFuelSearch запущен отдельный continuation до 4 млн реальных
+ticks с промежуточной записью каждые 100 тыс.; лог
+`target/stage23b-actual-local-fuel-search-completion.log`. Не запускать второй writer к
+`target/stage23b-actual-local-fuel-search.s25`, пока этот процесс работает.
+Одновременно запущено отдельное обычное получение производственного капитала из
+`target/stage23b-ordinary-yard-funding.s25`: 84 967 кр., собственный miner fleet:26,
+система 14, известные source/hub координаты, 4 742 813,40 кг реактивной массы.
+Output `target/stage23b-ordinary-production-capital.s25`, лог одноимённый `.log`.
+Цель рейса — 1 млн кг существующей metallic_ore, настоящий полёт/добыча/продажа;
+cruise 500 м/с, партии продажи ограничены фактической обработкой и ликвидностью.
+До итогового PASS заработок не считать полученным. Это отдельная ветка настоящего
+исторического прогресса; текущая приобретённая база и поисковый полёт не откатываются.
+Оба процесса пишут разные файлы. Не запускать конкурирующие writers к их outputs.
+Обновление: localFuelSearch **завершён**, actual DOCK hub.2 на tick 38299312,
+exact restore audit PASS, кошелёк 14 767 кр.; hub.2 теперь лично известен.
+Earning рейс физически прибыл на собственный известный участок и начал добычу.
+Для пересборки производительности он кооперативно сохранён на tick 13203991 (27 081,624 кг
+руды), без остановки посреди доменного такта/отката. Затем пройдены ещё 10 000 ticks
+на исправленном resolver; output tick 13213991. Миллион кг и продажа ещё не завершены.
+Полное продолжение требует устранить scale gap point cargo lots: каждый tick создаёт
+отдельный receipt, codec ограничен 100 тыс. rows. Нельзя стирать исходные даты или
+увеличивать предел вместо масштабируемого точного учёта. Следующий подшаг — lossless
+series representation, partial FIFO handling и версия сохранения с исторической совместимостью.
+
+Продолжение 2026-10-10: предложения существующих ресурсных карт показывают архивный вид
+сырья без неоплаченной навигации. На реальном v21 checkpoint оплачены карта проводников
+и существующая маршрутная карта (суммарно 200 кр., кошелёк 14 767 кр.). Личные пути:
+металлическая руда — 2→7→9→13→16→11→19→14; проводники — 2→7→8→3.
+У местного продавца отсутствует карта light_metal_minerals; три сырьевых пути не закрыты.
+В UI добычи подключены выбор кг, Shift/Ctrl и количество в журнале. 10 целевых тестов,
+Javadoc и packaging прошли; GPU-покупка карты и exact F8/F9 также прошли.
+Попытка реального вылета отклонена штатным onboard fuel preflight: известный маршрут
+с возможным снабжением не означает достаточное текущее топливо. Отдельный checkpoint
+`target/stage23b-actual-conductor-supply.s25` сохранён после UNDOCK, без добычи/доставки.
+Следующий зависимый шаг — обычное физическое снабжение корабля и продолжение доставки.
+
+Дополнительное продолжение 2026-10-10: read-only fuel audit подтвердил 87 643,15 кг
+reaction mass в miner, отсутствие воды в собственном трюме/industry.2 и отсутствие liquid
+storage у этой станции. Projected journey предполагает загрузку 709 584,44 кг на hub.2,
+который ещё неизвестен лично; диагностический удалённый stock не передан в personal knowledge.
+По цене 2,5 кр./кг такая покупка превышает текущие 14 767 кр. Местный dispatcher не имеет
+доступных station-map offers: purchases=0. На отдельном `target/stage23b-actual-fuel-access.s25`
+выполнен только обычный повторный DOCK в собственной industry.2; exact native reload прошёл.
+Для маршрута добавлена отдельная проверка onboard fuel первого прыжка, для SHIPS/supply —
+крупные шаги кг. Заправка, финансирование и обнаружение местного жидкого дока остаются
+игровыми зависимостями; никаких материалов/координат/денег при загрузке не выдано.
+Начат обычный поиск по заранее выбранному локальному origin waypoint, не по скрытой
+координате дока: 60 000 настоящих ticks, cruise 25 м/с, native checkpoint tick 34673641
+в `target/stage23b-actual-local-fuel-search.s25`. Exact restore/read-only audit прошёл.
+Дальнейшее прибытие, фактический контакт и заправка не заявлены. Итоговые 8 целевых
+тестов, Javadoc/package и RTX 4070 fuel UI/F8/F9 прошли; детали в журнале реализации.
+
+Актуальное продолжение 2026-10-09: компонентные партии и native v20 подключены;
+добавлен собственный перенос сырья LOAD_COMMODITY / UNLOAD_COMMODITY без оплаты.
+11 тестов, строгий Javadoc и packaging прошли. Реальный acquired checkpoint подтвердил
+1 кг existing ore → трюм → exact native reload → следующий такт → свой склад с лимитом
+3 ГБ; GPU-кнопки и F8/F9 прошли. Следующий зависимый шаг — обычное получение остальных
+материалов и их доставка для полного bill секции, затем подходящая действующая верфь.
+Детали и логи — в журнале реализации; завершение 23B не заявляется.
+Полная цепочка one-section bill проверена отдельным физическим тестом: 8 refining batches,
+3 component batches, сборка 1,5 млн кг, полная конечная работа и partial native reload каждого
+этапа. Добавлен собственный агрегированный supply plan и исправлены дробные списания на
+прежней точности 1e-9 кг. Итог: 23 теста, строгий Javadoc и packaging — BUILD SUCCESS.
+Тестовый feedstock/line fixture не закрывает обычное получение всех ресурсов и мощностей:
+реальный read-only аудит не нашёл действующей линии пяти недостающих рецептов в текущем файле.
+Следующее продолжение: управление всеми исходными собственными установками и режим 50 %
+штатных ресурсов подключены к owner/berth guards, UI, журналу и прежним native snapshots.
+6 целевых тестов, строгий Javadoc и packaging прошли. На настоящей базе подтверждены
+half/full и сохранение четырёх ресурсных сумм; GPU-кнопки и F8/F9 также прошли.
+100 кг существующей руды реально переработаны за 100 вместо 50 тактов, без выдачи progress.
+Продолжимый checkpoint — `target/stage23b-ordinary-half-rate-refining-restored.s25`:
+759,7472054745352 кг руды, 126 кг металла, rated bulk refinery, кошелёк 14 967 кр.
+Дальше требуется физическое решение получения недостающих установок/обработанных
+материалов: они отсутствуют в текущем мире, а их строительство само требует таких входов.
+Следующий срез разрывает строительный cycle отдельной batch-processing установкой:
+25 млн кг трёх обычных bulk-сплавов, 4 млн рабочих секунд, отключённый physical completion,
+явное включение из существующих station allocations. Default opening capital и прежние
+bills сохранены. Native v21 добавляет два проверяемых runtime content fingerprints.
+49 целевых/исторических тестов, Javadoc и packaging прошли; реальная база и GPU подтверждают
+совместимую существующую assembly, чистый отказ на missing bill и точный v21 save/load.
+Продолжимый файл — `target/stage23b-bootstrap-materials-v21.s25`, без нового сооружения.
+Дальше: добыча/доставка metallic/light-metal/conductor feedstocks, выпуск трёх строительных
+сплавов и обычное строительство/ввод периодической установки. 23B остаётся ACTIVE/PARTIAL.
 
 ## Порядок зависимостей
 
@@ -707,3 +919,445 @@ probe passed** на RTX 4070, heap 4 ГБ. Настоящий клиент F9 т
 QA-сохранения, журналы и графический снимок сохранены отдельно перед clean и восстановлены
 в `target`; снимок фактического исследованного участка —
 `target/stage23b-ordinary-mining-known-marker.png`.
+
+### Продолжение 2026-10-14: измеренная навигация и новая станция
+
+Закрыт переход из личной сенсорной строки на анонимную измеренную точку локальной карты,
+включая keyboard C focus, погрешность/возраст и отсутствие true target metadata.
+Bearing-only, потерянное received range evidence и другая система не дают координату.
+Пересекающиеся подписи больше не накладываются на выбранную. 13 целевых тестов,
+Javadoc/package прошли; настоящий measured checkpoint и RTX 4070 F8/F9 — PASS.
+
+Отдельный обычный новый старт seed 1 с оплаченной покупкой fleet:7 затем прошёл
+63766 общих физических ticks: реальные radar pulses, guidance только по полученным
+range/bearing estimates, подход и DOCK ранее неизвестного hub.16. Проверено отсутствие
+цели в исходном личном архиве/discoveredObjects, точный composed native round trip и
+GPU keyboard focus/F8/F9. Исторические сохранения не изменялись. После стыковки нет
+доступных industrial map offers; кошелёк 75000 кр., 0 покупок, отдельный PARTIAL output.
+
+Подробные журналы, snapshots и различие промежуточной полной регрессии (2648 tests,
+JaCoCo/Javadoc/package) и последующей целевой проверки — в
+[журнале реализации](stage23b_production_ui_consolidation.md).
+Этап остаётся **ACTIVE/PARTIAL**; полный актуальный перечень —
+[канонический остаток](stage23b_remaining_work.md).
+
+### Продолжение 2026-10-14: физическое состояние малых аппаратов (PARTIAL)
+
+Native v25 сохраняет отдельные точные координаты и скорости уже выпущенных аппаратов.
+Чтение v1–24 оставляет этот раздел пустым: позиции, аппараты и завершённые вылеты
+не выводятся из старых миссий. Общий неизменяемый инженерный каталог объединяет
+принятые определения грузовых кораблей и аппаратов без изменения физических параметров.
+Движение аппарата использует существующий PlayerDirectControlSystem на общем world tick.
+Завершённый deck cycle освобождает отсек только при явной актуальной физической проекции
+устья запуска; стандартный пустой provider сохраняет ожидание handoff. Ретаск сохраняет
+происхождение вылета; подтверждённая потеря сразу удаляет физический маркер и однократно
+пишет личное событие. Личная карта и список кораблей показывают только доказанно свои
+аппараты и не раскрывают opaque цели миссий.
+
+Целевая проверка: target/stage23b-native25-local-flight-verify.log — 37 tests,
+0 failures/errors/skips, Javadoc/package PASS. Проверка GPU RTX 4070:
+target/stage23b-native25-local-flight-graphics.log — клавиатурный выбор аппарата,
+фокус C, точные F8/F9 на паузе и отдельный реальный такт движения, PASS.
+Сохранение target/stage23b-native25-local-flight-graphics-paused-fixture.s25 и снимок
+target/stage23b-native25-local-flight-focus.png используют ЯВНО заданные produced/deployed
+craft и геометрию; обычное приобретение или запуск этим не подтверждены.
+Полная регрессия этой версии ещё выполняется; результат будет записан отдельно.
+
+Открыты обычное приобретение носителя/аппаратов, личные команды, авторская физическая
+геометрия запуска/приёма, маневрирование и последствия миссий, снабжение/замена и
+самостоятельное личное владение аппаратом после утраты/продажи носителя.
+Этап 23B остаётся ACTIVE/PARTIAL; этот срез не закрывает пункт 5 целиком.
+
+Продолжение этого среза: физический deck recovery теперь согласован с local-flight owner.
+Пока фактический приём стоит в очереди и отсек недоступен, аппарат остаётся снаружи,
+движется и сохраняется с RECOVERY_PENDING. Когда существующий deck owner принимает
+его в RECOVERING, отдельная позиция удаляется без второго такта движения; окончание
+конечной обработки переводит миссию в COMPLETE, оставляя аппарат SERVICING.
+Топливо, боезапас, деньги и новая identity не выдаются. Личный журнал фиксирует приём
+в ангар один раз. Новый runtime-тест покрывает ожидание, reload, приём и завершение;
+составной native-тест — точное восстановление очереди и движение при недоступном отсеке.
+Геометрия recovery gate в этих тестах задана явно; обычный вход в приёмный шлюз ещё открыт.
+
+Первая полная регрессия v25: 2659 tests, 7 failures, 0 errors, 1 штатный skip.
+Все семь failures относятся к общему helper старых файлов: он ожидал EOF сразу после
+crew payload и не учитывал новый local-flight payload. Helper теперь проверяет и удаляет
+только пустой раздел; действующую физическую позицию он отбрасывать запрещает.
+Повторная историческая проверка target/stage23b-native25-historical-fixture-verify.log:
+28 tests, 0 failures/errors/skips, Javadoc/package BUILD SUCCESS.
+Настоящее старое сохранение неизвестной станции прошло GPU keyboard focus/F8/F9
+на v25: target/stage23b-native25-historical-graphics.log, без геометрических fixture.
+
+Последующее согласование физического приёма проверено составной цепочкой и native restore
+внутри RECOVERING/SERVICING; событие приёма однократно, COMPLETE наступает на общем такте.
+Актуальные целевые проверки: 25 и 19 tests, Javadoc/package PASS; GPU повторно PASS.
+Первая полная recovery-регрессия выявила один повторный ручной COMPLETE в старом тесте;
+после исправления автоматическое завершение и прежние физические проверки сохраняются.
+Полная повторная регрессия: target/stage23b-native25-final-full-verify.log (выполняется).
+На обычной стыковке нового пилота у hub.16 диспетчер доступен, предложенных контрактов 0.
+Отдельное продолжение реальной добычи продало ещё 947 кг за 17046 кр., затем конечный
+бюджет покупателя остановил продажу; кошелёк 119988 кр., точный reload отдельного файла PASS.
+Подробные свидетельства и границы — в журнале реализации; 23B по-прежнему ACTIVE/PARTIAL.
+
+### Итог текущей регрессии 2026-10-14
+
+Актуальная полная проверка target/stage23b-native25-final-full-verify.log:
+**2661 tests, 0 failures, 0 errors, 1 штатный skip**, BUILD SUCCESS за **11:07**
+(17:22:14 +03:00). JaCoCo: все coverage checks выполнены; Javadoc/package PASS.
+Включены исправления исторических fixture, автоматический recovery COMPLETE и составное
+native восстановление во время приёма, однократный журнал и неизменные конечные consumables.
+Это полная регрессия текущей реализации, не финальный clean verify всего законченного 23B.
+Статус этапа остаётся **ACTIVE/PARTIAL**, восемь обязательных блоков остатка не закрыты целиком.
+
+2026-10-14: игроковая отмена queued запуска подключена к SHIPS, клавиатуре,
+pure single-use preview, общему mission/deck validator и однократному журналу.
+После физического вылета отмена запрещена; текущий аппарат/расходники сохраняются.
+Целевые 10 tests и GPU keyboard preview/confirm/F8/F9 прошли на явно заданной очереди.
+Обычное приобретение носителя/аппарата и остальные миссии по-прежнему открыты.
+Карточка аппарата дополнительно очищается от технических design/bay IDs и enum-статусов.
+Подробности и границы доказательства — в журнале реализации.
+
+Итог текущего продолжения: полная регрессия команды аппарата — 2663 tests,
+0 failures/errors, 1 штатный skip; покрытие/Javadoc/package PASS (13:13).
+Последующие понятные подписи карточки проверены отдельно: 21 tests и повторный GPU
+keyboard preview/confirm/F8/F9 PASS. Полный этап этим результатом не заявляется закрытым.
+Обычное ожидание у hub.16 продвинуло мир ровно на 30000 тактов (63766 → 93766),
+кошелёк сохранил 75000 кр.; доступный диспетчер по-прежнему не предлагает контрактов
+или промышленных карт. Все выходы отдельные, точное восстановление подтверждено.
+Для остальных carrier-миссий остаются физические link context/план манёвра и авторское
+устье запуска; текущий принятый datalink задаёт каналы, но намеренно не задаёт дальность.
+Подробные журналы и границы доказательства — в журнале реализации. Статус ACTIVE/PARTIAL.
+
+### 2026-10-14: реальные остатки добытого образца в личной разведке
+
+Карточки ресурсных открытий в INTELLIGENCE дополнены материалом, оставшейся массой
+в собственных трюмах и временем самого раннего/позднего сохранившегося поступления.
+Источник — существующие CargoLotState и ExtractionReceiptSeries; проекция не читает
+точные запасы или состав месторождения. Учитываются только собственные корабли,
+точный личный extraction order и provenance. Купленный, чужой, проданный и выгруженный
+груз исключён. Погашенные квитанции не возвращаются в расчёт массы; FIFO использует
+время оставшейся головной квитанции. Серии не разворачиваются в отдельные поступления.
+
+Дополнение доступно только существующему личному наблюдению RESOURCE_OCCURRENCE
+с RESOURCE_INDICATION или выше. Груз не создаёт новое открытие или ResourceEstimate.
+После расходования образца сохраняется архивное свидетельство с пояснением отсутствия
+груза на собственных кораблях. Исходное время наблюдения не обновляется.
+Каталог материалов кэшируется в проекторе; формат сохранения не меняется.
+
+target/stage23b-extraction-sample-ui-tests.log: **15 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, Java 17, 32.122 с. Проверены личная собственность, provenance,
+несколько кораблей, FIFO с миллионной серией, отсутствие знания/NONE, расходование
+образца, неизменность checkpoint при проекции и точный native restore игровой добычи.
+Независимый reviewer проверил этот срез; замечания по каталогу и покрытию устранены.
+target/stage23b-extraction-sample-ui-javadoc.log: строгий Javadoc **BUILD SUCCESS**, 15.956 с.
+Полная регрессия и GPU-проверка этого дополнения не выполнялись. Количественное
+исследование месторождения остаётся открытым: авторская модель измерителя состава,
+запаса и погрешности отсутствует. Статус **23B ACTIVE/PARTIAL**.
+
+### 2026-10-14: игроковая загрузка боезапаса собственной станции
+
+LOAD_AMMUNITION использует действующую физическую стыковку лично принадлежащего idle
+корабля у собственной станции. Целые патроны выбранного установленного кинетического
+орудия списываются из конечного product stock через Stage19WarfareSupplyService и
+поступают в прежний ConsumableState. Привязанный WeaponLoadoutState, damage, maintenance,
+энергия и тепло сохраняются; деньги, боеприпасы или готовность не выдаются.
+Непривязанные, несовместимые и уничтоженные орудия не получают пополнения; отказ
+одного магазина не закрывает другой корректный магазин. Полный существующий adapter
+по-прежнему проверяет все боевые орудия; servicing использует проверку выбранного mount.
+
+Владение и реальная геометрия проверяются до раскрытия склада. Служба проверяет
+существующие authored массу/геометрию патрона, fitted feed capacity и предел массы
+корпуса. Масса партии ограничена общим endpoint mass rate; отдельный патрон — max unit
+mass. Ремонт, переоснащение и перенос оборудования/изделий исключают одновременную
+загрузку. journal фиксирует фактическое исполнение в штуках и расход handling interval;
+повторная загрузка/commodity handling того же такта запрещены и после native restore.
+
+Runtime product vocabulary дополнен существующими core/small-craft ammunition IDs
+через withAmmunitionCatalog(STAGE22_AUTHORED). Это регистрация ранее авторских изделий,
+без изменения тел боеприпасов, recipes, starting stock или формата ConsumableState.
+Во вкладке SHIPS добавлены own-berth rows, кнопки -/+ ШТ., pure single-use preview и
+confirm. На паузе применяется только доступная обработка уже завершённого интервала.
+
+Целевые проверки до последнего max-unit-mass guard:
+target/stage23b-personal-ammunition-final-tests.log — **17 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, 35.780 с. Проверены консервация stock/count/mass и идентичности,
+empty/foreign/remote/unbound/incompatible отказы, переполнение магазина при достаточном
+stock, предел корпуса, уничтоженное оружие, сохранение использованного handling, обратный порядок
+commodity→ammo, native reload, одно событие и расход патрона общим AmmunitionRuntime.
+Независимый reviewer подтвердил устранение случая смешанных магазинов и отсутствие
+оставшихся блокирующих замечаний этого среза; итог зависит от полной регрессии.
+
+target/stage23b-personal-ammunition-graphics.log — **RTX 4070 PASS**: клавиатурные
+количество/preview/confirm, одно событие, неизменность денег и точные F8/F9.
+target/stage23b-ammunition-graphics-fixture.s25 использует явно заданные weapon fit,
+own-station, четыре патрона и berth; обычное приобретение не заявляется.
+Снимки target/stage23b-ammunition-preview.png и target/stage23b-ammunition-loaded.png
+визуально проверены: 0→1 патрон в магазине, 4→3 на складе, поля и кнопки читаемы.
+Полная регрессия последнего исходного состояния:
+target/stage23b-personal-ammunition-full-verify.log — **2673 tests, 0 failures/errors,
+1 штатный skip**, **BUILD SUCCESS**, Java 17, -Ptest-parallel verify, **15:04**
+(23:15:35 +03:00). JaCoCo: все coverage checks выполнены; строгий Javadoc и package PASS.
+Включены последний max-unit-mass guard, предыдущий срез отображения образцов и
+унаследованное рабочее состояние 23B. Это полная регрессия текущего дерева, не итоговый
+clean verify завершённого 23B. Статус **23B ACTIVE/PARTIAL**.
+
+### 2026-10-15: партии боеприпасов в личном производстве
+
+В INDUSTRY добавлены Union 140 кг и Empire 150 кг патроны с существующим общим
+manufacturing.profile.kinetic_ammunition. Runtime-композиция получила только готовый
+Empire product binding; профиль, fractions/energy/work/maintenance и Stage18 default
+fingerprint не изменены. Новых рецептов, запасов или производственных возможностей нет.
+Small-craft ammo не предлагаются без подтверждённых manufacturing bindings.
+
+Выбор партии использует отдельный счётчик целых патронов, кнопки -/+ ШТ. (Shift — 100,
+Ctrl — 10 000), точную массу и полный bill материалов. Новое количество сбрасывает
+прошлый preview. START_MANUFACTURING передаёт выбранный count в прежнюю очередь;
+другие секции по-прежнему заказываются по одной. Работающий заказ показывает собственный
+requestedUnits, резерв и completedFraction, независимо от нового выбора количества.
+Готовая партия поступает целиком; отмена возвращает материальный резерв при наличии места,
+не возвращая работу. Отсутствующая/выключенная линия не подменяется номинальной мощностью.
+
+Транзакционные тесты создают отдельный явный fixture: существующая собственная
+физическая стыковка и оружие; конечный donor для bill конструкции ordnance; явный
+construction-work budget, реальный следующий world tick, adoption выключенной установки
+и распределение существующих station resources. Материалы патронов также заданы конечным
+донором. Это проверка общей цепочки исполнения, не обычное получение этих активов.
+Обе партии по три патрона проходят pure preview/confirm, полный reserve, partial native
+save/load и одинаковое продолжение до выпуска. Изготовленный Empire патрон затем
+загружается в прежний магазин через LOAD_AMMUNITION. Два параллельных ammo orders
+расходуют один energy budget; отмена после partial reload возвращает reserve ровно один раз.
+
+target/stage23b-ammunition-manufacturing-verify.log: **24 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, Java 17, **56.935 с**, строгий Javadoc и package PASS. Это целевой verify
+с -Djacoco.skip=true; глобальное покрытие и полная регрессия дерева здесь не заявляются.
+Предыдущая полная регрессия 2673 tests относится к состоянию до этого производственного среза.
+
+target/stage23b-ammunition-manufacturing-graphics.log: **RTX 4070 PASS, exit 0** — keyboard
+count/preview/confirm, сброс stale preview при смене партии, резерв ровно трёх патронов,
+настоящий partial tick, exact F8/F9 и отмена без готового выпуска. Снимки
+target/stage23b-ammunition-manufacturing-preview.png и
+target/stage23b-ammunition-manufacturing-partial.png визуально проверены: 3 шт. / 450 кг,
+исходные materials и reserve, 0.56% выполненной работы, читаемые кнопки и счётчик.
+Независимый reviewer не нашёл блокирующих замечаний; уточнение текста отмены применено.
+Обычный путь строительства/ввода ordnance и получения сырья остаётся открытым.
+Статус **23B ACTIVE/PARTIAL**.
+
+## Продолжение 2026-10-15: отдельное личное владение аппаратами
+
+Native v26 хранит отдельный ограниченный реестр personalCraftOwnership. Связь крыла,
+юридический оператор и владение носителем больше не создают право собственности на аппарат.
+Смена/потеря носителя сохраняет личный аппарат на карте и в списке; командная доступность
+по-прежнему проверяет существующий законный носитель и физическое состояние.
+Утрата самого аппарата сохраняет историческое право без создания замены. Передача права
+отзывает доступ и инвалидирует старое подтверждение. Журнал launch/recovery/loss проверяет
+право на аппарат и допускает отсутствие собственного носителя. Player/world composition
+сохраняет реестр. Не выделенные allocator ID и дубликаты отклоняются; v1–25 получают пустой
+реестр, без вывода приобретений из чужих/старых wings. Trusted composition boundary принимает
+явный результат приобретения/передачи; обычный игровой путь приобретения ещё требуется.
+
+Проверка: `target/stage23b-personal-craft-property-verify.log`, **21 tests, 0 failures/errors/skips,
+BUILD SUCCESS**, строгий Javadoc/package, целевой прогон без JaCoCo. Независимое ревью
+выявило и исправлено стирание реестра при world transition и допуск будущих craft ID.
+RTX 4070: `target/stage23b-personal-property-local-flight-graphics-v26.log`, **PASS**:
+keyboard focus собственного аппарата, F8/F9 до/после общего физического такта. Аппарат,
+вылет и координата в этой проверке явно заданы fixture; обычное получение/вылет не заявлены.
+
+Обычная навигация: предыдущий вывод об отсутствии промышленной цели у нового пилота
+исправлен. В личном seller briefing уже присутствует `industry.2` (system 2), цена 70 000 кр.
+при кошельке 75 000 кр. QA ошибочно искал только текущую систему 16. Исправленная проверка
+использует существующий личный архив независимо от системы: 0 покупок карт, точный native
+reload, `target/stage23b-ordinary-new-pilot-industrial-map-audit-v26.log`, **PASS**. Полный
+личный маршрут пока отсутствует: известны системы [2,16]. Нулевые station map offers здесь
+корректно подавляют повторную продажу уже известных координат. Полёт/покупка этим логом
+не доказываются. Новый journey исследует только опубликованные production UI выходы,
+затем использует планировщик по лично открытым системам; скрытый topology itinerary не передаётся.
+
+23B остаётся ACTIVE/PARTIAL: обычные supply/bootstrap, новые промышленные станции,
+quantitative surveys, реальные carrier missions, strategic operations и финальная регрессия
+должны быть завершены отдельно. Ручная приёмка остаётся после всего этапа 23.
+### Уточнение обычного bootstrap, 2026-10-15
+
+На настоящей новой ветке завершены опубликованные UI-переходы 16→11 (tick 1 730 523)
+и 11→18; затем начат 18→13. `target/stage23b-ordinary-industrial-explored-navigation-v26.log`
+и `...-next.log` подтверждают реальную физическую работу и точный reload bounded результатов;
+это не полный маршрут/покупка. FTL после прибытия требует 299 настоящих тактов готовности,
+которые QA теперь ожидает, без сброса cooldown. Продолжение читает сохранённый незавершённый
+прыжок; промежуточные файлы записываются каждые 100 000 тактов.
+
+Промышленный аудит выявил дополнительный обязательный остаток, а не завершение bootstrap:
+у `industry.2` нет `storage.liquid_tank`. Установка bootstrap предоставляет chemical capability,
+но не физическую ёмкость. `refining.industrial_chemicals` требует 55% carbonaceous и 45%
+volatile feedstock; второй вход нельзя разгрузить на эту базу. Наличие interface у facility
+не создаёт станционные танки. Для bootstrap25M базовая bill требует 15M structural alloy,
+6.25M light alloy и 3.75M conductor metal; при нулевом запасе это не менее 22 058 824 кг
+metallic ore, 11 574 075 кг light-metal minerals и 5 952 381 кг conductor ore.
+
+Существующие `refinery_complex` имеют жидкий склад 10M кг, bulk/chemical структуры и цену
+180 000 кр.; `frontier_multipurpose` — жидкий склад 20M кг и цену 200 000 кр. Но большинство
+таких generated endpoints сейчас представлены только storage/handling: промышленный реестр
+содержит единственную специализированную `industry.2`. Проверка цены обращается к отсутствующему
+industrial node. Поэтому нужны согласованные покупка/промышленный admission существующего
+endpoint и сохранение единственного владельца его склада. Регистрация шаблонных структур
+должна оставлять их выключенными без operating allocations; источники энергии/персонала/
+обслуживания остаются отдельной обязательной задачей. Изменять frozen generation rows,
+исторические bootstrap fingerprints или выдавать запасы для обхода этого разрыва нельзя.
+Указанные типы/экземпляры — диагностические данные, не личные знания нового пилота.
+Полная регрессия после v26 и исправления historical fixtures завершена:
+`target/stage23b-personal-property-full-verify-fixed.log` — **2680 tests, 0 failures/errors,
+1 штатный skip, BUILD SUCCESS**, JaCoCo thresholds, строгий Javadoc и desktop package PASS
+(2026-10-15 13:52:38 +03:00). Первый диагностический полный прогон выявил 9 падений framing/
+release-doc checks; они исправлены, повторный прогон полностью зелёный. Основной код после
+этого прогона не изменён. Проверена текущая рабочая копия с незакоммиченными изменениями;
+это не exact-head CI и не финальный isolated clean verify всего завершённого 23B.
+### Продолжение 2026-10-16: pending handling при admission
+
+Исправлен composed validator частичной обработки личного модуля: вместо поиска оператора
+только в industrial specialization module-only path проверяет настоящий ECS-владелец,
+существующую экономику, canonical civilian placement и точный berth. Repair/refit/product
+default остаётся строгим. На existing frontier с реальными oversized storage/handling
+проверены явно заданная historical custody, partial work, обычная покупка, exact reload,
+completion/cancel без дублирования массы/денег и отсутствие faction/docking/дистанция 5000 м.
+23 целевых теста PASS, независимое ревью без блокирующих замечаний. Полная регрессия:
+`target/stage23b-pending-admission-full-verify.log` (выполняется).
+Это закрывает отдельную проверку admission/pending module handling; обычный старт обработки
+на ещё не зарегистрированной станции и весь промышленный bootstrap не заявляются закрытыми.
+Подробности — [описание admission](stage23b_existing_station_industrial_admission.md).
+
+Обычная навигация продолжена runtime v27 из точного migrated v26 checkpoint с heap 6 GiB
+и бюджетом 10 млн настоящих тактов: `target/stage23b-ordinary-industrial-navigation-v27-continuation.log/.s25`.
+Исходный файл сохраняется; промежуточные контрольные записи выполняются каждые 100000 тактов.
+Результат незавершённого прогона не считается прибытием или покупкой станции.
+### Подтверждённые результаты 2026-10-16, 00:25 +03:00
+
+Полная регрессия handling/admission завершена: `target/stage23b-pending-admission-full-verify.log`,
+**2688 tests, 0 failures/errors, 1 штатный skip, BUILD SUCCESS** (13:22), coverage,
+строгий Javadoc и package PASS. Это текущая рабочая копия до следующей политики initial
+station legal capital, а не финальный isolated clean verify всего 23B.
+
+Реальный ordinary пилот из сохранения v26 продолжил путь в runtime v27: опубликованные
+UI exits и лично известные маршруты привели в system 2 на tick 26357162; exact native reload
+PASS (`target/stage23b-ordinary-industrial-navigation-v27-continuation.log`). Затем физическое
+сближение по уже полученным личным координатам, dock и обычный `PURCHASE_STATION` завершились
+на tick 27200080: `industry.2`, цена 70000 кр., остаток 5000 кр., conserved seller treasury,
+неизменная физическая industry/fleet, exact reload PASS
+(`target/stage23b-ordinary-industry2-acquisition-v27.log`). Денег, координат и berth fixture
+в этом продолжении нет. Обычный ввод химической цепочки и строительство yard ещё открыты.
+### 2026-10-16: initial station legal capital — full gate
+
+Отдельная политика `stage23b.initial-npc-station-legal-capital.v1` реализована для новых
+кампаний: ограниченные существующие refinery/frontier получают настоящих NPC-операторов,
+только owner-local архив и местного диспетчера. Старый explicit baseline и restore сохраняют
+отсутствие владельца; деньги/stock/geometry/operating allocations не создаются. Один план
+используется в preview и commit; условия старта показывают только число назначений.
+Назначенный экономический владелец не меняется вслед за поздним territorial fallback.
+
+`target/stage23b-initial-station-capital-full-verify.log`: **2690 tests, 0 failures/errors,
+1 штатный skip, BUILD SUCCESS**, 14:52, 2026-10-16 09:27:48 +03:00; JaCoCo thresholds,
+строгий Javadoc и desktop package PASS. Независимое read-only ревью без блокирующих находок.
+Реальный acquired checkpoint `industry.2` проверен после этой policy: exact restore и один
+общий такт без изменения кошелька/флота, `target/stage23b-real-acquired-station-current-policy-integrity.log`.
+Этот gate относится к initial legal capital до последующих storage v28/FIFO изменений. Рабочая копия содержит inherited uncommitted changes,
+не exact-head CI и не финальный isolated clean gate всего 23B.
+
+Подробности: `docs/ui/stage23b_initial_station_legal_capital.md`. Следующий промышленный
+разрыв — оплачиваемое расширение liquid storage работающей станции; контракт зафиксирован
+в `docs/ui/stage23b_paid_liquid_storage_expansion.md`, **реализация ещё отсутствует**.
+Обычный ресурсный маршрут с low-fuel шахтёром остаётся PARTIAL, безопасные выходы не найдены;
+QA не выдаёт топливо/координаты. Все восемь широких блоков остатка 23B остаются открытыми.
+### 2026-10-16: bounded small-craft production vocabulary
+
+`Stage23SmallCraftProductionCatalogs` adds exactly seven existing M22.8J module IDs,
+their authoritative engineering masses, seven bindings to existing manufacturing family
+profiles, and the two compact hull / seven module service profiles. Historical Stage22
+loaders remain unchanged. `withEngineeringModules` selects explicit IDs from a larger
+engineering universe and rejects unknown, repeated and already registered identities
+without changing the original registry. No inventory, funds, operating resources or work
+are created. The campaign runtime is not switched to this catalog yet: persistent paid
+BUILD_SMALL_CRAFT escrow, shared yard work, physical delivery and ownership integration
+remain necessary before claiming the playable acquisition path.
+
+`target/stage23b-small-craft-catalog-manufacturing-tests.log`: 10 tests PASS, including
+all seven full material bills, refusal without work and refusal to reuse spent work/material.
+The test supplies explicit materials and capabilities; this is not ordinary acquisition.
+Independent read-only review found no blockers. Full gate:
+`target/stage23b-small-craft-catalog-full-verify.log` — PASS; final result below.
+### Ordinary paid resource navigation: PASS, 2026-10-16
+
+`target/stage23b-ordinary-new-pilot-resource-navigation-resumed-v28.log` reached
+system 3 on tick 40537628, using only personally known routes and published UI exits.
+The target is the previously purchased report
+`source.stage20e.s3.resource.3.0.occurrence.conductors.commodity.feedstock.conductor_ore`.
+The ordinary pilot checkpoint reloaded exactly; no assets or money were granted.
+This closes the system-navigation leg for this paid report, not mining or quantitative survey.
+The separate physical approach now runs from that preserved arrival checkpoint:
+`target/stage23b-ordinary-paid-resource-physical-visit-v28.log/.s25`.
+Its guidance reads only the saved personal waypoint; no approach completion is claimed yet.
+Ordinary physical approach completed: `target/stage23b-ordinary-paid-resource-physical-visit-v28.log`
+— **PASS**, tick 41500311, distance 249.99868551598124 m after 962683 actual flight ticks.
+Guidance used the purchased personal waypoint, with ordinary thrust and braking. Exact native
+reload passed. The wallet, owned fleets, resource knowledge and original report evidence were
+preserved; no extraction or deposit survey was fabricated. The paid map → published-exit
+navigation → local physical approach chain is now demonstrated. Cargo-only equipment does
+not gain mining capability from visiting the site.
+Ordinary system-3 local exploration also reached a real station without using its hidden
+coordinate: `target/stage23b-ordinary-resource3-origin-search-complete-v28.log` — PASS.
+After the predetermined origin search and actual braking, DOCK hub.3 committed at tick
+43523559. Original resource-visit and intermediate search checkpoints remain preserved.
+The station has actual water stock; no refueling transaction has been claimed.
+`target/stage23b-ordinary-hub3-npc-contract-audit-v28.log` is a pure local audit: wallet
+4900 credits, empty personal cargo, zero accessible NPC contacts/contracts in this historical
+campaign. No new dispatcher or offer was injected to turn this visit into contract acceptance.
+Full gate completed: `target/stage23b-small-craft-catalog-full-verify.log` —
+**2701 tests, 0 failures, 0 errors, 1 skip; BUILD SUCCESS**, 25:12,
+2026-10-16 14:53:00 +03:00. Coverage thresholds, strict Javadoc and package passed.
+This result supersedes the running gate status above. Independent catalog review found
+no blockers. No production source changed after this gate started; later changes were
+QA journey code and documentation. Stage23B remains ACTIVE/PARTIAL: this catalog slice
+does not complete persistent small-craft construction, physical delivery or the other
+remaining acceptance blocks. Native format remains v28.
+
+## 2026-10-16: сохранённое строительство малого аппарата
+
+Реализована paid build queue с полным материальным резервом, реальными общими тактами
+верфи, отменой нетронутого заказа и отдельной приёмкой готового пустого аппарата.
+Native v29 сохраняет очередь и точно мигрирует настоящий checkpoint v28 без выдач.
+Прошли целевые проверки завершения, совокупного складского резерва, подделок и повторного
+использования номера отменённого заказа; строгий Javadoc прошёл. Полный verify выполняется:
+target/stage23b-small-craft-build-native29-full-verify.log. Обычное получение полного bill,
+физическая доставка и прочий канонический остаток 23B остаются открытыми.
+
+## Current native29 production gate — 2026-10-16 20:13:13 +03:00
+
+Full mvn -Ptest-parallel verify completed: target/stage23b-small-craft-build-native29-full-verify.log,
+2714 tests, 0 failures, 0 errors, 1 expected skip, BUILD SUCCESS, 18:11.
+Both coverage files were merged, JaCoCo thresholds passed, strict Javadoc and desktop package passed.
+This supersedes preceding in-progress entries and includes the central typed/file legacy guard,
+module-card names, cancelled-order cache reuse fix and conserved available-yard allocation.
+Independent reviews found no remaining blockers for these slices. Builder affiliation stays locked
+until CLAIM or valid cancellation; ordinary affiliation preview refuses safely without live mutation.
+No production source changed after the successful gate began. Subsequent changes are QA/test
+continuation and documentation. This dirty working-copy gate is not exact-head CI or whole23B RC
+acceptance. Stage23B remains ACTIVE/PARTIAL; ordinary material chains, delivery and other broad
+acceptance blocks remain open.
+
+## Generated NPC supply composition — 2026-10-16 20:23:47 +03:00
+
+GeneratedCampaignNpcSupplyOffersTest now verifies the previously missing successful composed
+cycle: real freight loss and actual shortage observation fund a generated proposal; player
+ACCEPT takes1kg; PURCHASE buys the existing idle NPC mining vessel; START_MINING produces
+external cargo from an existing finite FREE_BODY source over completed ticks; ordinary SELL
+creates/consumes the delivery receipt and completes the contract. Source reserve decreases,
+cargo loses1kg, recipient stock gains1kg, sale income and held bonus are paid exactly, issuer
+treasury is not charged again, and reputation/journal completion occur once. Journal money sums
+match the actual wallet delta. Exact native reload and the next tick do not replay the bonus.
+
+Targeted gate: target/stage23b-npc-generated-offer-ordinary-sale-composition.log —1test PASS,
+0 failures/errors,38.477s. This expands an existing test after the2714-test production gate;
+production sources remain unchanged. Independent read-only review found no blockers.
+This is composed integration, not ordinary journey evidence: destruction/review invocation and
+travel/source geometry are explicit fixtures. NPC, proposal, cargo and escrow are not injected
+in the new successful-cycle helper. Historical zero-roster campaigns receive no new NPCs.
+Full ordinary NPC continuation without those fixtures remains open.
+
+Физический путь шахтёра к industry.2 продолжен из сохранённого движения через систему8. Файл `target/stage23b-actual-miner-system8-to-industry2-native29.s25` сохраняет ещё 2000000 реальных тактов, результат PARTIAL/TICK_BUDGET, прибытие не заявляется. Следующий участок пишет отдельный `target/stage23b-actual-miner-system8-transit2-to-industry2-native29.s25` на неизменном проверенном runtime `target/qa/stage23b-native29-2714-flight-runtime.jar`. Деньги, топливо и исходные сохранения не подменяются.
+
+2026-10-17: локальная охрана прошла полный `mvn -Ptest-parallel verify`:2722tests/0failures/0errors/1skip, JaCoCo/Javadoc/package PASS,18:40; `target/stage23b-local-guard-full-verify.log`. Целевые12PASS; reviewer blockers отсутствуют. Базовый полный2714PASS заменён новым2722PASS для текущего production-кода. Обычный маршрут кindustry.2 всё ещё PARTIAL: tick49929023,система3,339739.807kgтоплива,физическая местная дозаправка ещё требуется.

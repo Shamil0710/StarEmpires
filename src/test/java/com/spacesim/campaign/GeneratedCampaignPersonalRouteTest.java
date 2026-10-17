@@ -11,6 +11,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("slow")
 class GeneratedCampaignPersonalRouteTest {
+    @Test void projectedStationRefuelingDoesNotAuthorizeDepartureWithAnEmptyOnboardTank() {
+        var campaign = knownSystemsFixture();
+        var world = campaign.coordinator().runtime().world();
+        var p = campaign.playerState().orElseThrow();
+        var fleet = world.findFleet(p.activeFleetId()).orElseThrow();
+        var fitted = world.findSession(fleet.systemId()).orElseThrow().getEntityRegistry().require(fleet.localEntityId())
+                .getComponent(com.spacesim.components.EngineeringComponent.class);
+        var old = fitted.runtimeState;
+        var stores = old.consumables();
+        // Explicit spent-tank fixture; no station stock, knowledge or cargo is created here.
+        var loads = stores.interfaceLoads().stream().map(l -> l.kind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.REACTION_MASS
+                ? new com.spacesim.ship.ShipEngineeringState.ConsumableLoad(l.mountId(), l.interfaceId(), l.kind(), 0, 0, l.itemCount()) : l).toList();
+        fitted.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(
+                new com.spacesim.ship.ShipEngineeringState.ConsumableState(stores.cargoMassKg(), stores.storesMassKg(),
+                        stores.missionPayloadMassKg(), stores.missionIntegrationVolumeM3(), loads),
+                old.sharedBusEnergyJ(), old.shipHeatStoredJ(), old.localHeatJByMount(), old.thrustLimitNByMount(),
+                old.coolantBusCapacityW(), old.ftlCooldownSecondsByMount()));
+        var before = campaign.captureState();
+        var destination = world.getTopology().neighbors(fleet.systemId()).get(0);
+        var preview = campaign.previewPilotRoute(destination).orElseThrow();
+        assertFalse(preview.firstHopFuel().feasible());
+        assertFalse(preview.departure().allowed());
+        assertThrows(IllegalStateException.class, () -> campaign.submitPilotAction(preview.departure()));
+        assertEquals(before, campaign.captureState());
+    }
     @Test void undiscoveredDestinationsAndCurrentSystemDoNotProduceRoutesOrMutateKnowledge() {
         var campaign = FoundedCampaignFixture.restore();
         var player = campaign.playerState().orElseThrow();
@@ -33,6 +58,7 @@ class GeneratedCampaignPersonalRouteTest {
         var preview = campaign.previewPilotRoute(destination).orElseThrow();
         assertTrue(preview.departure().allowed());
         assertEquals(java.util.List.of(origin, destination), preview.route().path());
+        assertEquals(world.planFleetRouteFuel(player.activeFleetId(), java.util.List.of(origin, destination)), preview.firstHopFuel());
         assertEquals(baseline, campaign.captureState());
         var foreign = Stage228CampaignAuthority.restore(baseline);
         assertThrows(IllegalStateException.class, () -> foreign.submitPilotAction(preview.departure()));
@@ -67,6 +93,7 @@ class GeneratedCampaignPersonalRouteTest {
         var before = campaign.captureState();
         var again = campaign.previewPilotRoute(preview.route().path().get(preview.route().path().size() - 1)).orElseThrow();
         assertEquals(preview.route(), again.route());
+        assertEquals(preview.firstHopFuel(), again.firstHopFuel());
         assertEquals(before, campaign.captureState());
         campaign.submitPilotAction(preview.departure());
         assertEquals(preview.route().path().get(1), world.findFleetJump(player.activeFleetId()).orElseThrow().destinationSystemId());

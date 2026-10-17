@@ -26,6 +26,21 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
             ComponentMapper.getFor(PlayerControlledComponent.class);
     private final ComponentMapper<TransformComponent> transformMapper =
             ComponentMapper.getFor(TransformComponent.class);
+    private EngineeringComponent lastExactComponent;
+    private com.spacesim.ship.ShipEngineeringRuntime.TickResult lastExactResult;
+
+    /** Clears transient scheduling evidence before an explicitly composed single-tick operation. */
+    public void clearExactIntervalEvidence() {
+        lastExactComponent = null; lastExactResult = null;
+    }
+
+    /**
+     * @param component the actual ship whose just-completed interval is being composed
+     * @return its propulsion result, or empty if this control system did not advance that ship
+     */
+    public java.util.Optional<com.spacesim.ship.ShipEngineeringRuntime.TickResult> exactIntervalEvidence(EngineeringComponent component) {
+        return component == lastExactComponent ? java.util.Optional.ofNullable(lastExactResult) : java.util.Optional.empty();
+    }
 
     /** Creates the transient direct-control movement system. */
     public PlayerDirectControlSystem() {
@@ -64,6 +79,7 @@ public final class PlayerDirectControlSystem extends IteratingSystem {
             throttle = engineering.throttleForDeltaV(fitted, speed, deltaSeconds);
         }
         var result = engineering.advancePropulsion(fitted, throttle, deltaSeconds);
+        lastExactComponent = fitted; lastExactResult = result;
         double deltaV = result.actualThrustN() / result.derivedState().totalMassKg() * deltaSeconds;
         if (braking) deltaV = Math.min(speed, deltaV);
         double vx = physical.velocityXMps() + x * deltaV;

@@ -108,6 +108,13 @@ public final class ShipWeaponEngineeringAdapter {
             WeaponAmmunitionCatalog ammunition,
             WeaponLauncherCatalog launcherCatalog,
             WeaponLoadoutState loadout) {
+        return deriveKineticMounts(derived, ammunition, launcherCatalog, loadout, null);
+    }
+
+    // Servicing one feed must not require an unrelated weapon to have an ammunition binding.
+    List<FittedKineticMount> deriveKineticMounts(DerivedShipState derived,
+            WeaponAmmunitionCatalog ammunition, WeaponLauncherCatalog launcherCatalog,
+            WeaponLoadoutState loadout, String selectedMount) {
         DerivedShipState checkedDerived = Objects.requireNonNull(derived, "derived");
         WeaponAmmunitionCatalog checkedAmmunition = Objects.requireNonNull(ammunition, "ammunition");
         WeaponLauncherCatalog checkedLaunchers = Objects.requireNonNull(launcherCatalog, "launcherCatalog");
@@ -115,6 +122,7 @@ public final class ShipWeaponEngineeringAdapter {
 
         List<FittedKineticMount> result = new ArrayList<>();
         for (InstalledCapability capability : checkedDerived.installedCapabilities()) {
+            if (selectedMount != null && !selectedMount.equals(capability.mountId())) continue;
             if (capability.family() != ModuleFamily.WEAPON_AMMUNITION) {
                 continue;
             }

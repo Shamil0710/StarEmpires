@@ -155,6 +155,35 @@ public final class ShipEngineeringGrantService {
     }
 
     /**
+     * Opens the unspent part of an interval already advanced by the ordinary propulsion authority.
+     * The nominal margin remains an additional conservative limit; actual generation, demand,
+     * recharge and prior storage discharge can only lower it.
+     * @param engineering actual post-propulsion ship
+     * @param intervalSeconds the same completed fixed interval
+     * @param completedTick result of the ordinary propulsion step
+     * @param rechargePowerW actual storage recharge in that interval
+     * @return remaining physical electrical scheduling budget
+     */
+    public IntervalBudget beginAfterPropulsion(EngineeringComponent engineering, double intervalSeconds,
+            ShipEngineeringRuntime.TickResult completedTick, double rechargePowerW) {
+        Objects.requireNonNull(completedTick, "completedTick");
+        requireNonNegativeFinite(rechargePowerW, "rechargePowerW");
+        if (!completedTick.state().equals(engineering.runtimeState))
+            throw new IllegalArgumentException("Propulsion evidence does not match the current ship state");
+        var nominal = beginInterval(engineering, intervalSeconds);
+        double generatedHeadroom = Math.max(0d, completedTick.powerSupplyW() - completedTick.powerDemandW());
+        // Stored energy was rounded at the magnitude of the whole buffer, before subtraction.
+        // This tolerance admits only that rounding; remaining power is still clamped to zero.
+        double roundoffW = Math.max(EPSILON, 2 * Math.ulp(engineering.runtimeState.sharedBusEnergyJ()) / intervalSeconds
+                + 2 * Math.ulp(generatedHeadroom));
+        if (rechargePowerW - generatedHeadroom > roundoffW)
+            throw new IllegalArgumentException("Recharge exceeds actual propulsion interval headroom");
+        return new IntervalBudget(engineering, intervalSeconds,
+                Math.min(nominal.initialContinuousPowerW(), Math.max(0d, generatedHeadroom - rechargePowerW)),
+                Math.max(0d, nominal.initialStorageDischargePowerW() - completedTick.storageDischargeW()));
+    }
+
+    /**
      * Attempts and, when feasible, commits one non-overlapping incremental operation load.
      *
      * <p>This compatibility method opens a fresh one-operation interval budget. Callers scheduling
