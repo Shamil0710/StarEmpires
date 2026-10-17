@@ -162,6 +162,29 @@ public final class MapCameraState {
         return (float) (centerY + (pointY - centerY) * zoom + panY);
     }
 
+    /**
+     * Double-precision {@link #transformX} for anchors far outside the viewport, such as the
+     * metric-grid origin at inspection zoom, where a float result would lose whole pixels.
+     *
+     * @param pointX fitted base-projection X
+     * @param centerX viewport center X
+     * @return transformed screen X without float rounding
+     */
+    public double transformXPrecise(double pointX, double centerX) {
+        return centerX + (pointX - centerX) * zoom + panX;
+    }
+
+    /**
+     * Double-precision {@link #transformY}; see {@link #transformXPrecise(double, double)}.
+     *
+     * @param pointY fitted base-projection Y
+     * @param centerY viewport center Y
+     * @return transformed screen Y without float rounding
+     */
+    public double transformYPrecise(double pointY, double centerY) {
+        return centerY + (pointY - centerY) * zoom + panY;
+    }
+
     /** Sets an inspection zoom before focusing a physical object.
      * @param requested positive pixels-per-metre-derived zoom
      */

@@ -1008,7 +1008,6 @@ public final class GeneratedWorldCommandUiRenderer {
         sectorBackgrounds.draw(batch, snapshot.worldSeed(), snapshot.activeSystemId(),
                 backgroundRect.x(), backgroundRect.y(), backgroundRect.width(), backgroundRect.height());
         batch.end();
-        drawGrid(layout.map());
 
         Rect projectionRect = inset(layout.map(), 28f * metrics.scale());
         PhysicalMapProjection projection = resolveSystemProjection(snapshot, projectionRect);
@@ -1054,6 +1053,7 @@ public final class GeneratedWorldCommandUiRenderer {
                     systemMapCamera.transformX(base.x(), cameraCenterX),
                     systemMapCamera.transformY(base.y(), cameraCenterY)));
         }
+        drawMetricGrid(layout.map(), projection, pixelsPerMetre, cameraCenterX, cameraCenterY);
         // Scissor oversized hulls against the map, including on HiDPI displays.
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
         float sx = (float) Gdx.graphics.getBackBufferWidth() / Gdx.graphics.getWidth();
@@ -1123,6 +1123,7 @@ public final class GeneratedWorldCommandUiRenderer {
                         + "  •  СКМ/Home: отмена",
                 layout.map().x() + 18f * metrics.scale(), layout.map().top() - 46f * metrics.scale());
         batch.end();
+        drawScaleBar(layout.map(), pixelsPerMetre);
 
         LocalObjectView selected = snapshot.localObjects().stream()
                 .filter(value -> selection.kind() == SelectionKind.LOCAL_OBJECT
@@ -1707,6 +1708,59 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.setColor(safe > 0.9f ? ImperialUiPalette.AMBER : ImperialUiPalette.CYAN);
         shapes.rect(rect.x(), rect.y(), rect.width() * safe, rect.height());
         shapes.end();
+    }
+
+    /** Draws metre-anchored grid lines that move and rescale with the system-map camera. */
+    private void drawMetricGrid(Rect map, PhysicalMapProjection projection, double pixelsPerMetre,
+            float cameraCenterX, float cameraCenterY) {
+        if (!usableMapScale(map, pixelsPerMetre)) return;
+        MetricMapGrid.Spacing spacing = MetricMapGrid.spacing(pixelsPerMetre, 40f * metrics.scale());
+        PhysicalMapProjection.Point origin = projection.metreOrigin();
+        // The origin can lie far outside the viewport at inspection zoom: keep it in double.
+        List<MetricMapGrid.Line> vertical = MetricMapGrid.lines(
+                systemMapCamera.transformXPrecise(origin.x(), cameraCenterX),
+                pixelsPerMetre, spacing, map.x(), map.right());
+        List<MetricMapGrid.Line> horizontal = MetricMapGrid.lines(
+                systemMapCamera.transformYPrecise(origin.y(), cameraCenterY),
+                pixelsPerMetre, spacing, map.y(), map.top());
+        // SpriteBatch.end() disables blending; major and minor lines differ only by alpha.
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        for (MetricMapGrid.Line line : vertical) {
+            shapes.setColor(line.major() ? ImperialUiPalette.MAP_GRID_MAJOR : ImperialUiPalette.MAP_GRID_MINOR);
+            shapes.line(line.screen(), map.y(), line.screen(), map.top());
+        }
+        for (MetricMapGrid.Line line : horizontal) {
+            shapes.setColor(line.major() ? ImperialUiPalette.MAP_GRID_MAJOR : ImperialUiPalette.MAP_GRID_MINOR);
+            shapes.line(map.x(), line.screen(), map.right(), line.screen());
+        }
+        shapes.end();
+    }
+
+    /** Draws a round-length scale bar in the bottom-left corner of the system map. */
+    private void drawScaleBar(Rect map, double pixelsPerMetre) {
+        if (!usableMapScale(map, pixelsPerMetre)) return;
+        MetricMapGrid.ScaleBar bar = MetricMapGrid.scaleBar(pixelsPerMetre, map.width() * 0.22f);
+        float x = map.x() + 18f * metrics.scale();
+        float y = map.y() + 18f * metrics.scale();
+        float thickness = Math.max(1f, 2f * metrics.scale());
+        float tick = 8f * metrics.scale();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.IVORY);
+        shapes.rect(x, y, bar.pixels(), thickness);
+        shapes.rect(x, y, thickness, tick);
+        shapes.rect(x + bar.pixels() - thickness, y, thickness, tick);
+        shapes.end();
+        batch.begin();
+        fonts.small().setColor(ImperialUiPalette.IVORY);
+        fonts.small().draw(batch, bar.label(), x, y + tick + 16f * metrics.scale());
+        batch.end();
+    }
+
+    private static boolean usableMapScale(Rect map, double pixelsPerMetre) {
+        return map.width() > 0f && map.height() > 0f
+                && Double.isFinite(pixelsPerMetre) && pixelsPerMetre > 0d;
     }
 
     private void drawGrid(Rect map) {

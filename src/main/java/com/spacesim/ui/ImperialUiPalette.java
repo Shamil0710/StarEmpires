@@ -30,6 +30,10 @@ public final class ImperialUiPalette {
     public static final Color PANEL_SURFACE = new Color(0.085f, 0.105f, 0.115f, 0.985f);
     /** Low-contrast chart grid. */
     public static final Color GRID = new Color(0.27f, 0.31f, 0.32f, 0.32f);
+    /** Major lines of the blended metric system-map grid. */
+    public static final Color MAP_GRID_MAJOR = new Color(0.42f, 0.50f, 0.52f, 0.55f);
+    /** Faint minor lines of the blended metric system-map grid. */
+    public static final Color MAP_GRID_MINOR = new Color(0.42f, 0.50f, 0.52f, 0.22f);
 
     private ImperialUiPalette() {
         throw new AssertionError("No instances");

@@ -85,6 +85,12 @@ final class PhysicalMapProjection {
         return pixelsPerMetre;
     }
 
+    /** @return fitted screen point of the frame's metre origin, the anchor of the metric grid */
+    Point metreOrigin() {
+        return new Point(centerX - midXMetres * pixelsPerMetre,
+                centerY - midYMetres * pixelsPerMetre);
+    }
+
     double inspectionZoom(LocalObjectView object, double width, double height) {
         if (object.sprite() == null) {
             return 1d;
