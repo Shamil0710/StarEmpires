@@ -1,3 +1,46 @@
+## Development process
+
+Adopted 2026-10-17. Transition plan and rationale: `docs/development_process_plan.md`.
+
+Acceptance and tests:
+- A slice is accepted by targeted tests plus scenario tests (`@Tag("scenario")`) that drive
+  the ordinary player path (player commands + world ticks + save/load) on a small authored
+  world. Keep the existing money/mass conservation and exact round-trip checks.
+- Long QA journeys over the generated galaxy (`tools/qa/*Journey*`) are soak runs: on request
+  or weekly, never the acceptance gate of a single slice. Do not start one without the user.
+- Run targeted tests while working; run full `mvn -Ptest-parallel verify` before pushing a
+  large slice, not after every change.
+
+Commits:
+- Commit after every green slice (targeted tests pass). Never leave work uncommitted for
+  more than a working day. Push only with user approval; CI runs full verify on push.
+- New source files belong in the same commit as the code that uses them.
+
+Save compatibility (until the first RC):
+- Supported save versions start at the first RC (Stage 23G). Dev formats are not supported.
+- Keep one current native format; bump it only on a real structural change. An older dev save
+  is rejected before any mutation with a clear error. Do not write new migrations.
+- Do not delete existing migrations or legacy tests without user approval.
+
+Documentation:
+- Stage status lives in a short table (`docs/status/`), at most 150 lines per stage.
+- Evidence (logs, tick numbers, masses) stays in `target/` or CI artifacts; documents get one
+  line with the link and PASS/FAIL. Do not append long evidence narratives to docs.
+
+Balance and design findings:
+- If an ordinary path is blocked by balance (fuel, range, prices, capacity), report it to the
+  user as a balance issue and propose a design fix. Do not continue it as proof work.
+
+Code structure:
+- New classes get domain names, without `StageNN` prefixes.
+- Rename an existing `StageNN*` class or split a large class (`Stage228CampaignAuthority`,
+  `WorldSimulation`) only when it is already being substantially changed; get a Codex
+  researcher assessment before the first split. No standalone big refactorings.
+
+Playtests:
+- After each Stage 23B block closes, propose a short manual playtest of the core loop to the
+  user; record findings as `playtest` issues.
+
 ## Agent delegation
 
 The main agent owns implementation and integration.
