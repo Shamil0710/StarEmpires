@@ -20,7 +20,8 @@ class GeneratedCampaignPilotStartTest {
         var player = campaign.submitIndependentPilotStart(offer);
         assertNull(player.factionContentId()); assertEquals(java.util.List.of(offer.fleetId()), player.ownedFleetIds());
         assertEquals(75_000_000L, player.walletMilliCredits());
-        assertEquals(treasury + Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS,
+        assertEquals(treasury + Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS
+                        + OperatorTreasuryExpectations.openingTreasury(campaign, fleet.stableFactionId()),
                 campaign.coordinator().runtime().world().findFactionEconomicState(fleet.stableFactionId()).orElseThrow().treasuryMilliCredits());
         assertEquals(before.stage21Runtime().stage21HRuntime().stage21GRuntime().stage21FRuntime().stage21ERuntime().stage21DRuntime().stage21CRuntime().stage21BRuntime().stage21ARuntime().stage20Runtime().freight(),
                 campaign.coordinator().runtime().freight().capture());

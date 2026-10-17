@@ -16,8 +16,9 @@ class GeneratedCampaignNpcSupplyOffersTest {
         String faction = runtime.industry().industrial().stations().stream()
                 .filter(s -> GeneratedCampaignStationSalePolicy.priceMilliCredits(s.stationArchetypeId()) > 0)
                 .findFirst().orElseThrow().stableFactionId();
-        // New games start every treasury at zero and the starter ship is now bought from the Union, so the
-        // issuer is funded the ordinary way: the pilot buys one of its idle reserve ships at its hub.
+        assertTrue(runtime.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits() > 0,
+                "The issuer can fund offers from its opening treasury, whoever sold the starting ship");
+        // Buying one of the issuer's own ships after the start also checks the later seller briefing.
         var issuerReserve = runtime.freight().capture().freighters().stream()
                 .filter(f -> f.stableFactionId().equals(faction)
                         && f.phase() == com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase.IDLE

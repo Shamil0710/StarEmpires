@@ -1072,7 +1072,10 @@ public final class Stage228CampaignAuthority {
 
     private void initializePilotMarkets(GeneratedCampaignInitialStationLegalCapital.Plan stationCapital) {
         var runtime = coordinator.runtime();
+        var marketsByOperator = new java.util.TreeMap<String, Integer>();
         for (var endpoint : runtime.infrastructure().endpoints()) {
+            GeneratedCampaignInitialStationLegalCapital.owner(runtime, endpoint, stationCapital)
+                    .ifPresent(f -> marketsByOperator.merge(f, 1, Integer::sum));
             var system = endpoint.systemId();
             var session = runtime.world().findSession(system).orElseThrow();
             var transform = new com.spacesim.components.TransformComponent();
@@ -1092,6 +1095,30 @@ public final class Stage228CampaignAuthority {
                 throw new IllegalStateException("Opening market liquidity cannot be credited");
             session.getLedger().recordMoneySource(PILOT_MARKET_V2_IDENTITY_PREFIX + endpoint.stationId(),
                     PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v2");
+        }
+        initializeOperatorTreasuries(marketsByOperator);
+    }
+
+    /** New-game operator treasury, as a multiple of the opening working capital of the operator's markets. */
+    public static final int OPERATOR_TREASURY_MARKET_MULTIPLE = 10;
+
+    /**
+     * Gives each existing market operator a finite opening treasury, so operators can fund their
+     * markets and paid offers before anyone pays them. Recorded once as a disclosed new-game money source.
+     */
+    private void initializeOperatorTreasuries(java.util.Map<String, Integer> marketsByOperator) {
+        var world = coordinator.runtime().world();
+        var ledger = world.findSession(world.getActiveSystemId()).orElseThrow().getLedger();
+        for (var entry : marketsByOperator.entrySet()) {
+            if (world.findFactionEconomicState(entry.getKey()).isEmpty()) continue;
+            long amount = Math.multiplyExact(Math.multiplyExact((long) entry.getValue(), PILOT_MARKET_INITIAL_LIQUIDITY),
+                    OPERATOR_TREASURY_MARKET_MULTIPLE);
+            var funding = new WalletComponent();
+            if (!funding.creditFromSource(amount)) throw new IllegalStateException("Opening operator treasury cannot be credited");
+            String source = "new-game-operator-treasury:" + entry.getKey();
+            ledger.recordMoneySource(source, amount, "new-game-operator-treasury.v1");
+            if (!world.transferToFactionTreasury(entry.getKey(), funding, source, amount, "new-game-operator-treasury.v1"))
+                throw new IllegalStateException("Opening operator treasury cannot settle");
         }
     }
 

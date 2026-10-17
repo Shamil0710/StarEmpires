@@ -6,6 +6,32 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GeneratedCampaignMarketWorkingCapitalTest {
+    @Test void newGameGivesEachMarketOperatorADisclosedFiniteTreasuryOnce() {
+        var c = Stage228CampaignAuthority.create(1);
+        var world = c.coordinator().runtime().world();
+        var operators = new java.util.TreeMap<String, Integer>();
+        c.submitIndependentPilotStart(c.previewIndependentPilotStart());
+        for (var endpoint : c.coordinator().runtime().infrastructure().endpoints()) {
+            var ref = c.pilotMarketReference(endpoint.stationId()).orElseThrow();
+            var legal = world.findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId())
+                    .getComponent(FactionComponent.class);
+            if (legal != null) operators.merge(world.findFactionStableId(legal.factionId).orElseThrow(), 1, Integer::sum);
+        }
+        assertFalse(operators.isEmpty());
+        long pilotPurchase = Stage228CampaignAuthority.PILOT_SHIP_PRICE_MILLI_CREDITS;
+        String starterSeller = c.coordinator().runtime().freight().findFreighter(c.playerState().orElseThrow().activeFleetId())
+                .orElseThrow().stableFactionId();
+        for (var entry : operators.entrySet()) {
+            long expected = entry.getValue() * Stage228CampaignAuthority.PILOT_MARKET_INITIAL_LIQUIDITY
+                    * Stage228CampaignAuthority.OPERATOR_TREASURY_MARKET_MULTIPLE
+                    + (entry.getKey().equals(starterSeller) ? pilotPurchase : 0L);
+            assertEquals(expected, world.findFactionEconomicState(entry.getKey()).orElseThrow().treasuryMilliCredits(), entry.getKey());
+        }
+        var saved = c.captureState();
+        assertEquals(saved, Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
+                Stage228GeneratedCampaignPersistenceCodec.encode(saved))).captureState(), "Restore does not repeat the opening treasury");
+    }
+
     @Test void actualDockedMarketUsesExistingOperatorMoneyOnlyOnCompletedTicks() {
         var c = Stage228CampaignAuthority.create(1); c.submitIndependentPilotStart(c.previewIndependentPilotStart());
         var runtime = c.coordinator().runtime(); var world = runtime.world();

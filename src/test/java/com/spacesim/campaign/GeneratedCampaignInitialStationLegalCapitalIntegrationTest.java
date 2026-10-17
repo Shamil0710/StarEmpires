@@ -67,8 +67,14 @@ class GeneratedCampaignInitialStationLegalCapitalIntegrationTest {
                     && n.knowledge().stream().anyMatch(k -> k.factId().equals(n.npcId() + ":posting") && k.subjectId().equals(entry.getKey()))).findFirst();
             assertTrue(npc.isPresent(), "Assigned legal owner must have its archived local dispatcher");
         }
-        for (var actor : current.coordinator().actors().capture())
-            assertEquals(old.world().findFactionEconomicState(actor.factionContentId()), runtime.world().findFactionEconomicState(actor.factionContentId()));
+        // Legal capital creates no money itself; operating more markets only scales the opening treasury.
+        for (var actor : current.coordinator().actors().capture()) {
+            String faction = actor.factionContentId();
+            assertEquals(old.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits()
+                            - OperatorTreasuryExpectations.openingTreasury(baseline, faction)
+                            + OperatorTreasuryExpectations.openingTreasury(current, faction),
+                    runtime.world().findFactionEconomicState(faction).orElseThrow().treasuryMilliCredits(), faction);
+        }
         assertExact(current); assertExact(baseline);
         var historical = Stage228CampaignAuthority.restore(baseline.captureState());
         for (var station : plan.assignments().keySet()) {
