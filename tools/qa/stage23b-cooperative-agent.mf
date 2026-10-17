@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Agent-Class: Stage23BCooperativePauseAgent
+Can-Redefine-Classes: true
+
