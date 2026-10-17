@@ -109,8 +109,24 @@ class GeneratedCampaignNpcPlacementTest {
     @Test void postingsUseExistingArchivesWithoutChangingPhysicalOrFinancialState() {
         var coordinator = GeneratedCampaignCoordinator.create(1);
         var before = coordinator.runtime().captureState();
+        var archivesBefore = coordinator.runtime().discoveryState();
         GeneratedCampaignNpcPlacement.install(coordinator);
-        assertEquals(before, coordinator.runtime().captureState());
+        var after = coordinator.runtime().captureState();
+        assertEquals(before.worldState(), after.worldState());
+        assertEquals(before.freight(), after.freight());
+        assertEquals(before.localFleetPhysicalStates(), after.localFleetPhysicalStates());
+        assertEquals(before.campaign().materializedWorld(), after.campaign().materializedWorld());
+        assertEquals(before.campaign().industrialState(), after.campaign().industrialState());
+        // The only knowledge change is the operators' local survey of free-body resource sites.
+        for (var archive : coordinator.runtime().discoveryState().knowledgeStates()) {
+            var prior = archivesBefore.knowledgeFor(archive.ownerId());
+            for (var entry : prior.entries()) assertEquals(entry, archive.knowledge(entry.object()).orElseThrow());
+            for (var added : archive.entries().stream().filter(k -> prior.knowledge(k.object()).isEmpty()).toList()) {
+                assertTrue(added.object().resourceObject());
+                assertTrue(added.evidence().stream().allMatch(e ->
+                        e.provenanceId().startsWith(GeneratedCampaignNpcPlacement.LOCAL_RESOURCE_SURVEY_VERSION + ":local-survey:" + archive.ownerId())));
+            }
+        }
         var npcs = coordinator.npcMissions();
         assertFalse(npcs.npcs().isEmpty());
         assertTrue(npcs.missions().isEmpty());

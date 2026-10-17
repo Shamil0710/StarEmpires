@@ -1091,6 +1091,50 @@ public final class Stage20GeneratedWorldRuntimeBridge {
             }
         }
 
+        /**
+         * New-game local survey: each operator archives the free-body resource sites of the systems
+         * where it posts a dispatcher, so the dispatcher can sell their maps from the first visit.
+         * Only position, classification and a resource indication are archived, never grades or reserves.
+         * @param systemsByFaction posting systems per operator faction
+         * @param policyVersion named initial authoring policy
+         * @return number of archived resource sites
+         */
+        public int authorInitialLocalResourceSurveys(Map<String, java.util.Set<com.spacesim.world.StarSystemId>> systemsByFaction,
+                String policyVersion) {
+            Objects.requireNonNull(systemsByFaction, "systemsByFaction");
+            if (world.getAuthoritativeWorldTick() != 0 || policyVersion == null || policyVersion.isBlank())
+                throw new IllegalStateException("Initial resource surveys require a named initial authoring policy");
+            int archived = 0;
+            for (var entry : new java.util.TreeMap<>(systemsByFaction).entrySet()) {
+                if (world.findFactionEconomicState(entry.getKey()).isEmpty())
+                    throw new IllegalArgumentException("Initial resource survey references an unknown faction");
+                var knowledge = discovery.knowledgeFor(entry.getKey());
+                var sources = industry.sourceOutposts().sources().sources().stream()
+                        .filter(s -> entry.getValue().contains(s.systemId())
+                                && s.sourceState().environment() == com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment.FREE_BODY)
+                        .sorted(java.util.Comparator.comparing(s -> s.sourceId())).toList();
+                for (var source : sources) {
+                    var object = new com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectRef(source.systemId(),
+                            com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticObjectKind.RESOURCE_OCCURRENCE, source.sourceId());
+                    if (knowledge.knowledge(object).filter(k -> k.knownLocation().isPresent()).isPresent()) continue;
+                    knowledge = new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime().observe(knowledge,
+                            new com.spacesim.world.Stage20DiscoveryKnowledgeRuntime.StaticObservation(object,
+                                    com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryState.KNOWN_STATIC_LOCATION,
+                                    Optional.of(source.sourceState().outputCommodityId()), Optional.of(source.position()),
+                                    new com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledge(
+                                            com.spacesim.world.Stage20DiscoveryKnowledgeState.ResourceKnowledgeLevel.RESOURCE_INDICATION,
+                                            Optional.empty(), Optional.empty()),
+                                    new com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoveryEvidence(
+                                            com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE,
+                                            policyVersion + ":local-survey:" + entry.getKey() + ':' + source.sourceId(),
+                                            0d, java.util.OptionalDouble.empty())));
+                    archived++;
+                }
+                replaceDiscoveryOwner(knowledge);
+            }
+            return archived;
+        }
+
         private void replaceDiscoveryOwner(com.spacesim.world.Stage20DiscoveryKnowledgeState observed) {
             var states = new ArrayList<>(discovery.knowledgeStates());
             states.removeIf(state -> state.ownerId().equals(observed.ownerId())); states.add(observed);

@@ -28,6 +28,9 @@ final class GeneratedCampaignNpcPlacement {
         }
     }
 
+    /** Named new-game policy: dispatchers' operators archive the free-body resource sites of their posting systems. */
+    static final String LOCAL_RESOURCE_SURVEY_VERSION = "new-game-local-resource-survey.v1";
+
     /** Installs a local dispatcher at each existing archived civilian station on new-game authoring only. */
     static void install(GeneratedCampaignCoordinator coordinator) {
         install(coordinator, GeneratedCampaignInitialStationLegalCapital.Plan.baseline());
@@ -61,6 +64,10 @@ final class GeneratedCampaignNpcPlacement {
                     NpcRole.TRADE_LOGISTICS, faction, station.systemId(), NpcAvailability.AVAILABLE, List.of()));
         }
         service.installNpcRoster(roster);
+        var postingSystems = new java.util.TreeMap<String, java.util.Set<com.spacesim.world.StarSystemId>>();
+        for (var npc : roster)
+            postingSystems.computeIfAbsent(npc.factionContentId(), f -> new java.util.HashSet<>()).add(npc.locationSystemId());
+        runtime.authorInitialLocalResourceSurveys(postingSystems, LOCAL_RESOURCE_SURVEY_VERSION);
         for (var npc : roster) {
             var archive = coordinator.runtime().discoveryState().knowledgeFor(npc.factionContentId());
             service.receiveDiscovery(npc.npcId(), archive, postings.get(npc.npcId()), 0,

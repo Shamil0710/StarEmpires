@@ -30,7 +30,10 @@ class GeneratedCampaignInitialStationLegalCapitalIntegrationTest {
         for (var archive : old.discoveryState().knowledgeStates()) {
             var actual = runtime.discoveryState().knowledgeFor(archive.ownerId());
             for (var prior : archive.entries()) assertEquals(prior, actual.knowledge(prior.object()).orElseThrow());
-            var additions = actual.entries().stream().filter(k -> archive.knowledge(k.object()).isEmpty()).toList();
+            var surveyed = actual.entries().stream().filter(k -> archive.knowledge(k.object()).isEmpty()
+                    && k.evidence().stream().allMatch(e -> e.provenanceId().startsWith(GeneratedCampaignNpcPlacement.LOCAL_RESOURCE_SURVEY_VERSION))).toList();
+            assertTrue(surveyed.stream().allMatch(k -> k.object().resourceObject()), "The local survey archives only resource sites");
+            var additions = actual.entries().stream().filter(k -> archive.knowledge(k.object()).isEmpty() && !surveyed.contains(k)).toList();
             assertEquals(plan.assignments().entrySet().stream().filter(e -> e.getValue().equals(archive.ownerId())).count(), additions.size());
             for (var addition : additions) {
                 assertEquals(archive.ownerId(), plan.assignments().get(addition.object().objectId()));

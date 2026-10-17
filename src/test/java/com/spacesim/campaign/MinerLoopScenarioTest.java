@@ -1,7 +1,6 @@
 package com.spacesim.campaign;
 
 import com.spacesim.components.WalletComponent;
-import com.spacesim.content.Stage18ExtractionCatalog.ExtractionEnvironment;
 import com.spacesim.content.Stage22ShipConsumableCatalogLoader;
 import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
 import org.junit.jupiter.api.Tag;
@@ -13,11 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ordinary miner loop on a generated campaign: dock at the seller's hub, buy the existing mining ship,
- * fly to a finite free-body source, mine with a save/load in the middle, return, sell the ore and
- * pay for reaction mass. Everything goes through {@link ScenarioPilot}; no state is edited.
- *
- * <p>Known gap: the source coordinate is taken from the runtime registry, not from a paid map.</p>
+ * Ordinary miner loop on a generated campaign: dock at the seller's hub, buy the existing mining ship
+ * and the local dispatcher's resource maps, fly to the nearest mapped free-body source, mine with a
+ * save/load in the middle, return, sell the ore and pay for reaction mass. Everything goes through
+ * {@link ScenarioPilot}; no state is edited and no coordinate comes from outside the pilot's own knowledge.
  */
 @Tag("scenario")
 class MinerLoopScenarioTest {
@@ -56,23 +54,35 @@ class MinerLoopScenarioTest {
         assertEquals(walletBefore + paid, pilot.player().walletMilliCredits());
         assertEquals(treasuryBefore - paid, treasury(pilot, miner.stableFactionId()));
         assertEquals(hullsBefore, pilot.world().getFleetPlacements().size(), "purchase creates no hull");
+
+        // Buy every resource map the local dispatcher offers; 100 credits each go to its operator.
+        var offers = com.spacesim.ui.GeneratedCampaignResourceMapUi.rows(pilot.campaign());
+        assertTrue(!offers.isEmpty(), "the local dispatcher sells maps of its system's resource sites");
+        for (var offer : offers) {
+            var id = offer.selection().stableId().split("\\|");
+            long operatorBefore = treasury(pilot, miner.stableFactionId());
+            long cost = pilot.action("BUY_RESOURCE_MAP", id[1], id[2], 0);
+            assertEquals(-Stage228CampaignAuthority.RESOURCE_MAP_PRICE_MILLI_CREDITS, cost);
+            assertEquals(operatorBefore - cost, treasury(pilot, miner.stableFactionId()));
+        }
         pilot.action("UNDOCK", "", "", 0);
         pilot.action("SWITCH", Long.toString(miner.fleetId().value()), "", 0);
         assertEquals(miner.fleetId(), pilot.fleetId());
-        phase("purchase", t, pilot);
+        phase("purchase miner and " + offers.size() + " maps", t, pilot);
 
-        // 3. Fly to the nearest finite free-body source and mine, saving and reloading mid-order.
+        // 3. Fly to the nearest personally mapped source and mine, saving and reloading mid-order.
         t = System.nanoTime();
-        var source = pilot.campaign().coordinator().runtime().industry().sourceOutposts().sources().sources().stream()
-                .filter(s -> s.systemId().equals(pilot.fleet().systemId()))
-                .filter(s -> s.sourceState().environment() == ExtractionEnvironment.FREE_BODY)
-                .min(Comparator.comparingDouble(s -> s.position().distanceTo(pilot.physical().position())))
+        var mapped = pilot.campaign().coordinator().runtime().discoveryState()
+                .knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID).entries().stream()
+                .filter(k -> k.object().resourceObject() && k.knownLocation().isPresent()
+                        && k.object().systemId().equals(pilot.fleet().systemId()))
+                .min(Comparator.comparingDouble(k -> k.knownLocation().orElseThrow().distanceTo(pilot.physical().position())))
                 .orElseThrow();
-        long outboundTicks = pilot.fly(source.position(), 500, CRUISE_MPS);
+        long outboundTicks = pilot.fly(mapped.knownLocation().orElseThrow(), 500, CRUISE_MPS);
         phase("outbound flight " + outboundTicks + " ticks", t, pilot);
 
         t = System.nanoTime();
-        String sourceId = source.sourceId();
+        String sourceId = mapped.object().objectId();
         double sourceBefore = remainingSourceKg(pilot, sourceId);
         double cargoBefore = oreKg(pilot);
         pilot.action("START_MINING", sourceId, "", MINING_KG_PER_TICK);
