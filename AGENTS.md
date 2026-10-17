@@ -1,0 +1,45 @@
+## Agent delegation
+
+The main agent owns implementation and integration.
+
+Use researcher when:
+- A task affects multiple subsystems.
+- Architecture or dependencies are unclear.
+- Significant refactoring is proposed.
+
+Use reviewer when:
+- Implementation is completed.
+- Public interfaces are modified.
+- Simulation or persistence behavior changes.
+
+Do not spawn subagents for trivial tasks.
+
+Limit concurrency to two subagents.
+Only the main agent coordinates integration.
+
+Never merge into main without user approval.
+
+## Claude Code: delegation to Codex
+
+researcher and reviewer are Codex agents (.codex/agents/*.toml).
+In Claude Code, call them through Codex CLI, not through Claude subagents:
+
+- Research: `codex exec -s read-only -c 'windows.sandbox="unelevated"' "<researcher instructions from .codex/agents/researcher.toml>\n\nTask: ..."`
+- Review of a branch: `codex review -c 'windows.sandbox="unelevated"' --base main "<reviewer instructions>"`
+- Review of uncommitted work: `codex review -c 'windows.sandbox="unelevated"' --uncommitted "<reviewer instructions>"`
+
+The `windows.sandbox="unelevated"` override is required when Codex is launched from
+Claude Code: the user's default `elevated` sandbox fails there with
+`helper_unknown_error: setup refresh had errors`, and Codex cannot run any command.
+
+When to use Codex:
+- Review: always use Codex for the reviewer cases above; keep `model_reasoning_effort="high"`.
+- Research: only for cross-subsystem architecture questions or risk assessment of a large
+  refactoring. Simple lookups (where a class is defined, who uses it) Claude does itself.
+- For short Codex queries pass `-c model_reasoning_effort="low"`; the user default is `xhigh`.
+
+Rules:
+- Codex runs read-only only; Claude owns all edits, commits and pushes.
+- Run Codex in the background (runs can take minutes); at most two at once.
+- Codex output is advice, not truth: verify findings in the code before acting.
+- Report to the user which findings were accepted and which were rejected, and why.
