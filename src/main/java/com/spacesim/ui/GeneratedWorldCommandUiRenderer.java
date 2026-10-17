@@ -1224,9 +1224,97 @@ public final class GeneratedWorldCommandUiRenderer {
             drawEmptyInspector(layout.inspector(), "ОБЪЕКТ НЕ ВЫБРАН",
                     "Выберите корабль, станцию, ресурс, навигационный якорь или особую локацию на карте.");
         } else {
-            drawInspector(layout.inspector(), selected.name(), selected.subtitle(),
+            boolean market = dockedMarket != null && !dockedMarket.rows().isEmpty()
+                    && dockedMarket.stationStableId().equals(selected.stableId());
+            Rect inspector = layout.inspector();
+            float tableHeight = market ? marketTableHeight(inspector) : 0f;
+            drawInspector(new Rect(inspector.x(), inspector.y() + tableHeight, inspector.width(),
+                            inspector.height() - tableHeight), selected.name(), selected.subtitle(),
                     selected.factionName(), selected.sections(), detailScrollRows);
+            if (market) {
+                drawMarketTable(new Rect(inspector.x(), inspector.y(), inspector.width(), tableHeight));
+            }
         }
+    }
+
+    private MarketTable dockedMarket;
+
+    /** @param table quotes of the station the player's ship is docked at, or null when not docked */
+    public void bindDockedMarket(MarketTable table) { dockedMarket = table; }
+
+    /** @return height reserved for the market table: all rows, at most 55 % of the inspector */
+    private float marketTableHeight(Rect inspector) {
+        float line = fonts.small().getLineHeight() + 2f * metrics.scale();
+        float wanted = 30f * metrics.scale() + line * (dockedMarket.rows().size() + 1) + 12f * metrics.scale();
+        return Math.min(wanted, inspector.height() * 0.55f);
+    }
+
+    /** Draws the docked market: name left, numbers right-aligned, one trend column against base. */
+    private void drawMarketTable(Rect rect) {
+        float scale = metrics.scale();
+        float left = rect.x() + 16f * scale;
+        float right = rect.right() - 16f * scale;
+        float line = fonts.small().getLineHeight() + 2f * scale;
+        float top = rect.top() - 4f * scale;
+        batch.begin();
+        fonts.body().setColor(ImperialUiPalette.AMBER);
+        fonts.body().draw(batch, "РЫНОК", left, top);
+        batch.end();
+        float y = top - 26f * scale;
+
+        List<List<String>> cells = new ArrayList<>();
+        for (MarketTable.Row row : dockedMarket.rows()) cells.add(MarketTable.cells(row));
+        int columnCount = MarketTable.HEADERS.size();
+        float[] widths = new float[columnCount - 1];
+        for (int column = 1; column < columnCount; column++) {
+            glyph.setText(fonts.small(), MarketTable.HEADERS.get(column));
+            float width = glyph.width;
+            for (List<String> row : cells) {
+                glyph.setText(fonts.small(), row.get(column));
+                width = Math.max(width, glyph.width);
+            }
+            widths[column - 1] = width;
+        }
+        List<MarketTable.Span> spans = MarketTable.columns(left, right, widths, 9f * scale);
+        float nameWidth = Math.max(1f, spans.get(0).width());
+
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.GUNMETAL);
+        shapes.rect(left, y - line - 2f * scale, right - left, Math.max(1f, scale));
+        shapes.end();
+        int visibleRows = (int) Math.max(0, Math.floor((y - line - rect.y()) / line));
+        // Keep one row free for the "more rows" note when the table does not fit.
+        if (cells.size() > visibleRows) visibleRows = Math.max(0, visibleRows - 1);
+        batch.begin();
+        fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+        fonts.small().draw(batch, MarketTable.HEADERS.get(0), spans.get(0).left(), y, nameWidth, Align.left, false);
+        for (int column = 1; column < columnCount; column++) {
+            MarketTable.Span span = spans.get(column);
+            fonts.small().draw(batch, MarketTable.HEADERS.get(column), span.left(), y, 0,
+                    MarketTable.HEADERS.get(column).length(), span.width(), Align.right, false, "…");
+        }
+        for (int index = 0; index < cells.size() && index < visibleRows; index++) {
+            float rowY = y - line * (index + 1) - 4f * scale;
+            List<String> row = cells.get(index);
+            fonts.small().setColor(ImperialUiPalette.IVORY);
+            fonts.small().draw(batch, row.get(0), spans.get(0).left(), rowY, 0, row.get(0).length(), nameWidth, Align.left, false, "…");
+            for (int column = 1; column < columnCount; column++) {
+                fonts.small().setColor(column == columnCount - 1 ? switch (MarketTable.trend(dockedMarket.rows().get(index))) {
+                    case ABOVE -> ImperialUiPalette.AMBER;
+                    case BELOW -> ImperialUiPalette.CYAN;
+                    default -> ImperialUiPalette.MUTED_TEXT;
+                } : ImperialUiPalette.IVORY);
+                MarketTable.Span span = spans.get(column);
+                fonts.small().draw(batch, row.get(column), span.left(), rowY, 0, row.get(column).length(),
+                        span.width(), Align.right, false, "…");
+            }
+        }
+        if (cells.size() > visibleRows) {
+            fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch, "ещё " + (cells.size() - visibleRows) + " — вкладка «Логистика»",
+                    spans.get(0).left(), rect.y() + line, right - left, Align.left, false);
+        }
+        batch.end();
     }
 
     private List<StarSystemId> personalRoutePath = List.of();

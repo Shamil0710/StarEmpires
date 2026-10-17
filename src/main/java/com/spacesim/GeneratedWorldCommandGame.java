@@ -98,9 +98,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         projector.setComponentKilograms(componentKilograms);
         projector.setAmmunitionUnits(ammunitionUnits);
         production = projector.capture(campaign, snapshot, true);
+        // Quotes re-read the content catalogue, so they refresh at projection cadence, not per frame.
+        dockedMarket = ProductionUiProjector.dockedMarket(campaign);
         updateTimeControls();
         projectionAge = 0f;
     }
+
+    private com.spacesim.ui.MarketTable dockedMarket;
 
     private void updateTimeControls() {
         production = com.spacesim.ui.GeneratedCampaignTimeSkipUi.append(production, campaign, timeSkipMinutes, editingTimeSkipMinutes);
@@ -933,6 +937,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             pendingGovernment = null;
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
+            dockedMarket = ProductionUiProjector.dockedMarket(campaign);
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
             status = "Кампания загружена.";
         } catch (IOException | RuntimeException exception) {
@@ -980,6 +985,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 campaign.timeSkip().active(), editingTimeSkipMinutes);
         renderer.bindSessionActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("session"));
         bindPilotApproach();
+        // Undocking hides quotes at once, not at the next projection refresh.
+        renderer.bindDockedMarket(campaign.playerState().map(p -> p.docked()).orElse(false) ? dockedMarket : null);
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),
