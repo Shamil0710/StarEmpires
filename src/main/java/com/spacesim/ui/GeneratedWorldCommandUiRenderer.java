@@ -462,15 +462,17 @@ public final class GeneratedWorldCommandUiRenderer {
 
         int columns = 6;
         float tabWidth = (width - metrics.outerMargin() * 2f) / columns;
-        float rowHeight = 25f * metrics.scale();
+        float rowHeight = CommandBarLayout.tabRowHeight(metrics);
         batch.begin();
         fonts.small().setColor(ImperialUiPalette.IVORY);
         fonts.small().draw(batch, "STAR EMPIRES", metrics.outerMargin(), height - 5f * metrics.scale());
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-        fonts.small().draw(batch, snapshot.activeSystemName() + "  •  такт " + snapshot.worldTick()
-                        + "  •  " + (timeSkipActive ? paused ? "ПРОПУСК НА ПАУЗЕ" : "ПРОПУСК ВРЕМЕНИ"
-                            : paused ? "ПАУЗА" : String.format(Locale.ROOT, "×%.0f", timeScale)),
-                width * 0.35f, height - 5f * metrics.scale(), width * 0.65f - metrics.outerMargin(), Align.right, false);
+        String session = timeSkipActive ? paused ? "  •  ПРОПУСК НА ПАУЗЕ" : "  •  ПРОПУСК ВРЕМЕНИ"
+                : CommandBarLayout.activeTimeId(paused, timeScale).isEmpty()
+                ? String.format(Locale.ROOT, "  •  ×%.0f", timeScale) : "";
+        float textRight = timeControlLeft() - 12f * metrics.scale();
+        fonts.small().draw(batch, snapshot.activeSystemName() + "  •  такт " + snapshot.worldTick() + session,
+                width * 0.35f, height - 5f * metrics.scale(), textRight - width * 0.35f, Align.right, false);
         batch.end();
         for (int index = 0; index < Tab.values().length; index++) {
             Tab tab = Tab.values()[index];
@@ -490,6 +492,8 @@ public final class GeneratedWorldCommandUiRenderer {
             fonts.small().draw(batch, tabLabel, x, y + rowHeight * 0.72f, tabWidth - 3f * metrics.scale(), Align.center, false);
             batch.end();
         }
+        // After the tabs, so keyboard focus still reaches the tabs first.
+        drawTimeControl(paused, timeScale);
         batch.begin();
         fonts.small().setColor(ImperialUiPalette.IVORY);
         fonts.small().draw(batch, status == null || status.isBlank() ? "Tab: фокус • Enter: действие • Esc: назад" : status,
@@ -509,21 +513,53 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().draw(batch, workspace.breadcrumb(production), metrics.outerMargin(), y,
                 width - metrics.outerMargin() * 2f, Align.left, false);
         batch.end();
-        float x = metrics.outerMargin();
         y = height - metrics.topBarHeight() - 55f * metrics.scale();
-        String[] ids = {"back", "search", "sort", "filter", "density", "pause", "save", "load", "focus-player"};
         String[] labels = {"НАЗАД", workspace.searching() ? "ПОИСК: " + workspace.view().query() : "ПОИСК",
                 "СОРТ: " + switch (workspace.view().sort()) {
                     case NAME -> "имя"; case CATEGORY -> "тип"; case RECENT -> "новые";
                 }, "ФИЛЬТР: " + (workspace.view().category().isEmpty() ? "все" : workspace.view().category()),
-                "ПЛОТНОСТЬ", "ПАУЗА", "СОХРАНИТЬ", "ЗАГРУЗИТЬ", "МОЙ КОРАБЛЬ"};
-        float unit = (width - metrics.outerMargin() * 2f) / ids.length;
-        for (int i = 0; i < ids.length; i++) {
-            Rect bounds = new Rect(x + i * unit, y, unit - 4f * metrics.scale(), 28f * metrics.scale());
-            boolean enabled = (i != 0 || workspace.canGoBack()) && (i != 6 || saveAvailable);
-            button(bounds, labels[i], enabled);
-            if (enabled) hitTargets.add(new HitTarget(HitKind.ACTION, ids[i], null, bounds));
+                "ПЛОТНОСТЬ", "МОЙ КОРАБЛЬ"};
+        // Width of the former nine-button row, so the remaining tools keep their size.
+        float preferred = (width - metrics.outerMargin() * 2f) / 9f - 4f * metrics.scale();
+        List<CommandBarLayout.Slot> slots = CommandBarLayout.toolbar(metrics.outerMargin(),
+                width - metrics.outerMargin(), y, 28f * metrics.scale(), preferred,
+                4f * metrics.scale(), 20f * metrics.scale());
+        for (int i = 0; i < slots.size(); i++) {
+            CommandBarLayout.Slot slot = slots.get(i);
+            Rect bounds = new Rect(slot.x(), slot.y(), slot.width(), slot.height());
+            boolean enabled = !slot.id().equals("back") || workspace.canGoBack();
+            secondaryButton(bounds, labels[i], enabled);
+            if (enabled) hitTargets.add(new HitTarget(HitKind.ACTION, slot.id(), null, bounds));
         }
+    }
+
+    /** Draws the header pause/speed control; the active segment shows the session state. */
+    private void drawTimeControl(boolean paused, double timeScale) {
+        float scale = metrics.scale();
+        for (CommandBarLayout.TimeSegment segment : CommandBarLayout.headerTimeControl(
+                width, height, metrics, paused, timeScale)) {
+            CommandBarLayout.Slot slot = segment.slot();
+            Rect bounds = new Rect(slot.x(), slot.y(), slot.width() - 2f * scale, slot.height());
+            shapes.begin(ShapeRenderer.ShapeType.Filled);
+            shapes.setColor(segment.active() ? ImperialUiPalette.BURGUNDY : ImperialUiPalette.GRAPHITE);
+            shapes.rect(bounds.x(), bounds.y(), bounds.width(), bounds.height());
+            shapes.end();
+            shapes.begin(ShapeRenderer.ShapeType.Line);
+            shapes.setColor(segment.active() ? ImperialUiPalette.BRASS : ImperialUiPalette.GUNMETAL);
+            shapes.rect(bounds.x(), bounds.y(), bounds.width(), bounds.height());
+            shapes.end();
+            batch.begin();
+            fonts.small().setColor(segment.active() ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch, segment.label(), bounds.x(), bounds.y() + bounds.height() * 0.78f,
+                    bounds.width(), Align.center, false);
+            batch.end();
+            hitTargets.add(new HitTarget(HitKind.ACTION, slot.id(), null, bounds));
+        }
+    }
+
+    /** @return left edge of the header time control, where header text must end */
+    private float timeControlLeft() {
+        return CommandBarLayout.headerTimeControlLeft(width, metrics);
     }
 
     private void drawProductionSurface() {
@@ -577,7 +613,7 @@ public final class GeneratedWorldCommandUiRenderer {
                     inspectorRect.width(), inspectorRect.height() - 156f * metrics.scale()) : missionActions || pilotStartActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 112f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 112f * metrics.scale()) : workspace.tab() == Tab.FACTIONS
                     ? new Rect(inspectorRect.x(), inspectorRect.y() + 115f * metrics.scale(), inspectorRect.width(),
-                            inspectorRect.height() - 115f * metrics.scale()) : navigable ? new Rect(inspectorRect.x(), inspectorRect.y() + 58f * metrics.scale(),
+                            inspectorRect.height() - 115f * metrics.scale()) : navigable || sessionActions ? new Rect(inspectorRect.x(), inspectorRect.y() + 58f * metrics.scale(),
                     inspectorRect.width(), inspectorRect.height() - 58f * metrics.scale()) : inspectorRect;
             drawInspector(details, selected.name(), selected.category(), selected.summary(),
                     selected.explainedSections(), workspace.view().detailScroll());
@@ -586,7 +622,8 @@ public final class GeneratedWorldCommandUiRenderer {
             if (!factionActions.isEmpty()) drawFactionActions();
             else if (timeSkipActions) drawTimeSkipActions();
             else if (physicalPilotActions) drawPhysicalPilotActions();
-            if (navigable && !physicalPilotActions && factionActions.isEmpty()) {
+            else if (sessionActions) drawSessionActions();
+            if (navigable && !physicalPilotActions && !sessionActions && factionActions.isEmpty()) {
                 Rect focus = new Rect(inspectorRect.x() + 16f * metrics.scale(), inspectorRect.y() + 12f * metrics.scale(),
                         inspectorRect.width() - 32f * metrics.scale(), 36f * metrics.scale());
                 boolean available = selected.focusSystem() != null;
@@ -744,6 +781,22 @@ public final class GeneratedWorldCommandUiRenderer {
      */
     public void bindTimeSkipActions(boolean available, boolean active, boolean editing) {
         timeSkipActions = available; timeSkipActive = active; timeSkipEditing = editing;
+    }
+
+    private boolean sessionActions;
+
+    /** @param available whether the menu campaign-session row is selected */
+    public void bindSessionActions(boolean available) { sessionActions = available; }
+
+    private void drawSessionActions() {
+        float scale = metrics.scale();
+        float width = (inspectorRect.width() - 36f * scale) / 2f;
+        Rect save = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 12f * scale, width, 36f * scale);
+        Rect load = new Rect(save.right() + 4f * scale, save.y(), width, save.height());
+        button(save, "СОХРАНИТЬ (F8)", saveAvailable);
+        if (saveAvailable) hitTargets.add(new HitTarget(HitKind.ACTION, "save", null, save));
+        button(load, "ЗАГРУЗИТЬ (F9)", true);
+        hitTargets.add(new HitTarget(HitKind.ACTION, "load", null, load));
     }
 
     private void drawTimeSkipActions() {
@@ -1696,6 +1749,23 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.begin();
         fonts.body().setColor(enabled ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
         fonts.body().draw(batch, label, rect.x(), rect.y() + rect.height() * 0.63f,
+                rect.width(), Align.center, false);
+        batch.end();
+    }
+
+    /** Outline button for tools; filled {@link #button} stays reserved for object actions. */
+    private void secondaryButton(Rect rect, String label, boolean enabled) {
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.PANEL_SURFACE);
+        shapes.rect(rect.x(), rect.y(), rect.width(), rect.height());
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(enabled ? ImperialUiPalette.GUNMETAL : ImperialUiPalette.MIDNIGHT);
+        shapes.rect(rect.x(), rect.y(), rect.width(), rect.height());
+        shapes.end();
+        batch.begin();
+        fonts.small().setColor(enabled ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
+        fonts.small().draw(batch, label, rect.x(), rect.y() + rect.height() * 0.66f,
                 rect.width(), Align.center, false);
         batch.end();
     }

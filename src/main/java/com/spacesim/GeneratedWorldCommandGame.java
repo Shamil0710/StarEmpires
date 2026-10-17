@@ -286,6 +286,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             case "filter" -> { workspace.cycleCategory(production); yield true; }
             case "density" -> { workspace.cycleDensity(); yield true; }
             case "pause" -> togglePause();
+            case "speed-1" -> selectSpeed(1d);
+            case "speed-2" -> selectSpeed(2d);
+            case "speed-4" -> selectSpeed(4d);
+            case "speed-8" -> selectSpeed(8d);
             case "save" -> save();
             case "load" -> load();
             case "focus" -> focusSelection();
@@ -859,6 +863,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return true;
     }
 
+    /** Header speed segment: the chosen speed becomes the running state, so it also resumes. */
+    private boolean selectSpeed(double scale) {
+        setTimeScale(scale);
+        campaign.coordinator().setPaused(false);
+        return true;
+    }
+
     private boolean setTimeScale(double scale) {
         campaign.cancelTimeSkip();
         campaign.coordinator().setTimeScale(scale);
@@ -944,6 +955,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         String selectedPilot = workspace.view().selection().stableId();
         renderer.bindTimeSkipActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("time-control"),
                 campaign.timeSkip().active(), editingTimeSkipMinutes);
+        renderer.bindSessionActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("session"));
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),
