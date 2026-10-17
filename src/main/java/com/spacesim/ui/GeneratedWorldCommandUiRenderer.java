@@ -782,6 +782,24 @@ public final class GeneratedWorldCommandUiRenderer {
         timeSkipActions = available; timeSkipActive = active; timeSkipEditing = editing;
     }
 
+    private String pilotShipId = "";
+    private double pilotVelocityXMps;
+    private double pilotVelocityYMps;
+
+    /**
+     * Binds the player's active undocked local ship for the approach line to a selected object.
+     *
+     * @param shipStableId system-map id of the ship, or an empty string when there is none
+     * @param velocityXMps authoritative ship velocity along X
+     * @param velocityYMps authoritative ship velocity along Y
+     */
+    public void bindPilotApproach(String shipStableId, double velocityXMps, double velocityYMps) {
+        pilotShipId = Objects.requireNonNull(shipStableId, "shipStableId");
+        boolean finite = Double.isFinite(velocityXMps) && Double.isFinite(velocityYMps);
+        pilotVelocityXMps = finite ? velocityXMps : 0d;
+        pilotVelocityYMps = finite ? velocityYMps : 0d;
+    }
+
     private boolean sessionActions;
 
     /** @param available whether the menu campaign-session row is selected */
@@ -1182,8 +1200,11 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(selectedSprite.headingRad()));
         }
 
+        MapLabelLayout.Box approachPlate = drawApproachLine(snapshot.localObjects(), points, selection, layout.map(),
+                pixelsPerMetre, systemMapOverlays(layout.map(), snapshot.activeSystemName(),
+                        systemMapSubtitle(snapshot), null));
         drawMapLabels(snapshot.localObjects(), points, selection, layout.map(), pixelsPerMetre,
-                snapshot.activeSystemName(), systemMapSubtitle(snapshot));
+                snapshot.activeSystemName(), systemMapSubtitle(snapshot), approachPlate);
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
@@ -1831,8 +1852,90 @@ public final class GeneratedWorldCommandUiRenderer {
                 + "  •  СКМ/Home: отмена";
     }
 
-    /** Map title block and scale bar, which name plates must not cover. */
-    private List<MapLabelLayout.Box> systemMapOverlays(Rect map, String title, String subtitle) {
+    /**
+     * Draws a dashed line from the player's active ship to the selected object with distance,
+     * closing estimate and docking hint.
+     *
+     * @return the readout plate, which name plates must avoid, or null when nothing is drawn
+     */
+    private MapLabelLayout.Box drawApproachLine(List<LocalObjectView> objects, Map<String, Point> points,
+            UiSelection selection, Rect map, double pixelsPerMetre, List<MapLabelLayout.Box> overlays) {
+        if (pilotShipId.isEmpty() || selection.kind() != SelectionKind.LOCAL_OBJECT
+                || selection.stableId().equals(pilotShipId)) return null;
+        LocalObjectView ship = null;
+        LocalObjectView target = null;
+        for (LocalObjectView object : objects) {
+            if (object.stableId().equals(pilotShipId)) ship = object;
+            if (object.stableId().equals(selection.stableId())) target = object;
+        }
+        Point from = ship == null ? null : points.get(ship.stableId());
+        Point to = target == null ? null : points.get(target.stableId());
+        if (from == null || to == null || !ship.systemId().equals(target.systemId())) return null;
+        var offset = ship.position().displacementTo(target.position());
+        ApproachLine.Readout readout = ApproachLine.of(offset.deltaXM(), offset.deltaYM(),
+                pilotVelocityXMps, pilotVelocityYMps, target.kind() == ObjectKind.STATION);
+        MapLabelLayout.Box mapBox = new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height());
+        // Edge to edge, not across the hulls; with touching clearances only the readout remains.
+        float[] between = ApproachLine.trim(from.x(), from.y(), to.x(), to.y(),
+                screenClearance(ship, pixelsPerMetre), screenClearance(target, pixelsPerMetre));
+        float[] visible = between == null ? new float[] {from.x(), from.y(), from.x(), from.y()}
+                : ApproachLine.clip(between[0], between[1], between[2], between[3], mapBox);
+        if (visible == null) return null;
+
+        float scale = metrics.scale();
+        float dx = visible[2] - visible[0];
+        float dy = visible[3] - visible[1];
+        float length = (float) Math.hypot(dx, dy);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        if (length > 0f) {
+            float dash = 8f * scale;
+            float period = dash + 6f * scale;
+            shapes.begin(ShapeRenderer.ShapeType.Filled);
+            shapes.setColor(ImperialUiPalette.MAP_APPROACH_LINE);
+            for (float start = 0f; start < length; start += period) {
+                float end = Math.min(length, start + dash);
+                shapes.rectLine(visible[0] + dx * start / length, visible[1] + dy * start / length,
+                        visible[0] + dx * end / length, visible[1] + dy * end / length, Math.max(1f, 1.5f * scale));
+            }
+            shapes.end();
+        }
+
+        float padX = 4f * scale;
+        float padY = 2f * scale;
+        glyph.setText(fonts.small(), readout.label());
+        float plateWidth = glyph.width + 2f * padX;
+        float plateHeight = fonts.small().getLineHeight() + 2f * padY;
+        MapLabelLayout.Box plate = ApproachLine.placeReadout(visible, plateWidth, plateHeight, 10f * scale,
+                mapBox, overlays);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.MAP_LABEL_PLATE);
+        shapes.rect(plate.x(), plate.y(), plate.width(), plate.height());
+        shapes.end();
+        batch.begin();
+        fonts.small().setColor(switch (readout.dockHint()) {
+            case WITHIN_LIMITS -> ImperialUiPalette.CYAN;
+            case TOO_FAST -> ImperialUiPalette.AMBER;
+            default -> ImperialUiPalette.IVORY;
+        });
+        fonts.small().draw(batch, readout.label(), plate.x() + padX, plate.top() - padY);
+        batch.end();
+        return plate;
+    }
+
+    /** @return on-screen radius of an object: half its hull diagonal when the sprite is shown, else its marker */
+    private float screenClearance(LocalObjectView object, double pixelsPerMetre) {
+        float marker = markerSize(object.kind());
+        float length = (float) (object.physicalLengthM() * pixelsPerMetre);
+        float hullWidth = (float) (object.physicalWidthM() * pixelsPerMetre);
+        boolean hullShown = object.sprite() != null && length >= marker && hullWidth > 0f
+                && Float.isFinite(length) && Float.isFinite(hullWidth);
+        return hullShown ? Math.max(marker * 0.58f, MapLabelLayout.hullClearance(length, hullWidth)) : marker * 0.58f;
+    }
+
+    /** Map title block and scale bar (and the approach readout), which name plates must not cover. */
+    private List<MapLabelLayout.Box> systemMapOverlays(Rect map, String title, String subtitle,
+            MapLabelLayout.Box approachPlate) {
         float scale = metrics.scale();
         glyph.setText(fonts.title(), title);
         float titleWidth = glyph.width;
@@ -1844,7 +1947,7 @@ public final class GeneratedWorldCommandUiRenderer {
         // Scale bar: drawn 18 px in from the corner, up to 22 % of the map wide, with its label above.
         MapLabelLayout.Box scaleBarBox = new MapLabelLayout.Box(map.x(), map.y(),
                 26f * scale + map.width() * 0.22f, 18f * scale + 8f * scale + 16f * scale + 6f * scale);
-        return List.of(titleBox, scaleBarBox);
+        return approachPlate == null ? List.of(titleBox, scaleBarBox) : List.of(titleBox, scaleBarBox, approachPlate);
     }
 
     /** Draws corner brackets around the rotated hull of the selected marker-sized sprite. */
@@ -1937,7 +2040,8 @@ public final class GeneratedWorldCommandUiRenderer {
             Rect map,
             double pixelsPerMetre,
             String title,
-            String subtitle) {
+            String subtitle,
+            MapLabelLayout.Box approachPlate) {
         float scale = metrics.scale();
         float padX = 4f * scale;
         float padY = 2f * scale;
@@ -1992,7 +2096,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         List<MapLabelLayout.Placement> placements = MapLabelLayout.place(requests, markers,
                 new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()),
-                systemMapOverlays(map, title, subtitle), 4f * scale, 8f * scale);
+                systemMapOverlays(map, title, subtitle, approachPlate), 4f * scale, 8f * scale);
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);

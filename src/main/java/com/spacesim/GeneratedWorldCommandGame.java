@@ -863,6 +863,29 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         return true;
     }
 
+    /** Binds the active undocked local ship and its authoritative velocity for the approach line. */
+    private void bindPilotApproach() {
+        var player = campaign.playerState().orElse(null);
+        if (player == null || player.activeFleetId() == null || player.docked()) {
+            renderer.bindPilotApproach("", 0d, 0d);
+            return;
+        }
+        var runtime = campaign.coordinator().runtime();
+        var placement = runtime.world().findFleet(player.activeFleetId()).orElse(null);
+        if (placement == null || placement.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) {
+            renderer.bindPilotApproach("", 0d, 0d);
+            return;
+        }
+        var physical = runtime.arrival().materialization(placement.systemId())
+                .physicalState(placement.localEntityId()).orElse(null);
+        if (physical == null) {
+            renderer.bindPilotApproach("", 0d, 0d);
+            return;
+        }
+        renderer.bindPilotApproach("fleet:" + player.activeFleetId().value(),
+                physical.velocityXMps(), physical.velocityYMps());
+    }
+
     /** Header speed segment: the chosen speed becomes the running state, so it also resumes. */
     private boolean selectSpeed(double scale) {
         setTimeScale(scale);
@@ -956,6 +979,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindTimeSkipActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("time-control"),
                 campaign.timeSkip().active(), editingTimeSkipMinutes);
         renderer.bindSessionActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("session"));
+        bindPilotApproach();
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),
