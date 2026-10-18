@@ -1797,13 +1797,23 @@ public final class Stage228CampaignAuthority {
                 if (definition == null || !handling.supportedStorageClassIds().contains(definition.storageClassId())
                         || kg > handling.openInterval(coordinator.session().fixedStepSeconds()).remainingMassKg())
                     throw new IllegalStateException("Station consumable interface or handling budget unavailable");
+                var service = new com.spacesim.economy.Stage18ShipConsumableService(bindings,
+                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
+                if (ownsProductionStation(endpoint.stationId())) {
+                    // The pilot's own stock: serviced from the station store like unloading, without a sale.
+                    var supplied = service.load(binding.id(), commodity, kg, fitted.fit, old.consumables(), endpoint.storage());
+                    if (!supplied.committed()) throw new IllegalStateException("Own station stock or interface rejected servicing: " + supplied.status());
+                    fitted.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(supplied.consumables(),
+                            old.sharedBusEnergyJ(), old.shipHeatStoredJ(), old.localHeatJByMount(), old.thrustLimitNByMount(),
+                            old.coolantBusCapacityW(), old.ftlCooldownSecondsByMount()));
+                    runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+                    return;
+                }
                 var station = session.getEntityRegistry().require(ref.entityId());
                 var proxy = new com.badlogic.ashley.core.Entity().add(new WalletComponent(playerState.walletMilliCredits()))
                         .add(new com.spacesim.components.IdentityComponent("PLAYER", com.spacesim.components.IdentityComponent.Kind.FLEET));
                 if (playerState.factionContentId() != null) proxy.add(new com.spacesim.components.FactionComponent(
                         world.findFactionRuntimeId(playerState.factionContentId()).orElseThrow()));
-                var service = new com.spacesim.economy.Stage18ShipConsumableService(bindings,
-                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
                 long price = Math.multiplyExact(pilotCommodityPrice(endpoint.stationId(), binding.commodityId(), true), kg);
                 if (!world.createTradeController(session).settlePhysicalCargo(station, proxy,
                         com.spacesim.controllers.TradeTransactionPolicy.Direction.BUY_FROM_STATION, price,
@@ -2405,6 +2415,7 @@ public final class Stage228CampaignAuthority {
             advancePilotAtTick(tick);
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
+            GeneratedCampaignMarketConsumption.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
@@ -2459,6 +2470,7 @@ public final class Stage228CampaignAuthority {
             advancePilotAtTick(tick);
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
+            GeneratedCampaignMarketConsumption.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
