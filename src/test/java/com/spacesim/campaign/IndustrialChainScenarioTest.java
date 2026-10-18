@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Tag("scenario")
 
-@Tag("slow")
+@Tag("soak")
 class IndustrialChainScenarioTest {
     private static final long SEED = 2L;
     private static final double CRUISE_MPS = 1000d;
