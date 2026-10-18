@@ -662,7 +662,10 @@ public final class ProductionUiProjector {
                     : new MarketTable.Row(commodity, pilotCommodityName(definition),
                             campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true),
                             campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false),
-                            holdKg, openingQuote(commodity)));
+                            holdKg, openingQuote(commodity),
+                            // Only quotes the player saw here; nothing between visits is filled in.
+                            campaign.marketObservations().quotes(endpoint.stationId(), commodity).stream()
+                                    .map(q -> new MarketTable.HistoryPoint(q.tick(), q.buyMilliPerKg())).toList()));
         }
         return new MarketTable("station:" + endpoint.stationId(), rows);
     }

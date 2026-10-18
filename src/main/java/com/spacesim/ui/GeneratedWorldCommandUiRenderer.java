@@ -1319,7 +1319,13 @@ public final class GeneratedWorldCommandUiRenderer {
             }
             widths[column - 1] = width;
         }
-        List<MarketTable.Span> spans = MarketTable.columns(left, right, widths, 9f * scale);
+        // The history column holds a small line, not text: give it a fixed readable width.
+        widths[MarketTable.HISTORY_COLUMN - 1] = Math.max(widths[MarketTable.HISTORY_COLUMN - 1], 48f * scale);
+        boolean history = MarketTable.historyFits(right - left, widths, 9f * scale, 64f * scale);
+        if (!history) widths[MarketTable.HISTORY_COLUMN - 1] = 0f;
+        // A narrow inspector tightens the gaps before any number has to be truncated.
+        float gap = MarketTable.neededWidth(widths, 9f * scale, 64f * scale) <= right - left ? 9f * scale : 4f * scale;
+        List<MarketTable.Span> spans = MarketTable.columns(left, right, widths, gap, 64f * scale);
         float nameWidth = Math.max(1f, spans.get(0).width());
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -1333,6 +1339,7 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch, MarketTable.HEADERS.get(0), spans.get(0).left(), y, nameWidth, Align.left, false);
         for (int column = 1; column < columnCount; column++) {
+            if (!history && column == MarketTable.HISTORY_COLUMN) continue;
             MarketTable.Span span = spans.get(column);
             fonts.small().draw(batch, MarketTable.HEADERS.get(column), span.left(), y, 0,
                     MarketTable.HEADERS.get(column).length(), span.width(), Align.right, false, "…");
@@ -1343,6 +1350,7 @@ public final class GeneratedWorldCommandUiRenderer {
             fonts.small().setColor(ImperialUiPalette.IVORY);
             fonts.small().draw(batch, row.get(0), spans.get(0).left(), rowY, 0, row.get(0).length(), nameWidth, Align.left, false, "…");
             for (int column = 1; column < columnCount; column++) {
+                if (!history && column == MarketTable.HISTORY_COLUMN) continue;
                 fonts.small().setColor(column == columnCount - 1 ? switch (MarketTable.trend(dockedMarket.rows().get(index))) {
                     case ABOVE -> ImperialUiPalette.AMBER;
                     case BELOW -> ImperialUiPalette.CYAN;
@@ -1359,6 +1367,30 @@ public final class GeneratedWorldCommandUiRenderer {
                     spans.get(0).left(), rect.y() + line, right - left, Align.left, false);
         }
         batch.end();
+        if (history) drawMarketHistory(spans.get(MarketTable.HISTORY_COLUMN), y, line, Math.min(cells.size(), visibleRows));
+    }
+
+    /** Draws each row's observed buy prices as a small line in the history column; the newest point is marked. */
+    private void drawMarketHistory(MarketTable.Span span, float headerY, float line, int rows) {
+        float scale = metrics.scale();
+        float textHeight = fonts.small().getLineHeight();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (int index = 0; index < rows; index++) {
+            List<MarketTable.HistoryPoint> history = dockedMarket.rows().get(index).history();
+            if (history.isEmpty()) continue;
+            float rowTop = headerY - line * (index + 1) - 4f * scale;
+            MapLabelLayout.Box cell = new MapLabelLayout.Box(span.left(), rowTop - textHeight * 0.85f,
+                    span.width(), textHeight * 0.6f);
+            float[] xy = PriceSparkline.polyline(history.stream()
+                    .map(p -> new PriceSparkline.Point(p.tick(), p.buyMilliPerKg())).toList(), cell);
+            shapes.setColor(ImperialUiPalette.CYAN);
+            for (int point = 2; point < xy.length; point += 2) {
+                shapes.rectLine(xy[point - 2], xy[point - 1], xy[point], xy[point + 1], Math.max(1f, scale));
+            }
+            shapes.setColor(ImperialUiPalette.IVORY);
+            shapes.circle(xy[xy.length - 2], xy[xy.length - 1], Math.max(1.5f, 2f * scale), 10);
+        }
+        shapes.end();
     }
 
     private List<StarSystemId> personalRoutePath = List.of();

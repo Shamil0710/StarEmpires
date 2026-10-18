@@ -67,6 +67,11 @@ class MarketObservationScenarioTest {
         assertEquals(before + 1, afterTrade.size(), "the trade adds one observation");
         assertEquals(pilot.campaign().pilotCommodityPrice(hub, bought, true), afterTrade.get(afterTrade.size() - 1).buyMilliPerKg());
 
+        // The docked table's history column shows exactly the observed buy quotes.
+        var shown = ProductionUiProjector.dockedMarket(pilot.campaign()).rows().stream()
+                .filter(r -> r.commodityId().equals(bought)).findFirst().orElseThrow().history();
+        assertEquals(afterTrade.stream().map(q -> new com.spacesim.ui.MarketTable.HistoryPoint(q.tick(), q.buyMilliPerKg())).toList(), shown);
+
         // Save/load keeps the history exactly, and recording continues after the load.
         var history = pilot.campaign().marketObservations();
         pilot.saveAndReload();
