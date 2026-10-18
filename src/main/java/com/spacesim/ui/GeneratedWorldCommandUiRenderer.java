@@ -234,6 +234,8 @@ public final class GeneratedWorldCommandUiRenderer {
         listRect = Rect.empty();
         mapRect = Rect.empty();
         beginFrame();
+        // Only the system map sets it; other tabs must not inherit last frame's minimap area.
+        systemMinimapBox = null;
         drawFrameChrome(snapshot, tab, paused, timeScale, status);
         if (tab == Tab.SYSTEM && previousRenderedTab != Tab.SYSTEM) {
             localObjectMotion.reset();
@@ -306,6 +308,11 @@ public final class GeneratedWorldCommandUiRenderer {
      * @return topmost target, or {@code null} when the point is not interactive
      */
     public HitTarget hitTest(float x, float y) {
+        // The minimap covers the map corner: clicks on it must not select objects hidden beneath.
+        MapLabelLayout.Box minimap = systemMinimapBox;
+        if (minimap != null && x >= minimap.x() && x <= minimap.right() && y >= minimap.y() && y <= minimap.top()) {
+            return null;
+        }
         for (int index = hitTargets.size() - 1; index >= 0; index--) {
             HitTarget target = hitTargets.get(index);
             if (target.kind() == HitKind.LOCAL_OBJECT && !mapRect.contains(x, y)) {
@@ -1234,11 +1241,14 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(selectedSprite.headingRad()));
         }
 
+        layoutSystemMinimap(layout.map(), projectionRect);
         MapLabelLayout.Box approachPlate = drawApproachLine(snapshot.localObjects(), points, selection, layout.map(),
                 pixelsPerMetre, systemMapOverlays(layout.map(), snapshot.activeSystemName(),
                         systemMapSubtitle(snapshot), null));
         drawMapLabels(snapshot.localObjects(), points, selection, layout.map(), pixelsPerMetre,
                 snapshot.activeSystemName(), systemMapSubtitle(snapshot), approachPlate);
+        drawSystemMinimap(layout.map(), projectionRect, snapshot.localObjects(), smoothedBasePoints, selection,
+                cameraCenterX, cameraCenterY);
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
@@ -2070,7 +2080,64 @@ public final class GeneratedWorldCommandUiRenderer {
         // Scale bar: drawn 18 px in from the corner, up to 22 % of the map wide, with its label above.
         MapLabelLayout.Box scaleBarBox = new MapLabelLayout.Box(map.x(), map.y(),
                 26f * scale + map.width() * 0.22f, 18f * scale + 8f * scale + 16f * scale + 6f * scale);
-        return approachPlate == null ? List.of(titleBox, scaleBarBox) : List.of(titleBox, scaleBarBox, approachPlate);
+        List<MapLabelLayout.Box> overlays = new ArrayList<>(List.of(titleBox, scaleBarBox));
+        if (approachPlate != null) overlays.add(approachPlate);
+        if (systemMinimapBox != null) overlays.add(systemMinimapBox);
+        return List.copyOf(overlays);
+    }
+
+    /** Minimap box of the current frame, or null when the minimap is not shown. */
+    private MapLabelLayout.Box systemMinimapBox;
+
+    /** Chooses where the minimap goes this frame, before anything that must avoid it is placed. */
+    private void layoutSystemMinimap(Rect map, Rect frame) {
+        systemMinimapBox = SystemMinimap.shown(systemMapCamera.zoom())
+                ? SystemMinimap.box(new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()),
+                        new MapLabelLayout.Box(frame.x(), frame.y(), frame.width(), frame.height()),
+                        150f * metrics.scale(), 10f * metrics.scale())
+                : null;
+    }
+
+    /** Draws the whole system overview with object dots and the camera rectangle. */
+    private void drawSystemMinimap(Rect map, Rect frame, List<LocalObjectView> objects,
+            Map<String, PresentationMotionSmoother.Point> basePoints, UiSelection selection,
+            float cameraCenterX, float cameraCenterY) {
+        MapLabelLayout.Box box = systemMinimapBox;
+        if (box == null) return;
+        MapLabelLayout.Box frameBox = new MapLabelLayout.Box(frame.x(), frame.y(), frame.width(), frame.height());
+        float scale = metrics.scale();
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.MAP_LABEL_PLATE);
+        shapes.rect(box.x(), box.y(), box.width(), box.height());
+        String selectedId = selection.kind() == SelectionKind.LOCAL_OBJECT ? selection.stableId() : "";
+        // Layers: other objects, then the player's ship, then the selection, so neither is hidden.
+        for (int layer = 0; layer < 3; layer++) {
+            for (LocalObjectView object : objects) {
+                PresentationMotionSmoother.Point base = basePoints.get(object.stableId());
+                if (base == null) continue;
+                boolean selected = object.stableId().equals(selectedId);
+                boolean player = !selected && object.stableId().equals(pilotShipId);
+                int objectLayer = selected ? 2 : player ? 1 : 0;
+                if (objectLayer != layer) continue;
+                float[] dot = SystemMinimap.toMinimap(base.x(), base.y(), frameBox, box);
+                shapes.setColor(selected ? ImperialUiPalette.BRASS : player ? ImperialUiPalette.CYAN : factionColor(object.factionId()));
+                shapes.circle(dot[0], dot[1], (selected || player ? 3f : 2f) * scale, 12);
+            }
+        }
+        shapes.end();
+        MapLabelLayout.Box camera = SystemMinimap.cameraRect(
+                new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()), systemMapCamera.zoom(),
+                systemMapCamera.panX(), systemMapCamera.panY(), cameraCenterX, cameraCenterY, frameBox, box);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(ImperialUiPalette.GUNMETAL);
+        shapes.rect(box.x(), box.y(), box.width(), box.height());
+        if (camera != null) {
+            shapes.setColor(ImperialUiPalette.IVORY);
+            shapes.rect(camera.x(), camera.y(), Math.max(1f, camera.width()), Math.max(1f, camera.height()));
+        }
+        shapes.end();
     }
 
     /** Draws corner brackets around the rotated hull of the selected marker-sized sprite. */
