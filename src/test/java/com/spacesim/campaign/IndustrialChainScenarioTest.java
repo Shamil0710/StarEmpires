@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * build and commission the starter batch-processing facility. Only pilot inputs; nothing is granted.
  */
 @Tag("scenario")
-@org.junit.jupiter.api.Disabled("Not yet passing end to end after the cheap-water change; rerun and fix before enabling")
+
 @Tag("slow")
 class IndustrialChainScenarioTest {
     private static final long SEED = 2L;
@@ -41,7 +41,7 @@ class IndustrialChainScenarioTest {
 
     @Test
     @org.junit.jupiter.api.Timeout(value = 30, unit = java.util.concurrent.TimeUnit.MINUTES)
-    void ordinaryPilotBuildsAndCommissionsTheStarterProcessingFacility() {
+    void ordinaryPilotBuildsAndCommissionsTheStarterProcessingFacility() throws java.io.IOException {
         long t0 = System.nanoTime();
         var start = Stage228CampaignAuthority.create(SEED);
         start.submitIndependentPilotStart(start.previewIndependentPilotStart());
@@ -66,14 +66,19 @@ class IndustrialChainScenarioTest {
         long price = pilot.campaign().stationSalePriceMilliCredits(STATION);
         while (pilot.player().walletMilliCredits() < price) {
             long quote = pilot.campaign().pilotCommodityPrice(hub, "commodity.feedstock.metallic_ore", false);
-            double shortfallKg = Math.ceil((price - pilot.player().walletMilliCredits()) / (double) quote * 1.1) + 100;
+            // A round trip costs a fixed ~63,000 credits of reaction mass, so carry a full working load.
+            double shortfallKg = Math.max(20_000, Math.ceil((price - pilot.player().walletMilliCredits()) / (double) quote * 1.1) + 100);
             mine(pilot, "commodity.feedstock.metallic_ore", shortfallKg);
-            pilot.fly(endpoint(pilot, hub).position(), 500, CRUISE_MPS);
-            pilot.action("DOCK", hub, "", 0);
-            pilot.tick();
-            sellAll(pilot, hub, "commodity.feedstock.metallic_ore");
-            refuel(pilot, hub);
-            pilot.action("UNDOCK", "", "", 0);
+            // Sell at each local market in turn until the load is gone or no market can pay.
+            for (String market : java.util.List.of(hub, STATION)) {
+                if (cargoKg(pilot, "commodity.feedstock.metallic_ore") < 1) break;
+                pilot.fly(endpoint(pilot, market).position(), 500, CRUISE_MPS);
+                pilot.action("DOCK", market, "", 0);
+                pilot.tick();
+                sellWhilePaid(pilot, market, "commodity.feedstock.metallic_ore");
+                refuel(pilot, market);
+                pilot.action("UNDOCK", "", "", 0);
+            }
             System.out.printf("SCENARIO wallet %.0f / %.0f credits%n", pilot.player().walletMilliCredits() / 1000d, price / 1000d);
         }
         phase("earned station price", t, pilot);
@@ -108,6 +113,8 @@ class IndustrialChainScenarioTest {
             phase("delivered " + Math.round(ore.getValue()) + " kg " + ore.getKey(), t, pilot);
         }
         pilot.saveAndReload();
+        com.spacesim.persistence.Stage228GeneratedCampaignPersistenceCodec.write(
+                java.nio.file.Path.of("target", "industrial-chain-before-refining.s25"), pilot.campaign().captureState());
 
         // 5. Refine the three alloys at the owned bulk refinery.
         t = System.nanoTime();
@@ -116,12 +123,18 @@ class IndustrialChainScenarioTest {
         for (var alloy : bill.entrySet()) {
             String ore = ORE_BY_ALLOY.get(alloy.getKey());
             int kg = (int) Math.floor(storedKg(pilot, ore));
-            pilot.action("START_REFINING", STATION, RECIPE_BY_ALLOY.get(alloy.getKey()), kg);
-            for (double before = -1; storedKg(pilot, alloy.getKey()) + 1e-6 < alloy.getValue(); pilot.ticks(1000)) {
-                if (storedKg(pilot, alloy.getKey()) <= before) throw new AssertionError("refining of " + alloy.getKey()
-                        + " stopped at " + storedKg(pilot, alloy.getKey()) + " kg of " + alloy.getValue());
-                before = storedKg(pilot, alloy.getKey());
+            String recipe = RECIPE_BY_ALLOY.get(alloy.getKey());
+            pilot.action("START_REFINING", STATION, recipe, kg);
+            String orderId = com.spacesim.economy.Stage18ManufacturingWorkQueue.REFINING_PREFIX + STATION + ':' + recipe;
+            // Output arrives when the order completes; progress is the order's completed fraction.
+            for (double before = -1; storedKg(pilot, alloy.getKey()) + 1e-6 < alloy.getValue(); pilot.ticks(5000)) {
+                double done = refiningProgress(pilot, orderId);
+                if (done <= before) throw new AssertionError("refining " + recipe + " stalled at " + done
+                        + " of the order; " + storedKg(pilot, alloy.getKey()) + " kg of " + alloy.getValue());
+                before = done;
             }
+            System.out.printf("SCENARIO refined %.0f kg %s at tick %d%n", storedKg(pilot, alloy.getKey()), alloy.getKey(),
+                    pilot.world().getAuthoritativeWorldTick());
         }
         phase("refined " + bill.keySet(), t, pilot);
 
@@ -202,9 +215,14 @@ class IndustrialChainScenarioTest {
     }
 
     private static void mine(ScenarioPilot pilot, String commodity, double kg) {
-        var site = mappedSites(pilot, commodity).filter(k -> k.object().systemId().equals(pilot.fleet().systemId()))
-                .min(Comparator.comparingDouble(k -> k.knownLocation().orElseThrow().distanceTo(pilot.physical().position())))
-                .orElseThrow(() -> new AssertionError("no mapped site of " + commodity + " in " + pilot.fleet().systemId()));
+        // Prefer a mapped site in the current system; otherwise jump to the system of a mapped site.
+        var here = pilot.fleet().systemId();
+        var site = mappedSites(pilot, commodity)
+                .min(Comparator.comparing((com.spacesim.world.Stage20DiscoveryKnowledgeState.StaticKnowledge k) -> !k.object().systemId().equals(here))
+                        .thenComparingDouble(k -> k.object().systemId().equals(here)
+                                ? k.knownLocation().orElseThrow().distanceTo(pilot.physical().position()) : 0d))
+                .orElseThrow(() -> new AssertionError("no mapped site of " + commodity));
+        if (!site.object().systemId().equals(here)) pilot.travel(site.object().systemId());
         pilot.fly(site.knownLocation().orElseThrow(), 500, CRUISE_MPS);
         double target = cargoKg(pilot, commodity) + kg;
         pilot.action("START_MINING", site.object().objectId(), "", 1000);
@@ -216,6 +234,18 @@ class IndustrialChainScenarioTest {
             last = cargoKg(pilot, commodity);
         }
         pilot.action("STOP_MINING", "", "", 0);
+    }
+
+    /** Sells while this market (refilled by its operator between ticks) can still pay; leaves the rest. */
+    private static void sellWhilePaid(ScenarioPilot pilot, String station, String commodity) {
+        for (int idle = 0; cargoKg(pilot, commodity) >= 1 && idle <= 60; pilot.tick()) {
+            long quote = pilot.campaign().pilotCommodityPrice(station, commodity, false);
+            int kg = (int) Math.min(Math.min(Math.floor(cargoKg(pilot, commodity)), handlingKg(pilot, station)),
+                    marketWallet(pilot, station) / Math.max(1, quote));
+            if (kg >= 1) { pilot.action("SELL", station, commodity, kg); idle = 0; } else idle++;
+        }
+        System.out.printf("SCENARIO sold at %s; %.0f kg left, market wallet %.0f credits%n", station,
+                cargoKg(pilot, commodity), marketWallet(pilot, station) / 1000d);
     }
 
     /** Sells in batches the market can pay for now; its operator refills the docked market between ticks. */
@@ -238,17 +268,28 @@ class IndustrialChainScenarioTest {
                 .getComponent(com.spacesim.components.WalletComponent.class).getBalanceMilliCredits();
     }
 
+    /** Unloads in per-tick batches; a tick whose handling budget other traffic already used is simply retried. */
     private static void unloadAll(ScenarioPilot pilot, String station, String commodity) {
-        while (cargoKg(pilot, commodity) >= 1) {
+        for (int idle = 0; cargoKg(pilot, commodity) >= 1; pilot.tick()) {
             int kg = (int) Math.min(Math.floor(cargoKg(pilot, commodity)), handlingKg(pilot, station));
-            pilot.action("UNLOAD_COMMODITY", station, commodity, kg);
-            pilot.tick();
+            if (pilot.allowed("UNLOAD_COMMODITY", station, commodity, kg)) {
+                pilot.action("UNLOAD_COMMODITY", station, commodity, kg);
+                idle = 0;
+            } else if (++idle > 600) {
+                pilot.action("UNLOAD_COMMODITY", station, commodity, kg); // fails with the authority's reason
+            }
         }
     }
 
     private static double handlingKg(ScenarioPilot pilot, String station) {
         return Math.floor(endpoint(pilot, station).handlingCapability().massRateKgPerSecond()
                 * pilot.campaign().coordinator().session().fixedStepSeconds());
+    }
+
+    /** @return completed fraction of the refining order, or 2 once it has completed and left the queue */
+    private static double refiningProgress(ScenarioPilot pilot, String orderId) {
+        return pilot.campaign().coordinator().runtime().captureState().campaign().industrialState().processOrders().stream()
+                .filter(o -> o.orderId().equals(orderId)).mapToDouble(o -> o.completedFraction()).findFirst().orElse(2d);
     }
 
     private static OrderStatus constructionStatus(ScenarioPilot pilot, String orderId) {
