@@ -654,18 +654,15 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     private boolean missionActions;
-    private boolean missionConfirmation;
     private boolean pilotStartActions;
-    private boolean pilotStartConfirmation;
     private List<GeneratedCampaignFactionUi.Action> factionActions = List.of();
-    private boolean factionConfirmation;
     /**
-     * Binds the current row's presentation intents without granting faction authority.
+     * Binds the current row's presentation intents without granting faction authority; the
+     * confirmation comes from {@link #bindConfirmStates}.
      * @param actions selected personal faction intents
-     * @param confirmation current exact preview
      */
-    public void bindFactionActions(List<GeneratedCampaignFactionUi.Action> actions, boolean confirmation) {
-        factionActions = List.copyOf(actions); factionConfirmation = confirmation;
+    public void bindFactionActions(List<GeneratedCampaignFactionUi.Action> actions) {
+        factionActions = List.copyOf(actions);
     }
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
@@ -744,19 +741,17 @@ public final class GeneratedWorldCommandUiRenderer {
     public void bindAmmunitionManufacturingAction(boolean selected) { ammunitionManufacturing = selected; }
     private boolean ammunitionManufacturing;
     private String physicalPilotAssetAction = "";
-    private boolean physicalPilotConfirmation;
     private int physicalPilotKilograms;
 
     /**
-     * Binds presentation-only docking/trade controls to the current personal market row.
+     * Binds presentation-only docking/trade controls to the current personal market row; the
+     * confirmation comes from {@link #bindConfirmStates}.
      * @param available whether the selected row belongs to a commissioned personal market
      * @param trade whether quantity and buy/sell are relevant
-     * @param confirmation whether a validated current preview awaits confirmation
      * @param kilograms currently requested whole kilograms
      */
-    public void bindPhysicalPilotActions(boolean available, boolean trade, boolean confirmation, int kilograms) {
-        physicalPilotActions = available; physicalPilotTrade = trade;
-        physicalPilotConfirmation = confirmation; physicalPilotKilograms = kilograms;
+    public void bindPhysicalPilotActions(boolean available, boolean trade, int kilograms) {
+        physicalPilotActions = available; physicalPilotTrade = trade; physicalPilotKilograms = kilograms;
     }
 
     /**
@@ -779,8 +774,7 @@ public final class GeneratedWorldCommandUiRenderer {
             button(r,action.label(),true);hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-"+action.id(),null,r));
         }
         Rect confirm=new Rect(inspectorRect.x()+16f*scale,inspectorRect.y()+12f*scale,inspectorRect.width()-32f*scale,36f*scale);
-        button(confirm,"ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ РЕШЕНИЕ",factionConfirmation);
-        if(factionConfirmation)hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-confirm",null,confirm));
+        drawConfirm(confirm, factionConfirm, "pilot.government-confirm");
     }
 
     private boolean timeSkipActions;
@@ -995,17 +989,44 @@ public final class GeneratedWorldCommandUiRenderer {
             hitTargets.add(new HitTarget(HitKind.ACTION, ownCommodityHandling ? "pilot.unload-commodity" : "pilot.sell", null, second));
         }
         Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
-        button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
-        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, foundation ? "pilot.faction-confirm" : "pilot.physical-confirm", null, confirm));
+        drawConfirm(confirm, physicalConfirm, foundation ? "pilot.faction-confirm" : "pilot.physical-confirm");
+    }
+
+    private ConfirmButton.State physicalConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State missionConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State factionConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State pilotStartConfirm = ConfirmButton.hidden();
+
+    /**
+     * Binds the confirmation buttons; each exists only after a preview and names its outcome.
+     *
+     * @param physical physical pilot action or own-faction foundation
+     * @param mission personal contract command
+     * @param faction own-faction, fleet or small-craft decision
+     * @param pilotStart independent pilot start
+     */
+    public void bindConfirmStates(ConfirmButton.State physical, ConfirmButton.State mission,
+            ConfirmButton.State faction, ConfirmButton.State pilotStart) {
+        physicalConfirm = Objects.requireNonNull(physical, "physical");
+        missionConfirm = Objects.requireNonNull(mission, "mission");
+        factionConfirm = Objects.requireNonNull(faction, "faction");
+        pilotStartConfirm = Objects.requireNonNull(pilotStart, "pilotStart");
+    }
+
+    /** Draws a confirm button only after a preview; only an allowed preview is pressable. */
+    private void drawConfirm(Rect rect, ConfirmButton.State state, String id) {
+        if (!state.visible()) return;
+        button(rect, state.label(), state.enabled());
+        if (state.enabled()) hitTargets.add(new HitTarget(HitKind.ACTION, id, null, rect));
     }
 
     /**
-     * Binds new-game start buttons to the selected disclosed conditions.
+     * Binds new-game start buttons to the selected disclosed conditions; the confirmation comes
+     * from {@link #bindConfirmStates}.
      * @param available whether the selected row is the new-game offer
-     * @param confirmation whether a permitted authority preview is pending
      */
-    public void bindPilotStartActions(boolean available, boolean confirmation) {
-        pilotStartActions = available; pilotStartConfirmation = confirmation;
+    public void bindPilotStartActions(boolean available) {
+        pilotStartActions = available;
     }
 
     private void drawPilotStartActions() {
@@ -1015,20 +1036,19 @@ public final class GeneratedWorldCommandUiRenderer {
         button(check, "ПРОВЕРИТЬ УСЛОВИЯ СТАРТА", true);
         hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.preview", null, check));
         Rect confirm = new Rect(check.x(), inspectorRect.y() + 12f * scale, check.width(), check.height());
-        button(confirm, "КУПИТЬ КОРАБЛЬ И НАЧАТЬ", pilotStartConfirmation);
-        if (pilotStartConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.confirm", null, confirm));
+        drawConfirm(confirm, pilotStartConfirm, "pilot.confirm");
     }
 
     /**
      * Binds presentation-only availability for the currently selected personal contract.
      * The application owns preview tokens and revalidates every command before submission.
      *
+     * The confirmation comes from {@link #bindConfirmStates}.
+     *
      * @param selectedPersonalMission whether the selected row is a personal contract
-     * @param confirmationAvailable whether a permitted preview awaits explicit confirmation
      */
-    public void bindMissionActions(boolean selectedPersonalMission, boolean confirmationAvailable) {
+    public void bindMissionActions(boolean selectedPersonalMission) {
         missionActions = selectedPersonalMission;
-        missionConfirmation = confirmationAvailable;
     }
 
     private boolean supplyMissionQuantity;
@@ -1064,8 +1084,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         Rect confirm = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 12f * scale,
                 inspectorRect.width() - 32f * scale, 36f * scale);
-        button(confirm, missionConfirmation ? "ПОДТВЕРДИТЬ ДЕЙСТВИЕ" : "СНАЧАЛА ПРОВЕРЬТЕ ДЕЙСТВИЕ", missionConfirmation);
-        if (missionConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "mission.confirm", null, confirm));
+        drawConfirm(confirm, missionConfirm, "mission.confirm");
     }
 
     private void drawKeyboardFocus() {
@@ -1889,8 +1908,10 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.end();
         batch.begin();
         fonts.body().setColor(enabled ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
-        fonts.body().draw(batch, label, rect.x(), rect.y() + rect.height() * 0.63f,
-                rect.width(), Align.center, false);
+        // Long outcome labels end with an ellipsis instead of spilling past the button.
+        float inset = 6f * metrics.scale();
+        fonts.body().draw(batch, label, rect.x() + inset, rect.y() + rect.height() * 0.63f, 0, label.length(),
+                Math.max(1f, rect.width() - 2f * inset), Align.center, false, "…");
         batch.end();
     }
 

@@ -47,6 +47,10 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private String pendingGovernmentSelection = "";
     private Stage228CampaignAuthority.PlayerFactionFoundationPreview pendingFactionFoundation;
     private String pendingPilotSelection = "";
+    /** Outcome named on the confirm buttons, captured with each preview. */
+    private String pendingPilotOutcome = "";
+    private String pendingMissionOutcome = "";
+    private String pendingGovernmentOutcome = "";
     private int pilotKilograms = 1;
     private int refiningKilograms = 100;
     private int componentKilograms = 100;
@@ -478,6 +482,11 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             } catch(IllegalStateException exception){status="Условия изменились. Проверьте решение заново.";}
         } else {
             campaign.coordinator().setPaused(true);pendingGovernmentSelection=selected;pendingGovernment=null;
+            var offered = craft ? com.spacesim.ui.GeneratedCampaignCraftUi.actions(campaign, selected)
+                    : fleet ? com.spacesim.ui.GeneratedCampaignFleetUi.actions(selected)
+                    : com.spacesim.ui.GeneratedCampaignFactionUi.actions(selected);
+            pendingGovernmentOutcome = offered.stream().filter(a -> a.id().equals(action)).map(a -> a.label().toUpperCase(java.util.Locale.ROOT))
+                    .findFirst().orElse("РЕШЕНИЕ");
             try {
                 pendingGovernment=craft ? com.spacesim.ui.GeneratedCampaignCraftUi.preview(campaign,selected,action) : fleet ? com.spacesim.ui.GeneratedCampaignFleetUi.preview(campaign,selected,action) : com.spacesim.ui.GeneratedCampaignFactionUi.preview(campaign,selected,action);
                 status=pendingGovernment.allowed()?(group ? "Состав и юридическая регистрация группы проверены."
@@ -570,11 +579,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         if (pieces.length < 2 || !(ammunition || scan || jump || market || asset || finance || supply || report || resourceMap || stationMap || routeMap || mining || manufacturing || construction || craftBuild || journal || repair || refit || moduleTransfer || productTransfer)) return false;
         campaign.coordinator().setPaused(true);
         pendingPilotSelection = id;
-        pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "",
-                action.equals("START_COMPONENT_MANUFACTURING") ? componentKilograms
+        int amount = action.equals("START_COMPONENT_MANUFACTURING") ? componentKilograms
                 : action.equals("START_REFINING") ? refiningKilograms
                 : action.equals("START_MANUFACTURING") && com.spacesim.content.Stage23AmmunitionProduction.supports(pieces[2]) ? ammunitionUnits
-                : manufacturing || craftBuild ? 1 : pilotKilograms);
+                : manufacturing || craftBuild ? 1 : pilotKilograms;
+        pendingPilotPhysical = campaign.previewPilotAction(action, pieces[1], pieces.length > 2 ? pieces[2] : "", amount);
+        pendingPilotOutcome = com.spacesim.ui.ConfirmButton.physicalOutcome(action, amount,
+                pendingPilotPhysical.walletChangeMilliCredits());
         if (ammunition) {
             status = pendingPilotPhysical.allowed() ? "Подтвердите загрузку " + pilotKilograms
                     + " шт. из собственного склада в магазин. Масса и общий бюджет обработки проверены."
@@ -714,6 +725,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
                 && mission.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST
                 ? Math.toIntExact(Math.min(pilotKilograms, mission.objective().threshold())) : 0;
         pendingMissionPreview = campaign.previewMissionCommand(command, id, supplyPortion);
+        pendingMissionOutcome = com.spacesim.ui.ConfirmButton.missionOutcome(command.name(), supplyPortion,
+                supplyPortion > 0 ? pendingMissionPreview.proposedRewardMilliCredits() : 0L);
         status = pendingMissionPreview.allowed()
                 ? switch (command) {
                     case ACCEPT -> supplyPortion > 0 ? "На паузе. Принять поставку " + supplyPortion
@@ -972,14 +985,14 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         }
         String missionId = selectedPersonalMissionId();
         if (pendingMissionPreview != null && !pendingMissionPreview.missionId().equals(missionId)) pendingMissionPreview = null;
-        renderer.bindMissionActions(missionId != null, pendingMissionPreview != null && pendingMissionPreview.allowed());
+        renderer.bindMissionActions(missionId != null);
         var selectedMission = missionId == null ? null : campaign.coordinator().npcMissions().missions().stream()
                 .filter(m -> m.missionId().equals(missionId)).findFirst().orElse(null);
         boolean supplyOffer = selectedMission != null && selectedMission.status() == com.spacesim.world.Stage21HNpcMissionState.MissionStatus.OFFERED
                 && selectedMission.objective().kind() == com.spacesim.world.Stage21HNpcMissionState.ObjectiveKind.PLAYER_SUPPLY_DELIVERY_KG_AT_LEAST;
         renderer.bindSupplyMissionQuantity(supplyOffer, supplyOffer ? Math.toIntExact(Math.min(pilotKilograms, selectedMission.objective().threshold())) : 0);
         if (!selectedPilotStart()) pendingPilotStart = null;
-        renderer.bindPilotStartActions(selectedPilotStart(), pendingPilotStart != null && pendingPilotStart.allowed());
+        renderer.bindPilotStartActions(selectedPilotStart());
         String selectedPilot = workspace.view().selection().stableId();
         renderer.bindTimeSkipActions(workspace.tab() == Tab.SETTINGS && selectedPilot.equals("time-control"),
                 campaign.timeSkip().active(), editingTimeSkipMinutes);
@@ -1056,14 +1069,25 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindPersonalNotificationCount(campaign.playerJournal().unreadCount());
         renderer.bindOwnCommodityHandling(selectedPilot.startsWith("pilot-cargo|"));
         renderer.bindPhysicalPilotActions(selectedAmmunition || selectedScan || selectedJournal || foundation || finance || selectedJump || selectedSupply || selectedReport || selectedResourceMap || selectedStationMap || selectedRouteMap || !productTransferAction.isEmpty() || !moduleTransferAction.isEmpty() || !repairAction.isEmpty() || !refitAction.isEmpty() || !manufacturingAction.isEmpty() || !miningAction.isEmpty() || !assetAction.isEmpty() || workspace.tab() == Tab.LOGISTICS && (selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-cargo|") || selectedPilot.startsWith("pilot-station|")),
-                selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-cargo|"), foundation ? pendingFactionFoundation != null && pendingFactionFoundation.allowed()
-                        : pendingPilotPhysical != null && pendingPilotPhysical.allowed(),
+                selectedPilot.startsWith("pilot-market|") || selectedPilot.startsWith("pilot-cargo|"),
                 manufacturingAction.equals("START_COMPONENT_MANUFACTURING") ? componentKilograms
                 : manufacturingAction.equals("START_REFINING") ? refiningKilograms
                 : ammunitionManufacturing ? ammunitionUnits : pilotKilograms);
         if (!selectedPilot.equals(pendingGovernmentSelection)) pendingGovernment = null;
-        renderer.bindFactionActions(workspace.tab() == Tab.FACTIONS ? com.spacesim.ui.GeneratedCampaignFactionUi.actions(selectedPilot) : workspace.tab() == Tab.MILITARY ? com.spacesim.ui.GeneratedCampaignFleetUi.actions(selectedPilot) : workspace.tab() == Tab.SHIPS ? com.spacesim.ui.GeneratedCampaignCraftUi.actions(campaign, selectedPilot) : List.of(),
-                pendingGovernment != null && pendingGovernment.allowed());
+        renderer.bindFactionActions(workspace.tab() == Tab.FACTIONS ? com.spacesim.ui.GeneratedCampaignFactionUi.actions(selectedPilot) : workspace.tab() == Tab.MILITARY ? com.spacesim.ui.GeneratedCampaignFleetUi.actions(selectedPilot) : workspace.tab() == Tab.SHIPS ? com.spacesim.ui.GeneratedCampaignCraftUi.actions(campaign, selectedPilot) : List.of());
+        // Confirm buttons exist only after a preview and name its outcome.
+        var hidden = com.spacesim.ui.ConfirmButton.hidden();
+        renderer.bindConfirmStates(
+                foundation ? pendingFactionFoundation == null ? hidden
+                        : com.spacesim.ui.ConfirmButton.previewed(pendingFactionFoundation.allowed(), "ОСНОВАНИЕ «СОДРУЖЕСТВА ПИЛОТА»")
+                        : pendingPilotPhysical == null ? hidden
+                        : com.spacesim.ui.ConfirmButton.previewed(pendingPilotPhysical.allowed(), pendingPilotOutcome),
+                pendingMissionPreview == null ? hidden
+                        : com.spacesim.ui.ConfirmButton.previewed(pendingMissionPreview.allowed(), pendingMissionOutcome),
+                pendingGovernment == null ? hidden
+                        : com.spacesim.ui.ConfirmButton.previewed(pendingGovernment.allowed(), pendingGovernmentOutcome),
+                pendingPilotStart == null ? hidden
+                        : com.spacesim.ui.ConfirmButton.previewed(pendingPilotStart.allowed(), "ПОКУПКА РЕЗЕРВНОГО КОРАБЛЯ И НАЧАЛО ИГРЫ"));
         renderer.bindSaveAvailability(!campaign.canStartIndependentPilot());
         renderer.bindWorkspace(production, workspace);
         renderer.render(snapshot, workspace.tab(), workspace.view().selection(), workspace.view().detailScroll(),
