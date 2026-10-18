@@ -493,10 +493,25 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         // After the tabs, so keyboard focus still reaches the tabs first.
         drawTimeControl(paused, timeScale);
+        // Message on the left, context controls on the right; the message keeps priority.
+        String message = status == null ? "" : status;
+        String hints = ControlHints.forTab(active, !pilotShipId.isEmpty());
+        float available = width - metrics.outerMargin() * 2f;
+        glyph.setText(fonts.small(), message);
+        float messageWidth = glyph.width;
+        glyph.setText(fonts.small(), hints);
+        float hintsWidth = glyph.width;
+        ControlHints.Split split = ControlHints.split(available, messageWidth, hintsWidth,
+                24f * metrics.scale(), 260f * metrics.scale());
         batch.begin();
         fonts.small().setColor(ImperialUiPalette.IVORY);
-        fonts.small().draw(batch, status == null || status.isBlank() ? "Tab: фокус • Enter: действие • Esc: назад" : status,
-                metrics.outerMargin(), statusHeight * 0.68f, width - metrics.outerMargin() * 2f, Align.left, false);
+        fonts.small().draw(batch, message, metrics.outerMargin(), statusHeight * 0.68f, 0, message.length(),
+                split.statusWidth(), Align.left, false, "…");
+        if (split.hintsShown()) {
+            fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
+            fonts.small().draw(batch, hints, width - metrics.outerMargin() - hintsWidth, statusHeight * 0.68f,
+                    hintsWidth, Align.right, false);
+        }
         batch.end();
     }
 
@@ -1935,9 +1950,8 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     private static String systemMapSubtitle(GeneratedWorldUiSnapshot snapshot) {
-        return snapshot.localObjects().size()
-                + " объектов  •  единый масштаб в метрах  •  двойной клик: сопровождение"
-                + "  •  СКМ/Home: отмена";
+        // Controls live in the status bar (ControlHints); the title keeps facts about the map.
+        return snapshot.localObjects().size() + " объектов  •  единый масштаб в метрах";
     }
 
     /**
