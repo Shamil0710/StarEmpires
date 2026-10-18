@@ -57,11 +57,11 @@ class GeneratedCampaignPilotPhysicalTest {
         var wallet = c.coordinator().runtime().world().findSession(ref.systemId()).orElseThrow().getEntityRegistry().require(ref.entityId()).getComponent(WalletComponent.class);
         double stock = endpoint.storage().commodityMassKg(WATER); long personal = c.playerState().orElseThrow().walletMilliCredits(); long station = wallet.getBalanceMilliCredits();
         var buy = c.previewPilotAction("BUY", endpoint.stationId(), WATER, 1);
-        assertTrue(buy.allowed()); assertEquals(-5000, buy.walletChangeMilliCredits()); c.submitPilotAction(buy);
+        assertTrue(buy.allowed()); assertEquals(-50, buy.walletChangeMilliCredits()); c.submitPilotAction(buy);
         assertEquals(stock - 1, endpoint.storage().commodityMassKg(WATER));
         assertEquals(1d, c.coordinator().runtime().freight().cargoHoldSnapshot(fleet).commodityMassByIdKg().get(WATER));
-        assertEquals(personal - 5000, c.playerState().orElseThrow().walletMilliCredits());
-        assertEquals(station + 5000, wallet.getBalanceMilliCredits());
+        assertEquals(personal - 50, c.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(station + 50, wallet.getBalanceMilliCredits());
         assertFalse(c.previewPilotAction("SELL", endpoint.stationId(), WATER, 1).allowed());
         var restored = roundtrip(c);
         assertFalse(restored.previewPilotAction("SELL", endpoint.stationId(), WATER, 1).allowed());
@@ -69,7 +69,7 @@ class GeneratedCampaignPilotPhysicalTest {
         var sell = c.previewPilotAction("SELL", endpoint.stationId(), WATER, 1);
         assertTrue(sell.allowed()); c.submitPilotAction(sell);
         assertEquals(0d, c.coordinator().runtime().freight().findFreighter(fleet).orElseThrow().cargoMassKg());
-        assertEquals(personal - 500, c.playerState().orElseThrow().walletMilliCredits());
+        assertEquals(personal + buy.walletChangeMilliCredits() + sell.walletChangeMilliCredits(), c.playerState().orElseThrow().walletMilliCredits());
         roundtrip(c);
         c.submitPilotAction(c.previewPilotAction("UNDOCK", "", "", 0));
         assertFalse(c.playerState().orElseThrow().docked());

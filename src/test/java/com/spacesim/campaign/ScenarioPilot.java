@@ -62,8 +62,13 @@ final class ScenarioPilot {
     /** Submits one previewed pilot action; a rejection fails the scenario with the authority's reason. */
     long action(String verb, String target, String subject, int amount) {
         var preview = campaign.previewPilotAction(verb, target, subject, amount);
-        if (!preview.allowed()) throw new AssertionError("Rejected " + verb + " target=" + target + " subject=" + subject
-                + " amount=" + amount + " at tick=" + world().getAuthoritativeWorldTick() + ": " + rejectionReason(verb, target, subject, amount));
+        if (!preview.allowed()) {
+            String reason = rejectionReason(verb, target, subject, amount);
+            String checkpoint = saveFailureCheckpoint();
+            throw new AssertionError("Rejected " + verb + " target=" + target + " subject=" + subject
+                    + " amount=" + amount + " at tick=" + world().getAuthoritativeWorldTick() + ": " + reason
+                    + " (checkpoint " + checkpoint + ")");
+        }
         campaign.submitPilotAction(preview);
         return preview.walletChangeMilliCredits();
     }
@@ -80,11 +85,27 @@ final class ScenarioPilot {
                     String.class, String.class, String.class, int.class);
             execute.setAccessible(true);
             execute.invoke(isolated, verb, target, subject, amount);
+            // The preview also captures the result; its persistence invariants can reject what execution allowed.
+            isolated.captureState();
             return "no exception on isolated copy";
         } catch (java.lang.reflect.InvocationTargetException e) {
             return String.valueOf(e.getCause());
         } catch (ReflectiveOperationException e) {
             return "diagnostic unavailable: " + e;
+        } catch (RuntimeException e) {
+            return "capture after execution failed: " + e;
+        }
+    }
+
+    /** Writes the failing state so a short probe can reproduce the rejection without replaying the scenario. */
+    private String saveFailureCheckpoint() {
+        try {
+            var path = java.nio.file.Path.of("target", "scenario-failure-" + world().getAuthoritativeWorldTick() + ".s25");
+            java.nio.file.Files.createDirectories(path.getParent());
+            Stage228GeneratedCampaignPersistenceCodec.write(path, campaign.captureState());
+            return path.toString();
+        } catch (java.io.IOException | RuntimeException e) {
+            return "not saved: " + e;
         }
     }
 
