@@ -49,7 +49,9 @@ class GeneratedCampaignBootstrapMaterialsPersistenceTest {
                 pending.smallCraft(), pending.hangars(), pending.flightDeck(), pending.operations(), before.playerState()));
         byte[] bytes = Stage228GeneratedCampaignPersistenceCodec.encode(pending);
         java.nio.ByteBuffer.wrap(bytes).putInt(4, 20).putInt(8, 20);
-        int length = ((bytes[12] & 0xff) << 8) | (bytes[13] & 0xff); bytes[14 + length - 1] = '0';
+        // Forge the whole historical runtime identity, not just its last digit.
+        byte[] v20 = "m22.8.generated-campaign.v20".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int length = ((bytes[12] & 0xff) << 8) | (bytes[13] & 0xff); assertEquals(length, v20.length); System.arraycopy(v20, 0, bytes, 14, length);
         assertTrue(assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(bytes))
                 .getMessage().contains("native campaign v21"));
         loaded.coordinator().runtime().constructionQueue().cancel(order, loaded.coordinator().runtime().infrastructure().endpoint(station.stationId()).storage());

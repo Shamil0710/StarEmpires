@@ -27,7 +27,8 @@ class GeneratedCampaignPersonalMiningTest {
         byte[] forged = Stage228GeneratedCampaignPersistenceCodec.encode(before);
         java.nio.ByteBuffer.wrap(forged).putInt(4, 21).putInt(8, 21);
         byte[] runtime = com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        forged[14 + runtime.length - 1] = (byte) '1';
+        byte[] v21 = "m22.8.generated-campaign.v21".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals(runtime.length, v21.length); System.arraycopy(v21, 0, forged, 14, v21.length);
         var error = assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(forged));
         assertTrue(error.getMessage().contains("receipt series"));
         assertEquals(before, c.captureState());
