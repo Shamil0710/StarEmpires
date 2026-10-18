@@ -192,12 +192,8 @@ public final class ProductionUiProjector {
                     if (!hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
                             || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())
                             || !endpoint.storage().snapshot().capacityByStorageClassKg().containsKey(definition.storageClassId())) continue;
-                    logistics.add(row((ownStation ? "pilot-cargo|" : "pilot-market|") + endpoint.stationId() + "|" + commodity, switch (commodity) {
-                        case "commodity.material.purified_water" -> "Очищенная вода";
-                        case "commodity.material.structural_alloy" -> "Конструкционный сплав";
-                        case "commodity.feedstock.metallic_ore" -> "Металлическая руда";
-                        default -> definition.displayName();
-                    }, ownStation ? "Собственный склад" : "Товары личного рынка", name,
+                    logistics.add(row((ownStation ? "pilot-cargo|" : "pilot-market|") + endpoint.stationId() + "|" + commodity,
+                            pilotCommodityName(definition), ownStation ? "Собственный склад" : "Товары личного рынка", name,
                             List.of(InfoSection.of(ownStation ? "Перемещение собственного груза" : "Физическая сделка", "Запас станции", ownStation ? String.format(Locale.ROOT, "%.3f кг", endpoint.storage().commodityMassKg(commodity)) : "Доступность проверяется при сделке",
                                     "В трюме", String.format(Locale.ROOT, "%.3f кг", hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d)),
                                     "Свободно на складе", ownStation ? String.format(Locale.ROOT, "%.3f кг", endpoint.storage().remainingCapacityKg(definition.storageClassId())) : "Проверяется при сделке",
@@ -631,6 +627,63 @@ public final class ProductionUiProjector {
             String provenance, StarSystemId system, long fleet, long tick) {
         return new Row(new UiSelection(SelectionKind.SURFACE_ROW, id), name, category, summary,
                 sections, provenance, system, fleet, tick);
+    }
+
+    private static String pilotCommodityName(com.spacesim.content.Stage18ResourceOntologyCatalog.CommodityDefinition definition) {
+        return switch (definition.id()) {
+            case "commodity.material.purified_water" -> "Очищенная вода";
+            case "commodity.material.structural_alloy" -> "Конструкционный сплав";
+            case "commodity.feedstock.metallic_ore" -> "Металлическая руда";
+            default -> definition.displayName();
+        };
+    }
+
+    /**
+     * Market quotes of the station the player's active ship is docked at, for the system-map
+     * inspector. Quotes are disclosed only while docked; an own station shows hold contents without
+     * prices. Uses the same commodity filter as the docked logistics rows.
+     *
+     * @param campaign current campaign
+     * @return the docked station's table, or null when the ship is not docked at a local market
+     */
+    public static MarketTable dockedMarket(Stage228CampaignAuthority campaign) {
+        var player = campaign.playerState().orElse(null);
+        if (player == null || player.activeFleetId() == null || !player.docked()) return null;
+        var runtime = campaign.coordinator().runtime();
+        var fleet = runtime.world().findFleet(player.activeFleetId()).orElse(null);
+        if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return null;
+        var hold = runtime.freight().findFreighter(fleet.fleetId()).orElse(null);
+        for (var endpoint : runtime.infrastructure().endpoints()) {
+            if (!endpoint.systemId().equals(fleet.systemId())) continue;
+            var ref = campaign.pilotMarketReference(endpoint.stationId()).orElse(null);
+            if (ref == null || !ref.equals(player.dockedAt())) continue;
+            boolean ownStation = campaign.ownsProductionStation(endpoint.stationId());
+            var rows = new ArrayList<MarketTable.Row>();
+            for (var definition : PERSONAL_RESOURCE_ONTOLOGY.getCommodities()) {
+                String commodity = definition.id();
+                if (hold == null || !hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
+                        || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())
+                        || !endpoint.storage().snapshot().capacityByStorageClassKg().containsKey(definition.storageClassId())) continue;
+                double holdKg = hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d);
+                rows.add(ownStation
+                        ? new MarketTable.Row(commodity, pilotCommodityName(definition), null, null, holdKg, null)
+                        : new MarketTable.Row(commodity, pilotCommodityName(definition),
+                                campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true),
+                                campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false),
+                                holdKg, openingQuote(commodity)));
+            }
+            return new MarketTable("station:" + endpoint.stationId(), rows);
+        }
+        return null;
+    }
+
+    /** @return disclosed opening buy quote, or null for a commodity without one (no trend shown) */
+    private static Long openingQuote(String commodity) {
+        try {
+            return Stage228CampaignAuthority.pilotCommodityPrice(commodity, true);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private static String credits(long value) {

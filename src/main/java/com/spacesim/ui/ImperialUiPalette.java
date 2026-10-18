@@ -32,6 +32,12 @@ public final class ImperialUiPalette {
     public static final Color GRID = new Color(0.27f, 0.31f, 0.32f, 0.32f);
     /** Major lines of the blended metric system-map grid. */
     public static final Color MAP_GRID_MAJOR = new Color(0.42f, 0.50f, 0.52f, 0.55f);
+    /** Dashed approach line from the player's ship to the selected object. */
+    public static final Color MAP_APPROACH_LINE = new Color(0.30f, 0.58f, 0.65f, 0.75f);
+    /** Translucent plate under system-map object names. */
+    public static final Color MAP_LABEL_PLATE = new Color(0.055f, 0.075f, 0.085f, 0.78f);
+    /** Leader line from a displaced name plate to its object. */
+    public static final Color MAP_LABEL_LEADER = new Color(0.82f, 0.80f, 0.75f, 0.55f);
     /** Faint minor lines of the blended metric system-map grid. */
     public static final Color MAP_GRID_MINOR = new Color(0.42f, 0.50f, 0.52f, 0.22f);
 
