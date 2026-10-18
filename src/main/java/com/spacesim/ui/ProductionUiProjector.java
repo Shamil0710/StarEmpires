@@ -647,34 +647,24 @@ public final class ProductionUiProjector {
      * @return the docked station's table, or null when the ship is not docked at a local market
      */
     public static MarketTable dockedMarket(Stage228CampaignAuthority campaign) {
-        var player = campaign.playerState().orElse(null);
-        if (player == null || player.activeFleetId() == null || !player.docked()) return null;
-        var runtime = campaign.coordinator().runtime();
-        var fleet = runtime.world().findFleet(player.activeFleetId()).orElse(null);
-        if (fleet == null || fleet.locationKind() != com.spacesim.world.FleetLocationKind.IN_SYSTEM) return null;
-        var hold = runtime.freight().findFreighter(fleet.fleetId()).orElse(null);
-        for (var endpoint : runtime.infrastructure().endpoints()) {
-            if (!endpoint.systemId().equals(fleet.systemId())) continue;
-            var ref = campaign.pilotMarketReference(endpoint.stationId()).orElse(null);
-            if (ref == null || !ref.equals(player.dockedAt())) continue;
-            boolean ownStation = campaign.ownsProductionStation(endpoint.stationId());
-            var rows = new ArrayList<MarketTable.Row>();
-            for (var definition : PERSONAL_RESOURCE_ONTOLOGY.getCommodities()) {
-                String commodity = definition.id();
-                if (hold == null || !hold.cargoStorage().capacityByStorageClassKg().containsKey(definition.storageClassId())
-                        || !endpoint.handlingCapability().supportedStorageClassIds().contains(definition.storageClassId())
-                        || !endpoint.storage().snapshot().capacityByStorageClassKg().containsKey(definition.storageClassId())) continue;
-                double holdKg = hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d);
-                rows.add(ownStation
-                        ? new MarketTable.Row(commodity, pilotCommodityName(definition), null, null, holdKg, null)
-                        : new MarketTable.Row(commodity, pilotCommodityName(definition),
-                                campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true),
-                                campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false),
-                                holdKg, openingQuote(commodity)));
-            }
-            return new MarketTable("station:" + endpoint.stationId(), rows);
+        var endpoint = com.spacesim.campaign.DockedMarketQuotes.dockedEndpoint(campaign).orElse(null);
+        if (endpoint == null) return null;
+        var hold = campaign.coordinator().runtime().freight().findFreighter(campaign.playerState().orElseThrow().activeFleetId()).orElse(null);
+        boolean ownStation = campaign.ownsProductionStation(endpoint.stationId());
+        var rows = new ArrayList<MarketTable.Row>();
+        // One commodity rule for the table and the recorded observations (DockedMarketQuotes).
+        for (var definition : hold == null ? List.<com.spacesim.content.Stage18ResourceOntologyCatalog.CommodityDefinition>of()
+                : com.spacesim.campaign.DockedMarketQuotes.eligible(hold, endpoint)) {
+            String commodity = definition.id();
+            double holdKg = hold.cargoStorage().commodityMassByIdKg().getOrDefault(commodity, 0d);
+            rows.add(ownStation
+                    ? new MarketTable.Row(commodity, pilotCommodityName(definition), null, null, holdKg, null)
+                    : new MarketTable.Row(commodity, pilotCommodityName(definition),
+                            campaign.pilotCommodityPrice(endpoint.stationId(), commodity, true),
+                            campaign.pilotCommodityPrice(endpoint.stationId(), commodity, false),
+                            holdKg, openingQuote(commodity)));
         }
-        return null;
+        return new MarketTable("station:" + endpoint.stationId(), rows);
     }
 
     /** @return disclosed opening buy quote, or null for a commodity without one (no trend shown) */

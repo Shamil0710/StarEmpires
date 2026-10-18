@@ -44,7 +44,7 @@ final class HistoricalCampaignTimeControlFixture {
             if (admissionLength <= 0 || admissionLength > input.available()) throw new AssertionError("Invalid fixture admission framing");
             if (!com.spacesim.persistence.IndustrialStationAdmissionCodec.decode(in.readNBytes(admissionLength)).isEmpty())
                 throw new AssertionError("Historical fixture cannot discard industrial admissions");
-            HistoricalCampaignContentFixture.skipEmptyBuild(in);
+            HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in);
             if (in.read() != -1) throw new AssertionError("Trailing current fixture bytes");
             bytes = prefix.toByteArray();
         } catch (java.io.IOException exception) { throw new AssertionError(exception); }

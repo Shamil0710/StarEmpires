@@ -241,16 +241,27 @@ class GeneratedCampaignSmallCraftBuildTest {
         var noBuild = withBuilds(before, ShipyardSmallCraftBuildQueueState.empty());
         var individuallyFits = GeneratedCampaignPlayerWorldTransition.composeRuntime(noBuild, nextRuntime, before.playerState());
         assertThrows(IllegalArgumentException.class, () -> withBuilds(individuallyFits, before.smallCraftBuilds()));
+        // Same current-version framing with only the build section replaced: the empty build decodes,
+        // the combined escrow does not, so the rejection is about the overflow and nothing else.
+        var control = withReplacedBuilds(individuallyFits, ShipyardSmallCraftBuildQueueState.empty());
+        assertEquals(individuallyFits, Stage228GeneratedCampaignPersistenceCodec.decode(control));
+        var forged = withReplacedBuilds(individuallyFits, before.smallCraftBuilds());
+        assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(forged));
+        assertEquals(before, c.captureState());
+    }
+    private static byte[] withReplacedBuilds(Stage228GeneratedCampaignPersistentState state, ShipyardSmallCraftBuildQueueState builds)
+            throws Exception {
         var bytes = new ByteArrayOutputStream();
-        try (var in = new DataInputStream(new ByteArrayInputStream(Stage228GeneratedCampaignPersistenceCodec.encode(individuallyFits)));
+        try (var in = new DataInputStream(new ByteArrayInputStream(Stage228GeneratedCampaignPersistenceCodec.encode(state)));
                 var out = new DataOutputStream(bytes)) {
             out.writeInt(in.readInt()); out.writeInt(in.readInt()); out.writeInt(in.readInt()); out.writeUTF(in.readUTF());
             for (int i = 0; i < 19; i++) { int length = in.readInt(); out.writeInt(length); out.write(in.readNBytes(length)); }
-            HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
-            byte[] payload = ShipyardSmallCraftBuildQueuePersistenceCodec.encode(before.smallCraftBuilds()); out.writeInt(payload.length); out.write(payload);
+            HistoricalCampaignContentFixture.skipEmptyBuild(in);
+            int observationLength = in.readInt(); byte[] observations = in.readNBytes(observationLength); assertEquals(-1, in.read());
+            byte[] payload = ShipyardSmallCraftBuildQueuePersistenceCodec.encode(builds); out.writeInt(payload.length); out.write(payload);
+            out.writeInt(observationLength); out.write(observations);
         }
-        assertThrows(IllegalArgumentException.class, () -> Stage228GeneratedCampaignPersistenceCodec.decode(bytes.toByteArray()));
-        assertEquals(before, c.captureState());
+        return bytes.toByteArray();
     }
     static byte[] asV28(Stage228GeneratedCampaignPersistentState state) throws Exception {
         var bytes = new ByteArrayOutputStream();
@@ -258,7 +269,7 @@ class GeneratedCampaignSmallCraftBuildTest {
                 var out = new DataOutputStream(bytes)) {
             out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF(); out.writeInt(28); out.writeInt(28); out.writeUTF("m22.8.generated-campaign.v28");
             for (int i = 0; i < 19; i++) { int length = in.readInt(); byte[] payload = in.readNBytes(length); assertEquals(length, payload.length); out.writeInt(length); out.write(payload); }
-            HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
+            HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in); assertEquals(-1, in.read());
         }
         return bytes.toByteArray();
     }

@@ -934,7 +934,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     private boolean load() {
         try {
             var candidate = Stage228CampaignAuthority.restore(
-                    Stage228GeneratedCampaignPersistenceCodec.readOrMigrate(savePath));
+                    Stage228GeneratedCampaignPersistenceCodec.readCurrent(savePath));
             var coordinator = candidate.coordinator();
             var nextModel = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
                     com.spacesim.ui.GeneratedCampaignCarrierUi.source(candidate), () -> candidate.playerState().orElse(null));
@@ -1121,6 +1121,12 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
     static String safeMessage(Throwable exception) {
         // Exception messages can include absolute paths or save payload fragments.
         if (exception instanceof IOException) return "Не удалось прочитать или записать файл.";
+        if (exception instanceof com.spacesim.persistence.UnsupportedSaveVersionException unsupported) {
+            return unsupported.fileVersion() < 0
+                    ? "Файл не является сохранением кампании."
+                    : "Сохранение формата v" + unsupported.fileVersion() + " создано другой сборкой и не поддерживается"
+                            + " (эта сборка загружает v" + unsupported.currentVersion() + "). Кампания не изменена.";
+        }
         if (exception instanceof IllegalArgumentException) return "Данные или параметры не прошли проверку.";
         if (exception instanceof IllegalStateException) return "Состояние кампании не прошло проверку.";
         return "Внутренняя ошибка обработки.";

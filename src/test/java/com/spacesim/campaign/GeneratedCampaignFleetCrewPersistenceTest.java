@@ -45,7 +45,7 @@ class GeneratedCampaignFleetCrewPersistenceTest {
             assertTrue(com.spacesim.persistence.PersonalCraftOwnershipCodec.decode(in.readNBytes(ownershipLength)).isEmpty());
             int admissionLength = in.readInt();
             assertTrue(com.spacesim.persistence.IndustrialStationAdmissionCodec.decode(in.readNBytes(admissionLength)).isEmpty());
-            HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
+            HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in); assertEquals(-1, in.read());
         }
         var migrated = Stage228GeneratedCampaignPersistenceCodec.decode(buffer.toByteArray());
         assertEquals(Stage23FleetCrewManifest.unobserved(), migrated.crewManifest());

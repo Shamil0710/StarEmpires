@@ -115,7 +115,7 @@ class GeneratedCampaignStorageExpansionTest {
                 var out = new DataOutputStream(bytes)) {
             out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
             out.writeInt(27); out.writeInt(27); out.writeUTF("m22.8.generated-campaign.v27");
-            HistoricalCampaignContentFixture.copyPayloads(in, out, 19); HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
+            HistoricalCampaignContentFixture.copyPayloads(in, out, 19); HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in); assertEquals(-1, in.read());
         }
         var saved = Stage228GeneratedCampaignPersistenceCodec.decode(bytes.toByteArray()); assertEquals(baseline, saved);
         assertEquals(saved, Stage228CampaignAuthority.restore(saved).captureState());
