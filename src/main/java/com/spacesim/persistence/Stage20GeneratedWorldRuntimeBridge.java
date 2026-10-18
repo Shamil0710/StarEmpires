@@ -278,6 +278,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 .add(freightEngineering(fleet));
     }
 
+    private static final String UNION_KINETIC_FEED = "kinetic_feed";
+    private static final String UNION_DART_AMMUNITION = "ammo.industrial_union_dart_140kg_v1";
+
     /**
      * Projects the legacy Stage-20 freight ownership row onto its reviewed Stage-22 physical asset.
      *
@@ -287,8 +290,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      * not an infinite-flight fallback.</p>
      */
     private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
-        String fitId = fleet.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
-                && fleet.stableFactionId().equals("faction.beta") ? fleet.fitId() : switch (fleet.stableFactionId()) {
+        boolean unionVariant = fleet.stableFactionId().equals("faction.beta") && (fleet.fitId().equals(
+                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
+                || fleet.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT));
+        String fitId = unionVariant ? fleet.fitId() : switch (fleet.stableFactionId()) {
             case "faction.alpha" ->
                     com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
                             .EMPIRE_FREIGHT_STRATEGIC_FIT;
@@ -321,6 +326,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                             iface.capacity(),
                             iface.capacity(),
                             0L));
+                } else if (iface.kind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.AMMUNITION) {
+                    // Armed reserves start with an empty magazine; rounds are loaded only by ordinary supply.
+                    loads.add(new com.spacesim.ship.ShipEngineeringState.ConsumableLoad(
+                            installed.mountId(), iface.id(), iface.kind(), 0, 0, 0L));
                 }
             }
         }
@@ -333,10 +342,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 fit,
                 consumables,
                 com.spacesim.ship.ShipEngineeringState.DamageState.pristine());
-        return new com.spacesim.components.EngineeringComponent(
-                fit,
-                operating,
-                com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral());
+        var instance = com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral();
+        if (fitId.equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT)) {
+            // The armed reserve's kinetic feed is bound to the Union 140 kg dart that pilots can manufacture.
+            instance = new com.spacesim.ship.ShipInstanceRuntimeState(instance.damage(), instance.shieldStatesByMount(),
+                    instance.maintenance(), new com.spacesim.ship.WeaponLoadoutState(java.util.List.of(
+                            new com.spacesim.ship.WeaponLoadoutState.FeedBinding(
+                                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.FREIGHT_WEAPON_HARDPOINT,
+                                    UNION_KINETIC_FEED, UNION_DART_AMMUNITION))),
+                    instance.weaponMountRuntime());
+        }
+        return new com.spacesim.components.EngineeringComponent(fit, operating, instance);
     }
 
     private static void rollbackCreatedFreight(

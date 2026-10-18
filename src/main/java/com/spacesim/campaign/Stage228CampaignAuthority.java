@@ -414,7 +414,8 @@ public final class Stage228CampaignAuthority {
                         com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT))
                 .findFirst();
         var reserve = miner.flatMap(m -> idle.stream()
-                        .filter(f -> !f.fleetId().equals(m.fleetId()))
+                        .filter(f -> !f.fleetId().equals(m.fleetId()) && !f.fitId().equals(
+                                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT))
                         .filter(f -> world.findFleet(f.fleetId()).orElseThrow().systemId()
                                 .equals(world.findFleet(m.fleetId()).orElseThrow().systemId()))
                         .findFirst())
