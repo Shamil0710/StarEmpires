@@ -78,7 +78,7 @@ final class ScenarioPilot {
     }
 
     /** Diagnostic only: repeats the rejected action on an isolated restored copy to surface its exception. */
-    private String rejectionReason(String verb, String target, String subject, int amount) {
+    String rejectionReason(String verb, String target, String subject, int amount) {
         try {
             var isolated = Stage228CampaignAuthority.restore(campaign.captureState());
             var execute = Stage228CampaignAuthority.class.getDeclaredMethod("executePilotAction",
