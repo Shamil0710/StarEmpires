@@ -1097,6 +1097,26 @@ public final class Stage228CampaignAuthority {
                     PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v2");
         }
         initializeOperatorTreasuries(marketsByOperator);
+        initializeHubOpeningStock();
+    }
+
+    /** New-game finite stock of volatile feedstock at every trade hub that can store it. */
+    public static final double HUB_OPENING_VOLATILE_STOCK_KG = 200_000d;
+
+    /**
+     * Ordinary miners cannot work volatile-bearing bodies, so trade hubs open with a finite, disclosed
+     * stock of volatile feedstock that pilots buy for chemical processing. Placed once at new-game start.
+     */
+    private void initializeHubOpeningStock() {
+        var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+        String volatiles = "commodity.feedstock.volatile_feedstock";
+        String storageClass = ontology.findCommodity(volatiles).storageClassId();
+        for (var endpoint : coordinator.runtime().infrastructure().endpoints()) {
+            if (!endpoint.stationArchetypeId().equals("station.infrastructure.trade_logistics_hub")
+                    || !endpoint.handlingCapability().supportedStorageClassIds().contains(storageClass)
+                    || endpoint.storage().remainingCapacityKg(storageClass) < HUB_OPENING_VOLATILE_STOCK_KG) continue;
+            com.spacesim.economy.NewGameOpeningStock.stock(endpoint.storage(), volatiles, HUB_OPENING_VOLATILE_STOCK_KG);
+        }
     }
 
     /** New-game operator treasury, as a multiple of the opening working capital of the operator's markets. */
