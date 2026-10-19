@@ -655,6 +655,7 @@ public record Stage228GeneratedCampaignPersistentState(
  * @param industrialAdmissions explicit existing-station legal operators
      * @param personalCraftOwnership explicit personal property rights independent of current host
      * @param marketObservations quotes the player actually saw while docked
+     * @param stationSalePolicies the pilot's price and reserve terms for own-station stock
      */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {

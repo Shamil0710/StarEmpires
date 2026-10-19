@@ -377,6 +377,7 @@ public final class ProductionUiProjector {
         industry.addAll(GeneratedCampaignSmallCraftBuildUi.rows(campaign));
         industry.addAll(GeneratedCampaignAmmunitionManufacturingUi.rows(campaign, ammunitionUnits));
         industry.addAll(GeneratedCampaignRefiningUi.rows(campaign));
+        industry.addAll(GeneratedCampaignStationSaleUi.rows(campaign));
         industry.addAll(GeneratedCampaignComponentUi.rows(campaign, componentKilograms));
         industry.addAll(GeneratedCampaignConstructionUi.rows(campaign));
         industry.addAll(GeneratedCampaignYardConstructionUi.rows(campaign));

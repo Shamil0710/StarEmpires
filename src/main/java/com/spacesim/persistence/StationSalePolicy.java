@@ -27,7 +27,13 @@ public record StationSalePolicy(String stationId, String commodityId, long askMi
     public static final long MAX_ASK_MILLI_CREDITS_PER_KG = 100_000_000L;
     private static final int MAX_POLICIES = 4096;
 
-    /** Validates one set of terms. */
+    /**
+     * Validates one set of terms.
+     * @param stationId personally owned station
+     * @param commodityId commodity offered
+     * @param askMilliCreditsPerKg the pilot's price per kilogram, or 0 for the station's market price
+     * @param reserveKg stock kept back from any sale
+     */
     public StationSalePolicy {
         if (stationId == null || commodityId == null || stationId.isBlank() || commodityId.isBlank()
                 || stationId.length() > 256 || commodityId.length() > 256)
