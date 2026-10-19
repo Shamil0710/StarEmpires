@@ -1171,6 +1171,27 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
 
         /**
+         * Moves already extracted commodity from a source outpost into a station of the same system,
+         * through the ordinary Stage-18 logistics authority and both handling limits.
+         *
+         * @param siteId generated source-outpost site
+         * @param stationId receiving station in the outpost's system
+         * @param massKg recovered commodity mass
+         * @param durationSeconds local handling interval
+         * @return ordinary Stage-18 physical transfer result
+         */
+        public TransferResult transferOutpostToStation(String siteId, String stationId, double massKg, double durationSeconds) {
+            MaterializedExtractionOutpost outpost = industry.sourceOutposts().outpost(siteId);
+            RuntimeEndpoint station = infrastructure.endpoint(stationId);
+            if (!outpost.site().systemId().equals(station.systemId()))
+                throw new IllegalArgumentException("source outpost and station must share a system");
+            HandlingCapability handling = intersectHandling("stage23b.outpost-to-station:" + siteId + ':' + stationId,
+                    outpost.stationNode().handlingCapability(), station.handlingCapability());
+            return logistics.transferCommodity(outpost.storage(), station.storage(),
+                    outpost.source().sourceState().outputCommodityId(), massKg, handling, handling.openInterval(durationSeconds));
+        }
+
+        /**
          * Moves already extracted cargo from its outpost to the order's exact local major hub.
          *
          * @param fleetId order-owning freight fleet

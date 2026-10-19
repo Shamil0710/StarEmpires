@@ -2527,6 +2527,7 @@ public final class Stage228CampaignAuthority {
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
             GeneratedCampaignMarketConsumption.review(this, tick);
+            GeneratedCampaignWaterWorks.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
@@ -2583,6 +2584,7 @@ public final class Stage228CampaignAuthority {
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
             GeneratedCampaignMarketConsumption.review(this, tick);
+            GeneratedCampaignWaterWorks.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
