@@ -249,6 +249,10 @@ final class ScenarioPilot {
             if (cruise < .1) throw new AssertionError("No finite flight and braking plan");
             plan = ENGINEERING.planDeltaV(fitted, Math.hypot(ux * cruise - initial.velocityXMps(), uy * cruise - initial.velocityYMps()) + cruise);
         }
+        // A crawl on an almost empty tank takes days of ticks; an ordinary pilot would refuel first.
+        if (cruise < cruiseLimitMps / 8) throw new AssertionError(String.format(java.util.Locale.ROOT,
+                "Too little reaction mass for a working flight: %.0f kg aboard allows only %.1f of %.0f m/s cruise",
+                reactionMassKg(), cruise, cruiseLimitMps));
         double brakingAcceleration = .8 * plan.deliveredDeltaVMps() / plan.burnSeconds();
         float step = campaign.coordinator().session().fixedStepSeconds();
         while (true) {

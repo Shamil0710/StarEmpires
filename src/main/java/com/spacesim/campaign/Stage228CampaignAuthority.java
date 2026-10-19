@@ -108,6 +108,7 @@ public final class Stage228CampaignAuthority {
                 && (!id.equals(this.playerState.activeFleetId()) || !this.playerState.docked())
                 && this.coordinator.runtime().world().findFleetJump(id).isEmpty()
                 && canAdvanceExactPersonalFleet(id));
+        this.coordinator.runtime().bindPersonalStations(new GeneratedCampaignPersonalStations(this));
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         this.flightDeck = Objects.requireNonNull(flightDeck, "flightDeck");
@@ -352,6 +353,19 @@ public final class Stage228CampaignAuthority {
         for (long contact : GeneratedCampaignPersonalSensors.review(this, tick))
             recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "SENSOR_CONTACT_DETECTED",
                     "", "Контакт " + contact, 1, 0, playerState.activeFleetId());
+    }
+
+    /**
+     * Credits an NPC purchase from the pilot's station, already paid into {@code wallet}, and journals it.
+     * Called by world logistics inside the tick; the stock has already left the station.
+     */
+    void receivePersonalStationSale(long wallet, String stationId, String commodityId, double massKg, long paid) {
+        var p = playerState;
+        playerState = new PlayerState(wallet, p.factionContentId(), p.reputations(), p.ownedFleetIds(), p.activeFleetId(),
+                p.discoveredSystemIds(), p.discoveredObjects(), p.homeSystemId(), p.dockedAt(), p.fleetOrders(), p.threatIntel(),
+                p.ownedConstructionProjectIds(), p.ownedStations());
+        recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "STATION_SALE", stationId, commodityId,
+                Math.round(massKg), paid, null);
     }
 
     private void recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind kind, String action,
@@ -1297,7 +1311,11 @@ public final class Stage228CampaignAuthority {
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
                         - (p.action.equals("SELL") ? playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
                                 && e.kind() == com.spacesim.player.PlayerJournalState.Kind.MISSION_CHANGED)
-                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum() : 0),
+                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum() : 0)
+                        // NPC purchases at the pilot's station during the command's own ticks (SCAN) are journaled already.
+                        - playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
+                                && e.action().equals("STATION_SALE"))
+                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum(),
                 p.action.equals("PURCHASE") || p.action.equals("SWITCH") ? new FleetId(Long.parseLong(p.station))
                         : p.action.equals("CAPITALIZE") || p.action.equals("WITHDRAW") ? null : beforeFleet);
         if (p.action.equals("DOCK")) notifyContactedSupplyOffers(false);

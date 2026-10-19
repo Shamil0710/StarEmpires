@@ -540,6 +540,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
         private final com.spacesim.economy.Stage18ManufacturingWorkQueue manufacturingQueue;
         private final com.spacesim.economy.Stage18FacilityConstructionWorkQueue constructionQueue;
+        private PersonalStationAccess personalStations = PersonalStationAccess.NONE;
 
         private LiveRuntime(
                 Stage20GeneratedCampaignPersistentState campaignAuthority,
@@ -580,8 +581,19 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 throw new IllegalArgumentException("Manufacturing watermark exceeds world time");
             this.world.bindFleetPropellantLogisticsAuthority(
                     new Stage22GeneratedWorldPropellantLogisticsAuthority(
-                            this.world, this.infrastructure, this.industry));
+                            this.world, this.infrastructure, this.industry, () -> personalStations));
         }
+
+        /**
+         * Binds the campaign's view of personally owned stations for world logistics; transient, rebound on restore.
+         * @param access campaign authority over the pilot's stations
+         */
+        public void bindPersonalStations(PersonalStationAccess access) {
+            personalStations = Objects.requireNonNull(access, "personalStations");
+        }
+
+        /** @return the campaign's view of personally owned stations, or {@link PersonalStationAccess#NONE} */
+        public PersonalStationAccess personalStations() { return personalStations; }
 
         /** @return current immutable observer-local discovery registry */
         public Stage20DiscoveryPersistentState discoveryState() { return discovery; }

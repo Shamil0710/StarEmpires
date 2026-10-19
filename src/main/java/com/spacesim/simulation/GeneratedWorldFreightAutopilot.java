@@ -65,7 +65,7 @@ public final class GeneratedWorldFreightAutopilot {
                 case AT_SOURCE -> {
                     TransportOrderState order = runtime.freight()
                             .findOrder(fleet.activeOrderId()).orElseThrow();
-                    if (!hasLegalOrderAccess(fleet, order)) {
+                    if (!hasLegalOrderAccess(fleet, order) || servesPersonalStation(order)) {
                         continue;
                     }
                     var endpoint = runtime.infrastructure().endpoint(order.sourceEndpointId());
@@ -223,6 +223,15 @@ public final class GeneratedWorldFreightAutopilot {
                 Math.min(outpostStorageOutputKg, stagingOutputKg));
         maxSourceMassKg = Math.min(maxSourceMassKg, outputBudgetKg / recoveryFraction);
         return Math.max(0d, maxSourceMassKg);
+    }
+
+    /**
+     * A station sold to a pilot leaves its seller's recurring program: no new cycle loads for it or
+     * from it. A run already under way still completes; the freighter then waits at its source.
+     */
+    private boolean servesPersonalStation(TransportOrderState order) {
+        var personal = runtime.personalStations();
+        return personal.personallyOwned(order.sourceEndpointId()) || personal.personallyOwned(order.destinationEndpointId());
     }
 
     private boolean hasLegalOrderAccess(FreighterState fleet, TransportOrderState order) {
