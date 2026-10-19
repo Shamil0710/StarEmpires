@@ -11,6 +11,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Align;
 import com.spacesim.economy.Money;
+import com.spacesim.presentation.asset.BackgroundParallax;
 import com.spacesim.presentation.asset.SectorSpaceBackgroundTextureRenderer;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
 import com.spacesim.presentation.asset.Stage22RuntimeSpriteEffects;
@@ -1115,12 +1116,6 @@ public final class GeneratedWorldCommandUiRenderer {
         mapRect = layout.map();
         panel(layout.map(), ImperialUiPalette.MAP_SURFACE, ImperialUiPalette.GUNMETAL);
         panel(layout.inspector(), ImperialUiPalette.PANEL_SURFACE, ImperialUiPalette.GUNMETAL);
-        Rect backgroundRect = inset(layout.map(), Math.max(2f, 4f * metrics.scale()));
-        batch.begin();
-        sectorBackgrounds.draw(batch, snapshot.worldSeed(), snapshot.activeSystemId(),
-                backgroundRect.x(), backgroundRect.y(), backgroundRect.width(), backgroundRect.height());
-        batch.end();
-
         Rect projectionRect = inset(layout.map(), 28f * metrics.scale());
         PhysicalMapProjection projection = resolveSystemProjection(snapshot, projectionRect);
         double pixelsPerMetre = projection.pixelsPerMetre() * systemMapCamera.zoom();
@@ -1165,6 +1160,15 @@ public final class GeneratedWorldCommandUiRenderer {
                     systemMapCamera.transformX(base.x(), cameraCenterX),
                     systemMapCamera.transformY(base.y(), cameraCenterY)));
         }
+        // Drawn after the follow focus, so the parallax uses this frame's camera.
+        Rect backgroundRect = inset(layout.map(), Math.max(2f, 4f * metrics.scale()));
+        float zoom = systemMapCamera.zoom();
+        batch.begin();
+        sectorBackgrounds.draw(batch, snapshot.worldSeed(), snapshot.activeSystemId(),
+                backgroundRect.x(), backgroundRect.y(), backgroundRect.width(), backgroundRect.height(), zoom,
+                BackgroundParallax.viewOffset(zoom, systemMapCamera.panX()),
+                BackgroundParallax.viewOffset(zoom, systemMapCamera.panY()), metrics.scale());
+        batch.end();
         drawMetricGrid(layout.map(), projection, pixelsPerMetre, cameraCenterX, cameraCenterY);
         // Scissor oversized hulls against the map, including on HiDPI displays.
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
