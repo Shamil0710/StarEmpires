@@ -53,6 +53,9 @@ public final class GeneratedWorldCommandUiRenderer {
             new SectorSpaceBackgroundTextureRenderer();
     private final MiningBeamRenderer miningBeamRenderer = new MiningBeamRenderer();
     private final MiningBeamEffects miningEffects = new MiningBeamEffects();
+    private final MapHaloRenderer haloRenderer = new MapHaloRenderer();
+    /** Presentation clock of halo pulsing and beacon blinking; it reads no simulation time. */
+    private float haloClock;
     private List<MiningBeam> miningBeams = List.of();
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
@@ -1183,6 +1186,13 @@ public final class GeneratedWorldCommandUiRenderer {
                 (int) (layout.map().width() * sx), (int) (layout.map().height() * sy));
         ArrayList<LocalObjectView> spriteObjects = new ArrayList<>();
         LocalObjectView selectedSprite = null;
+        haloClock = (haloClock + frameSeconds()) % 3600f;
+        List<MapHaloLayout.Halo> halos = MapHaloLayout.layout(haloBodies(snapshot.localObjects(), points, pixelsPerMetre),
+                new MapLabelLayout.Box(layout.map().x(), layout.map().y(), layout.map().width(), layout.map().height()),
+                haloClock, metrics.scale());
+        batch.begin();
+        haloRenderer.draw(batch, halos, MapHaloLayout.Layer.BEHIND);
+        batch.end();
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (LocalObjectView object : snapshot.localObjects()) {
             Point point = points.get(object.stableId());
@@ -1245,6 +1255,9 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         batch.end();
         drawMiningBeams(snapshot.localObjects(), points, pixelsPerMetre);
+        batch.begin();
+        haloRenderer.draw(batch, halos, MapHaloLayout.Layer.OVER);
+        batch.end();
         if (selectedSprite != null) {
             drawSelectionBrackets(points.get(selectedSprite.stableId()),
                     (float) (selectedSprite.physicalLengthM() * pixelsPerMetre),
@@ -1323,6 +1336,25 @@ public final class GeneratedWorldCommandUiRenderer {
             miningBeamRenderer.draw(batch, segment, contactX, contactY, effect, reach, scale);
         }
         batch.end();
+    }
+
+    /** Objects on the map as the halo layout sees them: screen centre, drawn hull and marker size. */
+    private List<MapHaloLayout.Body> haloBodies(List<LocalObjectView> objects, Map<String, Point> points,
+            double pixelsPerMetre) {
+        List<MapHaloLayout.Body> bodies = new ArrayList<>();
+        for (LocalObjectView object : objects) {
+            Point point = points.get(object.stableId());
+            if (point == null) continue;
+            float marker = markerSize(object.kind());
+            float length = (float) (object.physicalLengthM() * pixelsPerMetre);
+            float hullWidth = (float) (object.physicalWidthM() * pixelsPerMetre);
+            // Only a drawn hull counts; below its marker size the object is drawn as the marker.
+            boolean hull = object.sprite() != null && length >= marker && hullWidth > 0f
+                    && Float.isFinite(length) && Float.isFinite(hullWidth);
+            bodies.add(new MapHaloLayout.Body(object.stableId(), object.kind(), point.x(), point.y(),
+                    hull ? length : 0f, hull ? hullWidth : 0f, object.headingRad(), marker));
+        }
+        return bodies;
     }
 
     private static float frameSeconds() {
@@ -2568,6 +2600,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         sectorBackgrounds.dispose();
         miningBeamRenderer.dispose();
+        haloRenderer.dispose();
         sprites.dispose();
         batch.dispose();
         shapes.dispose();
