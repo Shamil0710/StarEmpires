@@ -24,7 +24,7 @@ import java.util.Objects;
  */
 public final class Stage228GeneratedCampaignPersistenceCodec {
     private static final int MAGIC = 0x53323843; // S28C
-    private static final int FILE_VERSION = 30;
+    private static final int FILE_VERSION = 31;
     private static final int M22_8M_FILE_VERSION = 4;
     private static final String M22_8M_RUNTIME_VERSION = "m22.8.generated-campaign.v4";
     private static final int MAX_PLAYER_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -110,6 +110,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 PersonalCraftOwnershipCodec.encode(checked.personalCraftOwnership()),
                 IndustrialStationAdmissionCodec.encode(checked.industrialAdmissions()),
                 ShipyardSmallCraftBuildQueuePersistenceCodec.encode(checked.smallCraftBuilds()),
+                PlayerMarketObservationPersistenceCodec.encode(checked.marketObservations()),
                 StationSalePolicy.encode(checked.stationSalePolicies()));
         long size = header.size();
         for (byte[] payload : payloads) size += Integer.BYTES + (long) payload.length;
@@ -142,7 +143,7 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
                 case M22_8A_FILE_VERSION -> decodeM22_8A(in);
                 case M22_8B_FILE_VERSION -> decodeM22_8B(in);
                 case M22_8C_FILE_VERSION -> decodeM22_8C(in);
-                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, FILE_VERSION -> decodeCurrent(in, fileVersion);
+                case M22_8M_FILE_VERSION, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, FILE_VERSION -> decodeCurrent(in, fileVersion);
                 default -> throw new IllegalArgumentException(
                         "Unsupported M22.8 file version: " + fileVersion);
             };
@@ -257,12 +258,35 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
      */
     public static Stage228GeneratedCampaignPersistentState readOrMigrate(Path path)
             throws IOException {
+        return decodeOrMigrate(readBounded(path));
+    }
+
+    /**
+     * Reads only the current native format, as the game does. Older dev formats are rejected from
+     * the file header, before any nested state is decoded or restored; there is no migration.
+     *
+     * @param path checkpoint file
+     * @return current checkpoint
+     * @throws IOException when bytes cannot be read
+     * @throws UnsupportedSaveVersionException when the file is not a current campaign save
+     */
+    public static Stage228GeneratedCampaignPersistentState readCurrent(Path path) throws IOException {
+        byte[] bytes = readBounded(path);
+        if (bytes.length < 2 * Integer.BYTES || readMagic(bytes) != MAGIC) {
+            throw new UnsupportedSaveVersionException(-1, FILE_VERSION);
+        }
+        int fileVersion = java.nio.ByteBuffer.wrap(bytes, Integer.BYTES, Integer.BYTES).getInt();
+        if (fileVersion != FILE_VERSION) throw new UnsupportedSaveVersionException(fileVersion, FILE_VERSION);
+        return decode(bytes);
+    }
+
+    private static byte[] readBounded(Path path) throws IOException {
         Path source = Objects.requireNonNull(path, "path").toAbsolutePath();
         long size = Files.size(source);
         if (size <= 0L || size > MAX_BYTES) {
             throw new IllegalArgumentException("M22.8 checkpoint file size outside limits");
         }
-        return decodeOrMigrate(Files.readAllBytes(source));
+        return Files.readAllBytes(source);
     }
 
     private static Stage228GeneratedCampaignPersistentState decodeM22_8A(DataInputStream in)
@@ -441,12 +465,16 @@ public final class Stage228GeneratedCampaignPersistenceCodec {
         var builds = fileVersion >= 29 ? ShipyardSmallCraftBuildQueuePersistenceCodec.decode(
                 readPayload(in, ShipyardSmallCraftBuildQueuePersistenceCodec.MAX_BYTES, "Paid small-craft construction"))
                 : com.spacesim.economy.ShipyardSmallCraftBuildQueueState.empty();
-        var salePolicies = fileVersion >= 30 ? StationSalePolicy.decode(
+        var observations = fileVersion >= 30 ? PlayerMarketObservationPersistenceCodec.decode(
+                readPayload(in, PlayerMarketObservationPersistenceCodec.MAX_BYTES, "Observed market quotes"))
+                : com.spacesim.player.PlayerMarketObservationState.empty();
+        var salePolicies = fileVersion >= 31 ? StationSalePolicy.decode(
                 readPayload(in, StationSalePolicy.MAX_BYTES, "Station sale terms")) : java.util.List.<StationSalePolicy>of();
         requireEnd(in);
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION,
-                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards, timeSkip, crews, localFlights, personalCraft, admissions, builds, salePolicies);
+                stage21, smallCraft, hangars, flightDeck, operations, player, journal, custody, repairs, refits, transfers, products, yards, timeSkip, crews, localFlights, personalCraft, admissions, builds,
+                observations, salePolicies);
     }
 
     private static void requireEnd(DataInputStream in) throws IOException {

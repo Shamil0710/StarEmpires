@@ -18,7 +18,9 @@ import java.util.Objects;
  */
 public record MarketTable(String stationStableId, List<Row> rows) {
     /** Column headers, left to right. */
-    static final List<String> HEADERS = List.of("Товар", "Покупка", "Продажа", "В трюме", "К базе");
+    static final List<String> HEADERS = List.of("Товар", "Покупка", "Продажа", "В трюме", "История", "К базе");
+    /** Index of the observed-history column, drawn as a small price line. */
+    static final int HISTORY_COLUMN = 4;
     /** Relative deviation below which a price counts as the opening quote. */
     static final double NEAR_BASE = 0.005d;
 
@@ -39,8 +41,10 @@ public record MarketTable(String stationStableId, List<Row> rows) {
      * @param sellMilliPerKg price the pilot receives per kilogram, or null at an own station
      * @param holdKg mass of the commodity in the ship's hold
      * @param baseMilliPerKg disclosed opening buy quote per kilogram, or null when unknown
+     * @param history buy prices the player observed here, oldest first; empty without observations
      */
-    public record Row(String commodityId, String commodity, Long buyMilliPerKg, Long sellMilliPerKg, double holdKg, Long baseMilliPerKg) {
+    public record Row(String commodityId, String commodity, Long buyMilliPerKg, Long sellMilliPerKg, double holdKg, Long baseMilliPerKg,
+            List<HistoryPoint> history) {
         /**
          * Validates one row.
          *
@@ -50,13 +54,37 @@ public record MarketTable(String stationStableId, List<Row> rows) {
          * @param sellMilliPerKg price the pilot receives per kilogram, or null at an own station
          * @param holdKg mass of the commodity in the ship's hold
          * @param baseMilliPerKg disclosed opening buy quote per kilogram, or null when unknown
+         * @param history buy prices the player observed here, oldest first
          */
         public Row {
             Objects.requireNonNull(commodityId, "commodityId");
             Objects.requireNonNull(commodity, "commodity");
+            history = List.copyOf(history);
             if (!Double.isFinite(holdKg) || holdKg < 0d) throw new IllegalArgumentException("hold mass must be finite and non-negative");
         }
+
+        /**
+         * Row without observed history.
+         *
+         * @param commodityId exact commodity id
+         * @param commodity player-facing commodity name
+         * @param buyMilliPerKg price the pilot pays per kilogram, or null at an own station
+         * @param sellMilliPerKg price the pilot receives per kilogram, or null at an own station
+         * @param holdKg mass of the commodity in the ship's hold
+         * @param baseMilliPerKg disclosed opening buy quote per kilogram, or null when unknown
+         */
+        public Row(String commodityId, String commodity, Long buyMilliPerKg, Long sellMilliPerKg, double holdKg, Long baseMilliPerKg) {
+            this(commodityId, commodity, buyMilliPerKg, sellMilliPerKg, holdKg, baseMilliPerKg, List.of());
+        }
     }
+
+    /**
+     * One observed buy price.
+     *
+     * @param tick authoritative tick of the observation
+     * @param buyMilliPerKg observed price the pilot would pay per kilogram
+     */
+    public record HistoryPoint(long tick, long buyMilliPerKg) { }
 
     /**
      * Validates and freezes the table.
@@ -89,8 +117,35 @@ public record MarketTable(String stationStableId, List<Row> rows) {
             case NEAR -> "0 %";
             default -> String.format(Locale.ROOT, "%+d %%", Math.round(deviation(row) * 100d));
         };
+        // The history cell is drawn as a line; its text shows only when nothing was observed.
         return List.of(row.commodity(), price(row.buyMilliPerKg()), price(row.sellMilliPerKg()),
-                mass(row.holdKg()), trend);
+                mass(row.holdKg()), row.history().isEmpty() ? "—" : "", trend);
+    }
+
+    /**
+     * Whether the optional history column fits: names and numbers come first, so in a narrow
+     * inspector the history line is dropped before any number would be truncated.
+     *
+     * @param tableWidth width between the table edges
+     * @param numericWidths full widths of the numeric columns, history included
+     * @param gap gap between columns
+     * @param minNameWidth width kept for the name column
+     * @return true when every column fits at full width
+     */
+    static boolean historyFits(float tableWidth, float[] numericWidths, float gap, float minNameWidth) {
+        return neededWidth(numericWidths, gap, minNameWidth) <= tableWidth;
+    }
+
+    /**
+     * @param numericWidths full widths of the numeric columns; zero for a hidden column
+     * @param gap gap between shown columns
+     * @param minNameWidth width kept for the name column
+     * @return width the table needs to show every column without truncation
+     */
+    static float neededWidth(float[] numericWidths, float gap, float minNameWidth) {
+        float needed = minNameWidth;
+        for (float width : numericWidths) if (width > 0f) needed += width + gap;
+        return needed;
     }
 
     /**
@@ -113,11 +168,16 @@ public record MarketTable(String stationStableId, List<Row> rows) {
      * @param right right edge
      * @param numericWidths widths of the numeric columns, left to right
      * @param gap gap between columns
-     * @return spans, the name column first; when the numeric columns do not fit they shrink
-     *         proportionally (their cells are then truncated), so every span stays between the edges
+     * @param minNameWidth width kept for the name column before the numeric columns shrink
+     * @return spans, the name column first; when the numeric columns do not fit beside the
+     *         minimum name width they shrink proportionally (their cells are then truncated), so
+     *         every span stays between the edges and the names stay readable
      */
-    static List<Span> columns(float left, float right, float[] numericWidths, float gap) {
-        float available = Math.max(0f, right - left - numericWidths.length * gap);
+    static List<Span> columns(float left, float right, float[] numericWidths, float gap, float minNameWidth) {
+        // A hidden (zero-width) column takes no gap either.
+        int shown = 0;
+        for (float width : numericWidths) if (width > 0f) shown++;
+        float available = Math.max(0f, right - left - shown * gap - Math.max(0f, minNameWidth));
         float total = 0f;
         for (float width : numericWidths) total += width;
         float shrink = total > available && total > 0f ? available / total : 1f;
@@ -126,7 +186,7 @@ public record MarketTable(String stationStableId, List<Row> rows) {
         for (int index = numericWidths.length - 1; index >= 0; index--) {
             float width = numericWidths[index] * shrink;
             spans[index + 1] = new Span(x - width, x);
-            x -= width + gap;
+            if (numericWidths[index] > 0f) x -= width + gap;
         }
         spans[0] = new Span(left, Math.max(left, x));
         return List.of(spans);

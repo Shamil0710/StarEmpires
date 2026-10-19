@@ -2,7 +2,12 @@
 
 Status: **FROZEN FOR v0.7 RC TRAIN**
 
-Current development identity (2026-10-16): `campaign=29` / `m22.8.generated-campaign.v29`.
+Current development identity (2026-10-19): `campaign=31` / `m22.8.generated-campaign.v31`.
+Native v31 appends the pilot's station sale terms (price and reserve per station and commodity) as
+payload 22; the legacy decoder gives v1–30 no terms (market price, no reserve).
+Native v30 appends the player's observed market quotes as payload 21; the game loads only the current
+format (`readCurrent`) and rejects older dev saves from the file header before restoring anything; the
+legacy decoder still reads v1–29 for tests, giving them no observations.
 Native v29 appends paid small-craft build custody and content declaration as payload 20; historical v1–28 receive an empty non-granting queue. New finished small-craft module stock/production requires v29.
 Native v28 declares paid passive storage content separately; historical v21–27 retain their original content declaration and receive no storage expansion.
 Native v27 retains explicit admission of existing infrastructure to industrial runtime; historical v1–26 receive no inferred admissions or operating resources.

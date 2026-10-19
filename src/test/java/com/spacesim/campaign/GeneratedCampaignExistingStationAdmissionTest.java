@@ -65,7 +65,8 @@ class GeneratedCampaignExistingStationAdmissionTest {
         var f = fixture(); var c = f.campaign; var baseline = c.captureState();
         var migrated = Stage228GeneratedCampaignPersistenceCodec.decode(asV26(baseline));
         assertTrue(migrated.industrialAdmissions().isEmpty());
-        assertEquals(baseline, Stage228CampaignAuthority.restore(migrated).captureState());
+        assertEquals(HistoricalCampaignContentFixture.withoutObservations(baseline), Stage228CampaignAuthority.restore(migrated).captureState(),
+                "v26 holds everything but the observed quotes it cannot contain");
         c.submitPilotAction(c.previewPilotAction("PURCHASE_STATION", f.endpoint.stationId(), "", 0));
         var purchased = c.captureState();
         var forged = Stage228GeneratedCampaignPersistenceCodec.decode(asV26(purchased));
@@ -221,12 +222,13 @@ class GeneratedCampaignExistingStationAdmissionTest {
 
     private static byte[] asV26(Stage228GeneratedCampaignPersistentState state) throws Exception {
         var bytes = new ByteArrayOutputStream();
-        try (var in = new DataInputStream(new ByteArrayInputStream(Stage228GeneratedCampaignPersistenceCodec.encode(state)));
+        try (var in = new DataInputStream(new ByteArrayInputStream(Stage228GeneratedCampaignPersistenceCodec.encode(
+                HistoricalCampaignContentFixture.withoutObservations(state))));
                 var out = new DataOutputStream(bytes)) {
             out.writeInt(in.readInt()); in.readInt(); in.readInt(); in.readUTF();
             out.writeInt(26); out.writeInt(26); out.writeUTF("m22.8.generated-campaign.v26");
             HistoricalCampaignContentFixture.copyPayloads(in, out, 18);
-            int length = in.readInt(); assertEquals(length, in.readNBytes(length).length); HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
+            int length = in.readInt(); assertEquals(length, in.readNBytes(length).length); HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in); assertEquals(-1, in.read());
         }
         return bytes.toByteArray();
     }

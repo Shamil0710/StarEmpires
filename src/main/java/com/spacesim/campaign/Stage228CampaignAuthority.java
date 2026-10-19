@@ -48,6 +48,8 @@ public final class Stage228CampaignAuthority {
     private com.spacesim.simulation.CampaignTimeSkipState timeSkip = com.spacesim.simulation.CampaignTimeSkipState.idle();
     private String lastTimeSkipMessage = "";
     private com.spacesim.player.PlayerJournalState playerJournal = com.spacesim.player.PlayerJournalState.empty();
+    /** Quotes the player actually saw while docked; recorded only by committed actions and docked ticks. */
+    private com.spacesim.player.PlayerMarketObservationState marketObservations = com.spacesim.player.PlayerMarketObservationState.empty();
     private com.spacesim.economy.ShipyardModuleCustodyState moduleCustody =
             com.spacesim.economy.ShipyardModuleCustodyState.empty();
     private com.spacesim.economy.ShipyardRepairWorkQueue repairQueue = new com.spacesim.economy.ShipyardRepairWorkQueue(
@@ -250,6 +252,7 @@ public final class Stage228CampaignAuthority {
                 operations.carrierWings(),
                 saved.playerState());
         restored.playerJournal = saved.playerJournal();
+        restored.marketObservations = saved.marketObservations();
         restored.localFlights = new com.spacesim.world.SmallCraftLocalFlightRuntime(smallCraft, hangars, flightDeck,
                 SmallCraftCatalog.CONTENT, operations.missions(), saved.localFlights());
         restored.moduleCustody = saved.moduleCustody();
@@ -320,8 +323,7 @@ public final class Stage228CampaignAuthority {
                 Stage228FlightDeckPersistenceMapper.capture(flightDeck),
                 Stage228OperationsPersistenceMapper.capture(
                         missions, logistics, carrierWings),
-                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip, crewManifest, localFlights.capture(), personalCraftOwnership, industrialAdmissions, smallCraftBuilds.capture(),
-                stationSalePolicies);
+                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip, crewManifest, localFlights.capture(), personalCraftOwnership, industrialAdmissions, smallCraftBuilds.capture(), marketObservations, stationSalePolicies);
     }
 
     /** @return immutable personal committed history, independent of the selected knowledge viewer */
@@ -1352,7 +1354,50 @@ public final class Stage228CampaignAuthority {
                 p.action.equals("PURCHASE") || p.action.equals("SWITCH") ? new FleetId(Long.parseLong(p.station))
                         : p.action.equals("CAPITALIZE") || p.action.equals("WITHDRAW") ? null : beforeFleet);
         if (p.action.equals("DOCK")) notifyContactedSupplyOffers(false);
+        // After the committed action: what the player now sees at the dock becomes known history.
+        if (OBSERVING_ACTIONS.contains(p.action)) recordDockedQuotes(coordinator.runtime().world().getAuthoritativeWorldTick());
         return playerState;
+    }
+
+    /** Committed actions after which the docked quotes are recorded. */
+    private static final java.util.Set<String> OBSERVING_ACTIONS = java.util.Set.of("DOCK", "BUY", "SELL", "BUY_CONSUMABLE");
+    /** Interval between quote observations while the ship stays docked, in simulated seconds. */
+    private static final double DOCKED_OBSERVATION_INTERVAL_SECONDS = 3_600d;
+
+    /** @return quotes the player actually saw while docked */
+    public com.spacesim.player.PlayerMarketObservationState marketObservations() {
+        return marketObservations;
+    }
+
+    /**
+     * Records the docked station's current pilot quotes as observed history. An own station shows
+     * no prices and records nothing; a commodity whose quote cannot be formed is skipped, never
+     * invented. Never called from previews, projections or capture, so reading the UI cannot
+     * invalidate a pending confirmation.
+     */
+    private void recordDockedQuotes(long tick) {
+        var endpoint = DockedMarketQuotes.dockedEndpoint(this).orElse(null);
+        if (endpoint == null || ownsProductionStation(endpoint.stationId())) return;
+        var hold = coordinator.runtime().freight().findFreighter(playerState.activeFleetId()).orElse(null);
+        if (hold == null) return;
+        for (var definition : DockedMarketQuotes.eligible(hold, endpoint)) {
+            long buy;
+            long sell;
+            try {
+                buy = pilotCommodityPrice(endpoint.stationId(), definition.id(), true);
+                sell = pilotCommodityPrice(endpoint.stationId(), definition.id(), false);
+            } catch (IllegalArgumentException | IllegalStateException unavailable) {
+                continue;
+            }
+            marketObservations = marketObservations.record(endpoint.stationId(), definition.id(), tick, buy, sell);
+        }
+    }
+
+    /** Periodic observation while docked, checked from the tick number before any quote is formed. */
+    private void observeDockedQuotesAtTick(long tick) {
+        if (playerState == null || !playerState.docked()) return;
+        long interval = Math.max(1L, Math.round(DOCKED_OBSERVATION_INTERVAL_SECONDS / coordinator.session().fixedStepSeconds()));
+        if (tick % interval == 0L) recordDockedQuotes(tick);
     }
 
     /**
@@ -2490,6 +2535,7 @@ public final class Stage228CampaignAuthority {
             advanceLocalCraftAtTick(tick, coordinator.session().fixedStepSeconds(), java.util.Map.of());
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
+            observeDockedQuotesAtTick(tick);
             observeTimeSkip();
         });
     }
@@ -2546,6 +2592,7 @@ public final class Stage228CampaignAuthority {
                     validateCurrentLaunchApertures(Objects.requireNonNull(aperturesByTick.apply(tick))));
             reconcilePlayerMissionsAtTick(tick);
             notifyContactedSupplyOffers(true);
+            observeDockedQuotesAtTick(tick);
             observeTimeSkip();
         });
     }

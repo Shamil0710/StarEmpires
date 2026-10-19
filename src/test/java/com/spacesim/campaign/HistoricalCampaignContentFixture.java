@@ -33,6 +33,37 @@ final class HistoricalCampaignContentFixture {
         var state = com.spacesim.persistence.ShipyardSmallCraftBuildQueuePersistenceCodec.decode(in.readNBytes(length));
         if (!state.orders().isEmpty()) throw new AssertionError("Historical fixture cannot discard paid build custody");
     }
+    /**
+     * Explicitly removes observed quotes before writing a pre-v30 file, which cannot hold them; for
+     * tests whose subject is unrelated to market history.
+     */
+    static com.spacesim.persistence.Stage228GeneratedCampaignPersistentState withoutObservations(
+            com.spacesim.persistence.Stage228GeneratedCampaignPersistentState s) {
+        return withObservations(s, com.spacesim.player.PlayerMarketObservationState.empty());
+    }
+    /** Same checkpoint with other observed quotes; the constructor validates them. */
+    static com.spacesim.persistence.Stage228GeneratedCampaignPersistentState withObservations(
+            com.spacesim.persistence.Stage228GeneratedCampaignPersistentState s, com.spacesim.player.PlayerMarketObservationState observations) {
+        return new com.spacesim.persistence.Stage228GeneratedCampaignPersistentState(s.schemaVersion(), s.runtimeVersion(),
+                s.stage21Runtime(), s.smallCraft(), s.hangars(), s.flightDeck(), s.operations(), s.playerState(), s.playerJournal(),
+                s.moduleCustody(), s.repairQueue(), s.refitQueue(), s.moduleTransfers(), s.productTransfers(), s.yardConstruction(),
+                s.timeSkip(), s.crewManifest(), s.localFlights(), s.personalCraftOwnership(), s.industrialAdmissions(),
+                s.smallCraftBuilds(), observations);
+    }
+    /**
+     * Drops the v30 market-observation and v31 station-sale-terms sections after proving both are
+     * empty, so nothing is discarded.
+     */
+    static void skipEmptyObservations(DataInputStream in) throws IOException {
+        int length = in.readInt();
+        if (length <= 0 || length > in.available()) throw new AssertionError("Invalid market observation fixture framing");
+        var state = com.spacesim.persistence.PlayerMarketObservationPersistenceCodec.decode(in.readNBytes(length));
+        if (!state.series().isEmpty()) throw new AssertionError("Historical fixture cannot discard observed market quotes");
+        length = in.readInt();
+        if (length <= 0 || length > in.available()) throw new AssertionError("Invalid station sale terms fixture framing");
+        if (!com.spacesim.persistence.StationSalePolicy.decode(in.readNBytes(length)).isEmpty())
+            throw new AssertionError("Historical fixture cannot discard station sale terms");
+    }
     static void copyPayloads(DataInputStream in, DataOutputStream out, int count) throws IOException {
         byte[] stage21 = null;
         for (int i = 0; i < count; i++) {

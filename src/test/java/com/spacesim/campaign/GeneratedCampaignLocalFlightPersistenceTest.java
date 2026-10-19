@@ -50,7 +50,7 @@ class GeneratedCampaignLocalFlightPersistenceTest {
             out.writeInt(24); out.writeInt(24); out.writeUTF("m22.8.generated-campaign.v24");
             HistoricalCampaignContentFixture.copyPayloads(in, out, 16);
             for (int i = 0; i < 3; i++) { int length = in.readInt(); assertEquals(length, in.readNBytes(length).length); }
-            HistoricalCampaignContentFixture.skipEmptyBuild(in); assertEquals(-1, in.read());
+            HistoricalCampaignContentFixture.skipEmptyBuild(in); HistoricalCampaignContentFixture.skipEmptyObservations(in); assertEquals(-1, in.read());
         }
         var migrated = Stage228GeneratedCampaignPersistenceCodec.decode(bytes.toByteArray());
         assertEquals(SmallCraftLocalFlightState.empty(), migrated.localFlights());

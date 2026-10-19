@@ -234,6 +234,8 @@ public final class GeneratedWorldCommandUiRenderer {
         listRect = Rect.empty();
         mapRect = Rect.empty();
         beginFrame();
+        // Only the system map sets it; other tabs must not inherit last frame's minimap area.
+        systemMinimapBox = null;
         drawFrameChrome(snapshot, tab, paused, timeScale, status);
         if (tab == Tab.SYSTEM && previousRenderedTab != Tab.SYSTEM) {
             localObjectMotion.reset();
@@ -306,6 +308,11 @@ public final class GeneratedWorldCommandUiRenderer {
      * @return topmost target, or {@code null} when the point is not interactive
      */
     public HitTarget hitTest(float x, float y) {
+        // The minimap covers the map corner: clicks on it must not select objects hidden beneath.
+        MapLabelLayout.Box minimap = systemMinimapBox;
+        if (minimap != null && x >= minimap.x() && x <= minimap.right() && y >= minimap.y() && y <= minimap.top()) {
+            return null;
+        }
         for (int index = hitTargets.size() - 1; index >= 0; index--) {
             HitTarget target = hitTargets.get(index);
             if (target.kind() == HitKind.LOCAL_OBJECT && !mapRect.contains(x, y)) {
@@ -654,18 +661,15 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     private boolean missionActions;
-    private boolean missionConfirmation;
     private boolean pilotStartActions;
-    private boolean pilotStartConfirmation;
     private List<GeneratedCampaignFactionUi.Action> factionActions = List.of();
-    private boolean factionConfirmation;
     /**
-     * Binds the current row's presentation intents without granting faction authority.
+     * Binds the current row's presentation intents without granting faction authority; the
+     * confirmation comes from {@link #bindConfirmStates}.
      * @param actions selected personal faction intents
-     * @param confirmation current exact preview
      */
-    public void bindFactionActions(List<GeneratedCampaignFactionUi.Action> actions, boolean confirmation) {
-        factionActions = List.copyOf(actions); factionConfirmation = confirmation;
+    public void bindFactionActions(List<GeneratedCampaignFactionUi.Action> actions) {
+        factionActions = List.copyOf(actions);
     }
     private boolean physicalPilotActions;
     private boolean physicalPilotTrade;
@@ -744,19 +748,17 @@ public final class GeneratedWorldCommandUiRenderer {
     public void bindAmmunitionManufacturingAction(boolean selected) { ammunitionManufacturing = selected; }
     private boolean ammunitionManufacturing;
     private String physicalPilotAssetAction = "";
-    private boolean physicalPilotConfirmation;
     private int physicalPilotKilograms;
 
     /**
-     * Binds presentation-only docking/trade controls to the current personal market row.
+     * Binds presentation-only docking/trade controls to the current personal market row; the
+     * confirmation comes from {@link #bindConfirmStates}.
      * @param available whether the selected row belongs to a commissioned personal market
      * @param trade whether quantity and buy/sell are relevant
-     * @param confirmation whether a validated current preview awaits confirmation
      * @param kilograms currently requested whole kilograms
      */
-    public void bindPhysicalPilotActions(boolean available, boolean trade, boolean confirmation, int kilograms) {
-        physicalPilotActions = available; physicalPilotTrade = trade;
-        physicalPilotConfirmation = confirmation; physicalPilotKilograms = kilograms;
+    public void bindPhysicalPilotActions(boolean available, boolean trade, int kilograms) {
+        physicalPilotActions = available; physicalPilotTrade = trade; physicalPilotKilograms = kilograms;
     }
 
     /**
@@ -779,8 +781,7 @@ public final class GeneratedWorldCommandUiRenderer {
             button(r,action.label(),true);hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-"+action.id(),null,r));
         }
         Rect confirm=new Rect(inspectorRect.x()+16f*scale,inspectorRect.y()+12f*scale,inspectorRect.width()-32f*scale,36f*scale);
-        button(confirm,"ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ РЕШЕНИЕ",factionConfirmation);
-        if(factionConfirmation)hitTargets.add(new HitTarget(HitKind.ACTION,"pilot.government-confirm",null,confirm));
+        drawConfirm(confirm, factionConfirm, "pilot.government-confirm");
     }
 
     private boolean timeSkipActions;
@@ -995,17 +996,44 @@ public final class GeneratedWorldCommandUiRenderer {
             hitTargets.add(new HitTarget(HitKind.ACTION, ownCommodityHandling ? "pilot.unload-commodity" : "pilot.sell", null, second));
         }
         Rect confirm = new Rect(second.x(), inspectorRect.y() + 12f * scale, second.width(), second.height());
-        button(confirm, "ПОДТВЕРДИТЬ ПРОВЕРЕННОЕ ДЕЙСТВИЕ", physicalPilotConfirmation);
-        if (physicalPilotConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, foundation ? "pilot.faction-confirm" : "pilot.physical-confirm", null, confirm));
+        drawConfirm(confirm, physicalConfirm, foundation ? "pilot.faction-confirm" : "pilot.physical-confirm");
+    }
+
+    private ConfirmButton.State physicalConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State missionConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State factionConfirm = ConfirmButton.hidden();
+    private ConfirmButton.State pilotStartConfirm = ConfirmButton.hidden();
+
+    /**
+     * Binds the confirmation buttons; each exists only after a preview and names its outcome.
+     *
+     * @param physical physical pilot action or own-faction foundation
+     * @param mission personal contract command
+     * @param faction own-faction, fleet or small-craft decision
+     * @param pilotStart independent pilot start
+     */
+    public void bindConfirmStates(ConfirmButton.State physical, ConfirmButton.State mission,
+            ConfirmButton.State faction, ConfirmButton.State pilotStart) {
+        physicalConfirm = Objects.requireNonNull(physical, "physical");
+        missionConfirm = Objects.requireNonNull(mission, "mission");
+        factionConfirm = Objects.requireNonNull(faction, "faction");
+        pilotStartConfirm = Objects.requireNonNull(pilotStart, "pilotStart");
+    }
+
+    /** Draws a confirm button only after a preview; only an allowed preview is pressable. */
+    private void drawConfirm(Rect rect, ConfirmButton.State state, String id) {
+        if (!state.visible()) return;
+        button(rect, state.label(), state.enabled());
+        if (state.enabled()) hitTargets.add(new HitTarget(HitKind.ACTION, id, null, rect));
     }
 
     /**
-     * Binds new-game start buttons to the selected disclosed conditions.
+     * Binds new-game start buttons to the selected disclosed conditions; the confirmation comes
+     * from {@link #bindConfirmStates}.
      * @param available whether the selected row is the new-game offer
-     * @param confirmation whether a permitted authority preview is pending
      */
-    public void bindPilotStartActions(boolean available, boolean confirmation) {
-        pilotStartActions = available; pilotStartConfirmation = confirmation;
+    public void bindPilotStartActions(boolean available) {
+        pilotStartActions = available;
     }
 
     private void drawPilotStartActions() {
@@ -1015,20 +1043,19 @@ public final class GeneratedWorldCommandUiRenderer {
         button(check, "ПРОВЕРИТЬ УСЛОВИЯ СТАРТА", true);
         hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.preview", null, check));
         Rect confirm = new Rect(check.x(), inspectorRect.y() + 12f * scale, check.width(), check.height());
-        button(confirm, "КУПИТЬ КОРАБЛЬ И НАЧАТЬ", pilotStartConfirmation);
-        if (pilotStartConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "pilot.confirm", null, confirm));
+        drawConfirm(confirm, pilotStartConfirm, "pilot.confirm");
     }
 
     /**
      * Binds presentation-only availability for the currently selected personal contract.
      * The application owns preview tokens and revalidates every command before submission.
      *
+     * The confirmation comes from {@link #bindConfirmStates}.
+     *
      * @param selectedPersonalMission whether the selected row is a personal contract
-     * @param confirmationAvailable whether a permitted preview awaits explicit confirmation
      */
-    public void bindMissionActions(boolean selectedPersonalMission, boolean confirmationAvailable) {
+    public void bindMissionActions(boolean selectedPersonalMission) {
         missionActions = selectedPersonalMission;
-        missionConfirmation = confirmationAvailable;
     }
 
     private boolean supplyMissionQuantity;
@@ -1064,8 +1091,7 @@ public final class GeneratedWorldCommandUiRenderer {
         }
         Rect confirm = new Rect(inspectorRect.x() + 16f * scale, inspectorRect.y() + 12f * scale,
                 inspectorRect.width() - 32f * scale, 36f * scale);
-        button(confirm, missionConfirmation ? "ПОДТВЕРДИТЬ ДЕЙСТВИЕ" : "СНАЧАЛА ПРОВЕРЬТЕ ДЕЙСТВИЕ", missionConfirmation);
-        if (missionConfirmation) hitTargets.add(new HitTarget(HitKind.ACTION, "mission.confirm", null, confirm));
+        drawConfirm(confirm, missionConfirm, "mission.confirm");
     }
 
     private void drawKeyboardFocus() {
@@ -1215,11 +1241,14 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(selectedSprite.headingRad()));
         }
 
+        layoutSystemMinimap(layout.map(), projectionRect);
         MapLabelLayout.Box approachPlate = drawApproachLine(snapshot.localObjects(), points, selection, layout.map(),
                 pixelsPerMetre, systemMapOverlays(layout.map(), snapshot.activeSystemName(),
                         systemMapSubtitle(snapshot), null));
         drawMapLabels(snapshot.localObjects(), points, selection, layout.map(), pixelsPerMetre,
                 snapshot.activeSystemName(), systemMapSubtitle(snapshot), approachPlate);
+        drawSystemMinimap(layout.map(), projectionRect, snapshot.localObjects(), smoothedBasePoints, selection,
+                cameraCenterX, cameraCenterY);
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
@@ -1290,7 +1319,13 @@ public final class GeneratedWorldCommandUiRenderer {
             }
             widths[column - 1] = width;
         }
-        List<MarketTable.Span> spans = MarketTable.columns(left, right, widths, 9f * scale);
+        // The history column holds a small line, not text: give it a fixed readable width.
+        widths[MarketTable.HISTORY_COLUMN - 1] = Math.max(widths[MarketTable.HISTORY_COLUMN - 1], 48f * scale);
+        boolean history = MarketTable.historyFits(right - left, widths, 9f * scale, 64f * scale);
+        if (!history) widths[MarketTable.HISTORY_COLUMN - 1] = 0f;
+        // A narrow inspector tightens the gaps before any number has to be truncated.
+        float gap = MarketTable.neededWidth(widths, 9f * scale, 64f * scale) <= right - left ? 9f * scale : 4f * scale;
+        List<MarketTable.Span> spans = MarketTable.columns(left, right, widths, gap, 64f * scale);
         float nameWidth = Math.max(1f, spans.get(0).width());
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -1304,6 +1339,7 @@ public final class GeneratedWorldCommandUiRenderer {
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
         fonts.small().draw(batch, MarketTable.HEADERS.get(0), spans.get(0).left(), y, nameWidth, Align.left, false);
         for (int column = 1; column < columnCount; column++) {
+            if (!history && column == MarketTable.HISTORY_COLUMN) continue;
             MarketTable.Span span = spans.get(column);
             fonts.small().draw(batch, MarketTable.HEADERS.get(column), span.left(), y, 0,
                     MarketTable.HEADERS.get(column).length(), span.width(), Align.right, false, "…");
@@ -1314,6 +1350,7 @@ public final class GeneratedWorldCommandUiRenderer {
             fonts.small().setColor(ImperialUiPalette.IVORY);
             fonts.small().draw(batch, row.get(0), spans.get(0).left(), rowY, 0, row.get(0).length(), nameWidth, Align.left, false, "…");
             for (int column = 1; column < columnCount; column++) {
+                if (!history && column == MarketTable.HISTORY_COLUMN) continue;
                 fonts.small().setColor(column == columnCount - 1 ? switch (MarketTable.trend(dockedMarket.rows().get(index))) {
                     case ABOVE -> ImperialUiPalette.AMBER;
                     case BELOW -> ImperialUiPalette.CYAN;
@@ -1330,6 +1367,30 @@ public final class GeneratedWorldCommandUiRenderer {
                     spans.get(0).left(), rect.y() + line, right - left, Align.left, false);
         }
         batch.end();
+        if (history) drawMarketHistory(spans.get(MarketTable.HISTORY_COLUMN), y, line, Math.min(cells.size(), visibleRows));
+    }
+
+    /** Draws each row's observed buy prices as a small line in the history column; the newest point is marked. */
+    private void drawMarketHistory(MarketTable.Span span, float headerY, float line, int rows) {
+        float scale = metrics.scale();
+        float textHeight = fonts.small().getLineHeight();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (int index = 0; index < rows; index++) {
+            List<MarketTable.HistoryPoint> history = dockedMarket.rows().get(index).history();
+            if (history.isEmpty()) continue;
+            float rowTop = headerY - line * (index + 1) - 4f * scale;
+            MapLabelLayout.Box cell = new MapLabelLayout.Box(span.left(), rowTop - textHeight * 0.85f,
+                    span.width(), textHeight * 0.6f);
+            float[] xy = PriceSparkline.polyline(history.stream()
+                    .map(p -> new PriceSparkline.Point(p.tick(), p.buyMilliPerKg())).toList(), cell);
+            shapes.setColor(ImperialUiPalette.CYAN);
+            for (int point = 2; point < xy.length; point += 2) {
+                shapes.rectLine(xy[point - 2], xy[point - 1], xy[point], xy[point + 1], Math.max(1f, scale));
+            }
+            shapes.setColor(ImperialUiPalette.IVORY);
+            shapes.circle(xy[xy.length - 2], xy[xy.length - 1], Math.max(1.5f, 2f * scale), 10);
+        }
+        shapes.end();
     }
 
     private List<StarSystemId> personalRoutePath = List.of();
@@ -1889,8 +1950,10 @@ public final class GeneratedWorldCommandUiRenderer {
         shapes.end();
         batch.begin();
         fonts.body().setColor(enabled ? ImperialUiPalette.IVORY : ImperialUiPalette.MUTED_TEXT);
-        fonts.body().draw(batch, label, rect.x(), rect.y() + rect.height() * 0.63f,
-                rect.width(), Align.center, false);
+        // Long outcome labels end with an ellipsis instead of spilling past the button.
+        float inset = 6f * metrics.scale();
+        fonts.body().draw(batch, label, rect.x() + inset, rect.y() + rect.height() * 0.63f, 0, label.length(),
+                Math.max(1f, rect.width() - 2f * inset), Align.center, false, "…");
         batch.end();
     }
 
@@ -2049,7 +2112,64 @@ public final class GeneratedWorldCommandUiRenderer {
         // Scale bar: drawn 18 px in from the corner, up to 22 % of the map wide, with its label above.
         MapLabelLayout.Box scaleBarBox = new MapLabelLayout.Box(map.x(), map.y(),
                 26f * scale + map.width() * 0.22f, 18f * scale + 8f * scale + 16f * scale + 6f * scale);
-        return approachPlate == null ? List.of(titleBox, scaleBarBox) : List.of(titleBox, scaleBarBox, approachPlate);
+        List<MapLabelLayout.Box> overlays = new ArrayList<>(List.of(titleBox, scaleBarBox));
+        if (approachPlate != null) overlays.add(approachPlate);
+        if (systemMinimapBox != null) overlays.add(systemMinimapBox);
+        return List.copyOf(overlays);
+    }
+
+    /** Minimap box of the current frame, or null when the minimap is not shown. */
+    private MapLabelLayout.Box systemMinimapBox;
+
+    /** Chooses where the minimap goes this frame, before anything that must avoid it is placed. */
+    private void layoutSystemMinimap(Rect map, Rect frame) {
+        systemMinimapBox = SystemMinimap.shown(systemMapCamera.zoom())
+                ? SystemMinimap.box(new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()),
+                        new MapLabelLayout.Box(frame.x(), frame.y(), frame.width(), frame.height()),
+                        150f * metrics.scale(), 10f * metrics.scale())
+                : null;
+    }
+
+    /** Draws the whole system overview with object dots and the camera rectangle. */
+    private void drawSystemMinimap(Rect map, Rect frame, List<LocalObjectView> objects,
+            Map<String, PresentationMotionSmoother.Point> basePoints, UiSelection selection,
+            float cameraCenterX, float cameraCenterY) {
+        MapLabelLayout.Box box = systemMinimapBox;
+        if (box == null) return;
+        MapLabelLayout.Box frameBox = new MapLabelLayout.Box(frame.x(), frame.y(), frame.width(), frame.height());
+        float scale = metrics.scale();
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.MAP_LABEL_PLATE);
+        shapes.rect(box.x(), box.y(), box.width(), box.height());
+        String selectedId = selection.kind() == SelectionKind.LOCAL_OBJECT ? selection.stableId() : "";
+        // Layers: other objects, then the player's ship, then the selection, so neither is hidden.
+        for (int layer = 0; layer < 3; layer++) {
+            for (LocalObjectView object : objects) {
+                PresentationMotionSmoother.Point base = basePoints.get(object.stableId());
+                if (base == null) continue;
+                boolean selected = object.stableId().equals(selectedId);
+                boolean player = !selected && object.stableId().equals(pilotShipId);
+                int objectLayer = selected ? 2 : player ? 1 : 0;
+                if (objectLayer != layer) continue;
+                float[] dot = SystemMinimap.toMinimap(base.x(), base.y(), frameBox, box);
+                shapes.setColor(selected ? ImperialUiPalette.BRASS : player ? ImperialUiPalette.CYAN : factionColor(object.factionId()));
+                shapes.circle(dot[0], dot[1], (selected || player ? 3f : 2f) * scale, 12);
+            }
+        }
+        shapes.end();
+        MapLabelLayout.Box camera = SystemMinimap.cameraRect(
+                new MapLabelLayout.Box(map.x(), map.y(), map.width(), map.height()), systemMapCamera.zoom(),
+                systemMapCamera.panX(), systemMapCamera.panY(), cameraCenterX, cameraCenterY, frameBox, box);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(ImperialUiPalette.GUNMETAL);
+        shapes.rect(box.x(), box.y(), box.width(), box.height());
+        if (camera != null) {
+            shapes.setColor(ImperialUiPalette.IVORY);
+            shapes.rect(camera.x(), camera.y(), Math.max(1f, camera.width()), Math.max(1f, camera.height()));
+        }
+        shapes.end();
     }
 
     /** Draws corner brackets around the rotated hull of the selected marker-sized sprite. */
