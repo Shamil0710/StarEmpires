@@ -37,8 +37,10 @@ final class DockingArmRenderer {
                 batch.draw(segment, arm.portX(), arm.portY() - quad * 0.5f, 0f, quad * 0.5f, tubeLength, quad, 1f, 1f,
                         arm.rotationDegrees(), 0, 0, sourceWidth, segment.getHeight(), false, false);
             }
-            batch.draw(collar, arm.collarX() - quad * 0.5f, arm.collarY() - quad * 0.5f, quad * 0.5f, quad * 0.5f,
-                    quad, quad, 1f, 1f, arm.rotationDegrees(), 0, 0, collar.getWidth(), collar.getHeight(), false, false);
+            // A short arm squeezes the collar along its length, so it stays between the port and the hull.
+            float collarLength = arm.collarLength();
+            batch.draw(collar, arm.collarX() - collarLength * 0.5f, arm.collarY() - quad * 0.5f, collarLength * 0.5f, quad * 0.5f,
+                    collarLength, quad, 1f, 1f, arm.rotationDegrees(), 0, 0, collar.getWidth(), collar.getHeight(), false, false);
         } finally {
             entry.restore(batch);
         }

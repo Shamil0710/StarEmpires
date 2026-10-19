@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,10 +59,25 @@ class DockingArmGeometryTest {
         float reach = (float) (60d * DockingArmGeometry.SPINE_REACH);
         assertEquals(300f - reach - 10f - quad, along.tubeEndX(), 1e-3f);
 
-        // Right at the port only the collar is drawn.
+        assertEquals(quad, arm.collarLength(), 1e-3f, "a long arm draws the whole collar");
+
+        // Right at the port only the collar is drawn, squeezed so it spans exactly port to hull.
         var close = DockingArmGeometry.layout(port, 20f, 0f, 0f, 0f, 0d, 16f);
         assertEquals(0f, close.tileRepeats(), 1e-6f);
+        assertEquals(20f, close.collarLength(), 1e-3f);
+        assertEquals(0f, close.collarX() - close.collarLength() / 2f, 1e-3f, "the collar starts at the port");
+        assertEquals(20f, close.collarX() + close.collarLength() / 2f, 1e-3f, "and ends at the hull");
         assertNull(DockingArmGeometry.layout(port, 0f, 0f, 0f, 0f, 0d, 16f));
+    }
+
+    @Test
+    void armShowsOnlyWhileBothEndsAreDrawnAsHulls() {
+        assertTrue(DockingArmGeometry.shown(400f, 22f, 60f, 18f));
+        // Zoomed out: the large station is still a hull, the small ship already its marker.
+        assertFalse(DockingArmGeometry.shown(400f, 22f, 12f, 18f), "an arm onto a ship marker would cover it");
+        assertFalse(DockingArmGeometry.shown(20f, 22f, 60f, 18f));
+        assertFalse(DockingArmGeometry.shown(Float.POSITIVE_INFINITY, 22f, 60f, 18f));
+        assertFalse(DockingArmGeometry.shown(400f, 22f, Float.NaN, 18f));
     }
 
     @Test

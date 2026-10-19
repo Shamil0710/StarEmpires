@@ -1361,7 +1361,9 @@ public final class GeneratedWorldCommandUiRenderer {
         if (shipPoint == null || stationPoint == null) return;
         float stationLength = (float) (station.physicalLengthM() * pixelsPerMetre);
         float stationWidth = (float) (station.physicalWidthM() * pixelsPerMetre);
-        if (!(stationLength >= markerSize(station.kind())) || !Float.isFinite(stationLength) || !(stationWidth > 0f)) return;
+        float shipLength = (float) (ship.physicalLengthM() * pixelsPerMetre);
+        if (!DockingArmGeometry.shown(stationLength, markerSize(station.kind()), shipLength, markerSize(ship.kind()))
+                || !(stationWidth > 0f)) return;
         var port = DockingArmGeometry.nearest(DockingArmGeometry.ports(station.sprite().hardpoints(), stationPoint.x(),
                 stationPoint.y(), stationLength, stationWidth, Math.toRadians(MovementAlignedHeading.degrees(station.headingRad()))),
                 shipPoint.x(), shipPoint.y());
@@ -1369,13 +1371,14 @@ public final class GeneratedWorldCommandUiRenderer {
         float scale = metrics.scale();
         float armWidth = Math.max(4f * scale, Math.min(48f * scale, (float) (DockingArmGeometry.ARM_WIDTH_M * pixelsPerMetre)));
         var arm = DockingArmGeometry.layout(port, shipPoint.x(), shipPoint.y(),
-                (float) (ship.physicalLengthM() * pixelsPerMetre), (float) (ship.physicalWidthM() * pixelsPerMetre),
+                shipLength, (float) (ship.physicalWidthM() * pixelsPerMetre),
                 Math.toRadians(MovementAlignedHeading.degrees(ship.headingRad())), armWidth);
         if (arm == null) return;
         batch.begin();
         dockingArmRenderer.draw(batch, arm);
         batch.end();
     }
+
     /** Objects on the map as the halo layout sees them: screen centre, drawn hull and marker size. */
     private List<MapHaloLayout.Body> haloBodies(List<LocalObjectView> objects, Map<String, Point> points,
             double pixelsPerMetre) {

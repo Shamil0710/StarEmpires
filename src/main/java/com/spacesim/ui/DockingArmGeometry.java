@@ -29,6 +29,18 @@ final class DockingArmGeometry {
     }
 
     /**
+     * @param stationLengthPx station sprite length on screen
+     * @param stationMarkerPx station marker size
+     * @param shipLengthPx ship sprite length on screen
+     * @param shipMarkerPx ship marker size
+     * @return whether both ends are drawn as hulls; an arm onto a marker would cover it
+     */
+    static boolean shown(float stationLengthPx, float stationMarkerPx, float shipLengthPx, float shipMarkerPx) {
+        return stationLengthPx >= stationMarkerPx && shipLengthPx >= shipMarkerPx
+                && Float.isFinite(stationLengthPx) && Float.isFinite(shipLengthPx);
+    }
+
+    /**
      * One docking port on screen.
      *
      * @param x screen X
@@ -46,12 +58,13 @@ final class DockingArmGeometry {
      * @param tubeEndY end of the repeating tube
      * @param collarX collar centre X
      * @param collarY collar centre Y
+     * @param collarLength collar length along the arm: the quad height, or less on a short arm
      * @param quadHeight height of the drawn texture quads (the tube fills {@link #TUBE_SHARE} of it)
      * @param rotationDegrees arm direction, port to ship
      * @param tileRepeats how many segment tiles the tube spans; zero when only the collar fits
      */
     record Layout(float portX, float portY, float tubeEndX, float tubeEndY, float collarX, float collarY,
-            float quadHeight, float rotationDegrees, float tileRepeats) { }
+            float collarLength, float quadHeight, float rotationDegrees, float tileRepeats) { }
 
     /**
      * @param hardpoints station sprite hardpoints
@@ -131,7 +144,7 @@ final class DockingArmGeometry {
         double endX = port.x() + ux * tube;
         double endY = port.y() + uy * tube;
         return new Layout(port.x(), port.y(), (float) endX, (float) endY,
-                (float) (endX + ux * collar * 0.5d), (float) (endY + uy * collar * 0.5d), quad,
+                (float) (endX + ux * collar * 0.5d), (float) (endY + uy * collar * 0.5d), (float) collar, quad,
                 (float) Math.toDegrees(Math.atan2(uy, ux)), (float) (tube / (quad * TILE_ASPECT)));
     }
 }
