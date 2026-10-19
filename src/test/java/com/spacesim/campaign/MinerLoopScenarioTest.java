@@ -3,10 +3,14 @@ package com.spacesim.campaign;
 import com.spacesim.components.WalletComponent;
 import com.spacesim.content.Stage22ShipConsumableCatalogLoader;
 import com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader;
+import com.spacesim.ui.GeneratedWorldUiModel;
+import com.spacesim.ui.MiningBeam;
+import com.spacesim.ui.ProductionUiProjector;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Comparator;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -85,12 +89,26 @@ class MinerLoopScenarioTest {
         String sourceId = mapped.object().objectId();
         double sourceBefore = remainingSourceKg(pilot, sourceId);
         double cargoBefore = oreKg(pilot);
+        assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).isEmpty(), "no beam before mining");
         pilot.action("START_MINING", sourceId, "", MINING_KG_PER_TICK);
+        // The system map draws a beam between the two objects it shows, from the order itself.
+        var beam = new MiningBeam("fleet:" + pilot.fleetId().value(), "resource:" + sourceId,
+                pilot.world().getAuthoritativeWorldTick());
+        assertEquals(List.of(beam), ProductionUiProjector.miningBeams(pilot.campaign()), "the assigned order shows a beam");
+        var shown = mapObjectIds(pilot);
+        assertTrue(shown.contains(beam.shipStableId()) && shown.contains(beam.sourceStableId()),
+                "the beam's ship and source are both on the system map");
         pilot.ticks(MINING_TICKS / 2);
+        assertEquals(pilot.world().getAuthoritativeWorldTick(),
+                ProductionUiProjector.miningBeams(pilot.campaign()).get(0).lastProcessedTick(),
+                "the watermark advances with every extraction, which is what fires the sparks");
         double beforeReload = oreKg(pilot) - cargoBefore;
+        var beamsBeforeReload = ProductionUiProjector.miningBeams(pilot.campaign());
         pilot.saveAndReload();
+        assertEquals(beamsBeforeReload, ProductionUiProjector.miningBeams(pilot.campaign()), "same beam after save/load");
         pilot.ticks(MINING_TICKS / 2);
         pilot.action("STOP_MINING", "", "", 0);
+        assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).isEmpty(), "the beam ends with the order");
         double mined = oreKg(pilot) - cargoBefore;
         System.out.printf("SCENARIO mining before reload=%.3f kg, after reload=%.3f kg%n", beforeReload, mined - beforeReload);
         assertTrue(beforeReload > 0 && mined > beforeReload, "mining progresses on both sides of save/load");
@@ -158,6 +176,16 @@ class MinerLoopScenarioTest {
     private static void phase(String name, long startNanos, ScenarioPilot pilot) {
         System.out.printf("SCENARIO %-60s %6.1fs  tick=%d%n", name, (System.nanoTime() - startNanos) / 1e9,
                 pilot.world().getAuthoritativeWorldTick());
+    }
+
+    /** Ids of the objects the pilot's system map shows, from the same model the game draws. */
+    private static java.util.Set<String> mapObjectIds(ScenarioPilot pilot) {
+        var campaign = pilot.campaign();
+        var coordinator = campaign.coordinator();
+        var model = new GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
+                com.spacesim.ui.GeneratedCampaignCarrierUi.source(campaign), () -> campaign.playerState().orElse(null));
+        return model.capture().localObjects().stream().map(com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView::stableId)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     private static com.spacesim.persistence.Stage20FreightRuntime freight(ScenarioPilot pilot) {

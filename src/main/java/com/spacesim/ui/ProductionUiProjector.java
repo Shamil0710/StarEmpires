@@ -639,6 +639,24 @@ public final class ProductionUiProjector {
     }
 
     /**
+     * Mining beams of the player's own active mining orders, for the system map. Only the
+     * player's own fleets are shown; the order's tick watermark drives the extraction sparks.
+     *
+     * @param campaign current campaign
+     * @return one beam per personal mining order, ordered by ship id; empty without a pilot
+     */
+    public static List<MiningBeam> miningBeams(Stage228CampaignAuthority campaign) {
+        var player = campaign.playerState().orElse(null);
+        if (player == null) return List.of();
+        return campaign.coordinator().runtime().freight().personalMiningOrders().stream()
+                .filter(order -> player.ownedFleetIds().contains(order.fleetId()))
+                .map(order -> new MiningBeam("fleet:" + order.fleetId().value(), "resource:" + order.sourceId(),
+                        order.lastProcessedTick()))
+                .sorted(java.util.Comparator.comparing(MiningBeam::shipStableId).thenComparing(MiningBeam::sourceStableId))
+                .toList();
+    }
+
+    /**
      * Market quotes of the station the player's active ship is docked at, for the system-map
      * inspector. Quotes are disclosed only while docked; an own station shows hold contents without
      * prices. Uses the same commodity filter as the docked logistics rows.

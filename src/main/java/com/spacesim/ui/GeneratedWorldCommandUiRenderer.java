@@ -51,6 +51,9 @@ public final class GeneratedWorldCommandUiRenderer {
             new Stage20MinimumPlayableTextureRenderer();
     private final SectorSpaceBackgroundTextureRenderer sectorBackgrounds =
             new SectorSpaceBackgroundTextureRenderer();
+    private final MiningBeamRenderer miningBeamRenderer = new MiningBeamRenderer();
+    private final MiningBeamEffects miningEffects = new MiningBeamEffects();
+    private List<MiningBeam> miningBeams = List.of();
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
     private final MapCameraState systemMapCamera = new MapCameraState();
@@ -397,13 +400,15 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     /**
-     * Restores a freshly fitted current-system overview and cancels local-object following.
+     * Restores a freshly fitted current-system overview, cancels local-object following and
+     * forgets presentation-only mining beam effects.
      */
     public void resetSystemMapCamera() {
         systemMapCamera.reset();
         followedLocalObjectId = "";
         systemProjectionRefit = true;
         localObjectMotion.reset();
+        miningEffects.clear();
     }
 
     /**
@@ -1239,6 +1244,7 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(object.headingRad()));
         }
         batch.end();
+        drawMiningBeams(snapshot.localObjects(), points, pixelsPerMetre);
         if (selectedSprite != null) {
             drawSelectionBrackets(points.get(selectedSprite.stableId()),
                     (float) (selectedSprite.physicalLengthM() * pixelsPerMetre),
@@ -1286,6 +1292,43 @@ public final class GeneratedWorldCommandUiRenderer {
         }
     }
 
+
+    /**
+     * Mining beams from the player's mining ships to their sources, over the sprites. The effects
+     * advance once per drawn frame; a beam whose ship or source is not on this map is skipped.
+     */
+    private void drawMiningBeams(List<LocalObjectView> objects, Map<String, Point> points, double pixelsPerMetre) {
+        List<MiningBeamEffects.Effect> effects = miningEffects.advance(miningBeams, frameSeconds());
+        if (effects.isEmpty()) return;
+        Map<String, LocalObjectView> byId = new HashMap<>();
+        for (LocalObjectView object : objects) byId.put(object.stableId(), object);
+        float scale = metrics.scale();
+        batch.begin();
+        for (MiningBeamEffects.Effect effect : effects) {
+            LocalObjectView ship = byId.get(effect.shipStableId());
+            LocalObjectView source = byId.get(effect.sourceStableId());
+            Point from = ship == null ? null : points.get(ship.stableId());
+            Point to = source == null ? null : points.get(source.stableId());
+            if (from == null || to == null || !ship.systemId().equals(source.systemId())) continue;
+            // A hull too small to draw is its marker; the emitter then stays at the marker.
+            float shipMarker = markerSize(ship.kind());
+            float shipLength = Math.max(shipMarker, (float) (ship.physicalLengthM() * pixelsPerMetre));
+            float sourceSize = Math.max(markerSize(source.kind()) * 0.6f,
+                    (float) (Math.min(source.physicalLengthM(), source.physicalWidthM()) * pixelsPerMetre));
+            float[] segment = MiningBeamGeometry.segment(from.x(), from.y(), shipLength,
+                    Math.toRadians(MovementAlignedHeading.degrees(ship.headingRad())), to.x(), to.y(), sourceSize);
+            float contactX = segment == null ? to.x() : segment[2];
+            float contactY = segment == null ? to.y() : segment[3];
+            float reach = Math.min(48f * scale, 20f * scale + sourceSize * 0.2f);
+            miningBeamRenderer.draw(batch, segment, contactX, contactY, effect, reach, scale);
+        }
+        batch.end();
+    }
+
+    private static float frameSeconds() {
+        float delta = Gdx.graphics == null ? 0f : Gdx.graphics.getDeltaTime();
+        return Float.isFinite(delta) && delta > 0f ? Math.min(0.1f, delta) : 0f;
+    }
     private MarketTable dockedMarket;
 
     /** Draws the portrait frame and the selected object's sprite, level and fitted inside it. */
@@ -1315,6 +1358,9 @@ public final class GeneratedWorldCommandUiRenderer {
 
     /** @param table quotes of the station the player's ship is docked at, or null when not docked */
     public void bindDockedMarket(MarketTable table) { dockedMarket = table; }
+
+    /** @param beams the player's active mining orders, refreshed every frame from the campaign */
+    public void bindMiningBeams(List<MiningBeam> beams) { miningBeams = List.copyOf(beams); }
 
     /** @return height reserved for the market table: all rows, at most 55 % of the inspector */
     private float marketTableHeight(Rect inspector) {
@@ -2521,6 +2567,7 @@ public final class GeneratedWorldCommandUiRenderer {
             fonts.dispose();
         }
         sectorBackgrounds.dispose();
+        miningBeamRenderer.dispose();
         sprites.dispose();
         batch.dispose();
         shapes.dispose();

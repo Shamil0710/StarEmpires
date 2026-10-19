@@ -1000,6 +1000,8 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         bindPilotApproach();
         // Undocking hides quotes at once, not at the next projection refresh.
         renderer.bindDockedMarket(campaign.playerState().map(p -> p.docked()).orElse(false) ? dockedMarket : null);
+        // Mining orders are few and change every tick, so beams read them every frame.
+        renderer.bindMiningBeams(ProductionUiProjector.miningBeams(campaign));
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),

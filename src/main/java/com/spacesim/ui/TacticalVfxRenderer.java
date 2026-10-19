@@ -303,7 +303,13 @@ final class TacticalVfxRenderer {
         };
     }
 
-    private static Texture createRadialGlowTexture(int size) {
+    /**
+     * Soft radial glow sprite shared by the tactical and system-map VFX passes.
+     *
+     * @param size texture side in texels
+     * @return linear-filtered white texture with a smoothstep alpha falloff
+     */
+    static Texture createRadialGlowTexture(int size) {
         Pixmap pixmap = new Pixmap(size, size, Pixmap.Format.RGBA8888);
         try {
             float center = size * 0.5f;
@@ -326,7 +332,8 @@ final class TacticalVfxRenderer {
         }
     }
 
-    private static Texture createPixelTexture() {
+    /** @return small opaque white texture for stretched VFX streaks */
+    static Texture createPixelTexture() {
         Pixmap pixmap = new Pixmap(2, 2, Pixmap.Format.RGBA8888);
         try {
             pixmap.setColor(Color.WHITE);
