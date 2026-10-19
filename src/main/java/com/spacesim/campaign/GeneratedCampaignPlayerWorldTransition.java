@@ -34,6 +34,7 @@ final class GeneratedCampaignPlayerWorldTransition {
         return new Stage228GeneratedCampaignPersistentState(Stage228GeneratedCampaignPersistentState.CURRENT_VERSION,
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION, nextI, source.smallCraft(), source.hangars(),
                 source.flightDeck(), source.operations(), player, source.playerJournal(), source.moduleCustody(), source.repairQueue(), source.refitQueue(), source.moduleTransfers(), source.productTransfers(), source.yardConstruction(),
-                source.timeSkip(), source.crewManifest(), source.localFlights(), source.personalCraftOwnership(), source.industrialAdmissions(), source.smallCraftBuilds());
+                source.timeSkip(), source.crewManifest(), source.localFlights(), source.personalCraftOwnership(), source.industrialAdmissions(), source.smallCraftBuilds(),
+                source.stationSalePolicies());
     }
 }

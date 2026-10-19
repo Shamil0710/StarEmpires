@@ -36,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 final class IndustrialPilot {
     static final double CRUISE_MPS = 1000d;
+    /** Water an own station keeps back from NPC buyers: about two full miner tanks. */
+    static final int FUEL_RESERVE_KG = 5_000_000;
     static final Map<String, String> RECIPE_BY_MATERIAL = Map.of(
             "commodity.material.structural_alloy", "refining.structural_alloy",
             "commodity.material.light_alloy", "refining.light_alloy",
@@ -132,7 +134,13 @@ final class IndustrialPilot {
         dock(station);
         pilot.action("PURCHASE_STATION", station, "", 0);
         assertTrue(pilot.campaign().ownsProductionStation(station));
+        keepFuelReserve();
         pilot.action("UNDOCK", "", "", 0);
+    }
+
+    /** Keeps the station's water for the pilot's own ships; passing NPC freight may buy only what is above it. */
+    void keepFuelReserve() {
+        pilot.action("SET_STATION_RESERVE", station, "commodity.material.purified_water", FUEL_RESERVE_KG);
     }
 
     /** Mines and delivers the three ores, refines the alloys, builds and commissions the starter facility. */

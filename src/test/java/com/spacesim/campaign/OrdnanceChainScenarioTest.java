@@ -45,6 +45,7 @@ class OrdnanceChainScenarioTest {
 
     static void run(IndustrialPilot industry) throws IOException {
         long t0 = System.nanoTime();
+        industry.keepFuelReserve();
         var bill = Stage23StationStorageCatalog.construction().requiredMassByCommodityKg(ORDNANCE);
         var components = new TreeMap<String, Double>();
         bill.forEach((commodity, kg) -> { if (commodity.startsWith("commodity.component.")) components.put(commodity, kg); });

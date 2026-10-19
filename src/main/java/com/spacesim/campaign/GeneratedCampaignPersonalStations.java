@@ -10,8 +10,9 @@ import java.util.stream.Collectors;
 
 /**
  * The campaign's answer to world logistics about the pilot's stations: the pilot's own fleets use
- * own stock freely, and an NPC faction buys stock there at the station's market ask, paid from its
- * treasury into the pilot's wallet. A price the NPC cannot pay is not offered to it.
+ * own stock freely, and an NPC faction buys stock above the pilot's reserve at the pilot's price (or the
+ * station's market ask), paid from its treasury into the pilot's wallet. It refuses a price above any
+ * market's ceiling and gets nothing it cannot pay for.
  */
 final class GeneratedCampaignPersonalStations implements PersonalStationAccess {
     /** Ledger reason of an NPC purchase from a pilot-owned station. */
@@ -53,9 +54,19 @@ final class GeneratedCampaignPersonalStations implements PersonalStationAccess {
         var player = campaign.playerState().orElse(null);
         // Both sides must be able to settle before any stock moves: the buyer's money and the pilot's wallet room.
         long available = player == null ? 0 : Math.min(spendable(buyerFactionId), Long.MAX_VALUE - player.walletMilliCredits());
-        if (ask <= 0 || available <= 0) return 0d;
-        // One whole kilogram of margin keeps the rounded-up payment within the treasury.
-        return Math.max(0d, Math.floor((double) available / ask) - 1d);
+        if (ask <= 0 || available <= 0 || ask > acceptableOrZero(commodityId)) return 0d;
+        // The pilot's reserve is never offered; one whole kilogram of margin keeps the rounded-up payment within funds.
+        double forSale = campaign.coordinator().runtime().infrastructure().endpoint(stationId).storage().commodityMassKg(commodityId)
+                - campaign.stationSalePolicy(stationId, commodityId).reserveKg();
+        return Math.max(0d, Math.min(Math.floor(forSale), Math.floor((double) available / ask) - 1d));
+    }
+
+    private static long acceptableOrZero(String commodityId) {
+        try {
+            return Stage228CampaignAuthority.npcAcceptableAsk(commodityId);
+        } catch (RuntimeException unquoted) {
+            return 0;
+        }
     }
 
     @Override
@@ -83,7 +94,7 @@ final class GeneratedCampaignPersonalStations implements PersonalStationAccess {
 
     private long askOrZero(String stationId, String commodityId) {
         try {
-            return campaign.pilotCommodityPrice(stationId, commodityId, true);
+            return campaign.stationSaleAsk(stationId, commodityId);
         } catch (RuntimeException unquoted) {
             return 0; // no market or no admitted quote: nothing is sold
         }

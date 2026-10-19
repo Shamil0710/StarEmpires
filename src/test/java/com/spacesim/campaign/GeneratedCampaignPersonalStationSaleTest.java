@@ -61,6 +61,80 @@ class GeneratedCampaignPersonalStationSaleTest {
                 Stage228GeneratedCampaignPersistenceCodec.encode(saved))).captureState());
     }
 
+    @Test void thePilotsReserveIsNeverSoldAndADepartureNeedingMoreWaits() {
+        double needed = boughtWithoutTerms();
+        var c = dryHubCampaign();
+        double stock = water(c);
+        // Exactly the needed water above the reserve: the departure buys it and the reserve stays.
+        long reserve = (long) Math.floor(stock - needed - 10);
+        set(c, "SET_STATION_RESERVE", reserve);
+        assertTrue(depart(c).ready());
+        assertTrue(water(c) >= reserve, "stock never falls below the pilot's reserve");
+        // Half of what is needed above the reserve: nothing is taken, the freighter waits.
+        var short_ = dryHubCampaign();
+        set(short_, "SET_STATION_RESERVE", (long) Math.floor(stock - needed / 2));
+        assertFalse(depart(short_).ready());
+        assertEquals(stock, water(short_), 1e-9);
+    }
+
+    @Test void npcsPayThePilotsPriceUpToTheMarketCeilingAndRefuseAbove() {
+        long ceiling = Stage228CampaignAuthority.npcAcceptableAsk(WATER);
+        var c = dryHubCampaign();
+        set(c, "SET_STATION_PRICE", ceiling);
+        long wallet = c.playerState().orElseThrow().walletMilliCredits();
+        var preparation = depart(c);
+        assertTrue(preparation.ready(), preparation.reason());
+        assertEquals(wallet + (long) Math.ceil(preparation.loadedMassKg() * ceiling), c.playerState().orElseThrow().walletMilliCredits(),
+                "the buyer pays the pilot's price");
+
+        var dear = dryHubCampaign();
+        set(dear, "SET_STATION_PRICE", ceiling + 1);
+        double stock = water(dear);
+        assertFalse(depart(dear).ready(), "a price above every market's ceiling is refused");
+        assertEquals(stock, water(dear), 1e-9);
+    }
+
+    @Test void saleTermsNeedTheOwnedStationAndSurviveSaveLoad() {
+        var c = ownedStationCampaign();
+        assertFalse(c.previewPilotAction("SET_STATION_PRICE", "hub.1", WATER, 80).allowed(), "not the pilot's station");
+        assertFalse(c.previewPilotAction("SET_STATION_RESERVE", STATION, WATER, -1).allowed());
+        assertFalse(c.previewPilotAction("SET_STATION_PRICE", STATION, "commodity.unknown", 80).allowed());
+        set(c, "SET_STATION_PRICE", 80);
+        set(c, "SET_STATION_RESERVE", 5_000_000);
+        assertEquals(new com.spacesim.persistence.StationSalePolicy(STATION, WATER, 80, 5_000_000), c.stationSalePolicy(STATION, WATER));
+        assertEquals(80, c.stationSaleAsk(STATION, WATER));
+        assertEquals(2, c.playerJournal().entries().stream().filter(e -> e.action().startsWith("SET_STATION_")).count());
+        var restored = Stage228CampaignAuthority.restore(Stage228GeneratedCampaignPersistenceCodec.decode(
+                Stage228GeneratedCampaignPersistenceCodec.encode(c.captureState())));
+        assertEquals(c.captureState(), restored.captureState());
+        assertEquals(c.stationSalePolicy(STATION, WATER), restored.stationSalePolicy(STATION, WATER));
+        set(restored, "SET_STATION_PRICE", 0);
+        set(restored, "SET_STATION_RESERVE", 0);
+        assertTrue(restored.captureState().stationSalePolicies().isEmpty(), "default terms are not kept");
+    }
+
+    private static double boughtWithoutTerms() {
+        return depart(dryHubCampaign()).loadedMassKg();
+    }
+
+    private static com.spacesim.world.FleetPropellantLogisticsAuthority.DeparturePreparation depart(Stage228CampaignAuthority c) {
+        var world = c.coordinator().runtime().world();
+        var fleet = emptyTankedReserve(c);
+        return world.prepareFleetPropellantDeparture(fleet,
+                List.of(new StarSystemId(1), world.getTopology().neighbors(new StarSystemId(1)).iterator().next()));
+    }
+
+    private static void set(Stage228CampaignAuthority c, String action, long value) {
+        var preview = c.previewPilotAction(action, STATION, WATER, Math.toIntExact(value));
+        assertTrue(preview.allowed(), action + ' ' + value);
+        assertEquals(0, preview.walletChangeMilliCredits());
+        c.submitPilotAction(preview);
+    }
+
+    private static double water(Stage228CampaignAuthority c) {
+        return c.coordinator().runtime().infrastructure().endpoint(STATION).storage().commodityMassKg(WATER);
+    }
+
     @Test void aBuyerThatCannotPayGetsNothingFromThePilotsStation() {
         var c = dryHubCampaign();
         var world = c.coordinator().runtime().world();
