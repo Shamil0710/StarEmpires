@@ -13,6 +13,7 @@ import com.badlogic.gdx.utils.Align;
 import com.spacesim.economy.Money;
 import com.spacesim.presentation.asset.SectorSpaceBackgroundTextureRenderer;
 import com.spacesim.presentation.asset.Stage20MinimumPlayableTextureRenderer;
+import com.spacesim.presentation.asset.Stage22RuntimeSpriteEffects;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.FreightView;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.InfoSection;
 import com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView;
@@ -1274,7 +1275,7 @@ public final class GeneratedWorldCommandUiRenderer {
             float tableHeight = market ? marketTableHeight(inspector) : 0f;
             drawInspector(new Rect(inspector.x(), inspector.y() + tableHeight, inspector.width(),
                             inspector.height() - tableHeight), selected.name(), selected.subtitle(),
-                    selected.factionName(), selected.sections(), detailScrollRows);
+                    selected.factionName(), selected.sections(), detailScrollRows, selected);
             if (market) {
                 drawMarketTable(new Rect(inspector.x(), inspector.y(), inspector.width(), tableHeight));
             }
@@ -1282,6 +1283,31 @@ public final class GeneratedWorldCommandUiRenderer {
     }
 
     private MarketTable dockedMarket;
+
+    /** Draws the portrait frame and the selected object's sprite, level and fitted inside it. */
+    private void drawInspectorPortrait(MapLabelLayout.Box frame, LocalObjectView object, float[] hull) {
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(ImperialUiPalette.MAP_LABEL_PLATE);
+        shapes.rect(frame.x(), frame.y(), frame.width(), frame.height());
+        shapes.end();
+        // The portrait identifies the hull: no live engine plume, and nothing drawn outside the frame.
+        float sx = (float) Gdx.graphics.getBackBufferWidth() / Gdx.graphics.getWidth();
+        float sy = (float) Gdx.graphics.getBackBufferHeight() / Gdx.graphics.getHeight();
+        Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
+        Gdx.gl.glScissor((int) (frame.x() * sx), (int) (frame.y() * sy),
+                (int) Math.ceil(frame.width() * sx), (int) Math.ceil(frame.height() * sy));
+        batch.begin();
+        sprites.draw(batch, Stage22RuntimeSpriteEffects.withPropulsion(object.sprite(), 0d),
+                frame.x() + frame.width() * 0.5f, frame.y() + frame.height() * 0.5f, hull[0], hull[1], 0f);
+        batch.end();
+        Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        shapes.setColor(object.stableId().equals(pilotShipId) ? ImperialUiPalette.CYAN : ImperialUiPalette.BRASS);
+        shapes.rect(frame.x(), frame.y(), frame.width(), frame.height());
+        shapes.end();
+    }
 
     /** @param table quotes of the station the player's ship is docked at, or null when not docked */
     public void bindDockedMarket(MarketTable table) { dockedMarket = table; }
@@ -1794,21 +1820,48 @@ public final class GeneratedWorldCommandUiRenderer {
             String context,
             List<InfoSection> sections,
             int scrollRows) {
+        drawInspector(rect, title, subtitle, context, sections, scrollRows, null);
+    }
+
+    /**
+     * Inspector with an optional portrait of the selected map object in the header.
+     *
+     * @param portraitObject object whose sprite is shown level in the header, or null for none
+     */
+    private void drawInspector(
+            Rect rect,
+            String title,
+            String subtitle,
+            String context,
+            List<InfoSection> sections,
+            int scrollRows,
+            LocalObjectView portraitObject) {
         float padding = 18f * metrics.scale();
         float x = rect.x() + padding;
         float widthAvailable = rect.width() - padding * 2f;
         float y = rect.top() - padding;
+        MapLabelLayout.Box portrait = null;
+        float[] hull = null;
+        if (portraitObject != null && portraitObject.sprite() != null) {
+            portrait = InspectorPortrait.frame(x + widthAvailable, y, widthAvailable, 84f * metrics.scale(),
+                    44f * metrics.scale(), portraitObject.physicalLengthM() / portraitObject.physicalWidthM());
+            hull = InspectorPortrait.fit(portraitObject.physicalLengthM(), portraitObject.physicalWidthM(), portrait);
+            if (hull == null) portrait = null;
+        }
+        float textWidth = InspectorPortrait.textWidth(widthAvailable, portrait, 12f * metrics.scale());
+        if (portrait != null) drawInspectorPortrait(portrait, portraitObject, hull);
         batch.begin();
         fonts.title().setColor(ImperialUiPalette.IVORY);
-        GlyphLayout titleLayout = fonts.title().draw(batch, title, x, y, widthAvailable, Align.left, true);
+        GlyphLayout titleLayout = fonts.title().draw(batch, title, x, y, textWidth, Align.left, true);
         y -= titleLayout.height + 10f * metrics.scale();
         fonts.body().setColor(ImperialUiPalette.CYAN);
-        GlyphLayout subtitleLayout = fonts.body().draw(batch, subtitle, x, y, widthAvailable, Align.left, true);
+        GlyphLayout subtitleLayout = fonts.body().draw(batch, subtitle, x, y, textWidth, Align.left, true);
         y -= subtitleLayout.height + 8f * metrics.scale();
         fonts.small().setColor(ImperialUiPalette.MUTED_TEXT);
-        GlyphLayout contextLayout = fonts.small().draw(batch, context, x, y, widthAvailable, Align.left, true);
+        GlyphLayout contextLayout = fonts.small().draw(batch, context, x, y, textWidth, Align.left, true);
         y -= contextLayout.height + 18f * metrics.scale();
         batch.end();
+        y = InspectorPortrait.bodyTop(y, portrait, 18f * metrics.scale());
 
         // FreeType section glyphs extend above their draw baseline. Include their cap height
         // in the clipping viewport so the first section title is not cut in half.
