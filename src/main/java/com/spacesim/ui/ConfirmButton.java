@@ -24,6 +24,7 @@ public final class ConfirmButton {
             "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT");
     private static final Map<String, String> ACTIONS = Map.ofEntries(
             Map.entry("DOCK", "СТЫКОВКА"), Map.entry("UNDOCK", "ОТСТЫКОВКА"), Map.entry("JUMP", "ВЫЛЕТ В ПРЫЖОК"),
+            Map.entry("SET_STATION_PRICE", "ЦЕНА ВОДЫ ДЛЯ NPC"), Map.entry("SET_STATION_RESERVE", "ЗАПАС ВОДЫ"),
             Map.entry("SCAN", "ИМПУЛЬС РАДАРА"), Map.entry("BUY", "ПОКУПКА"), Map.entry("SELL", "ПРОДАЖА"),
             Map.entry("LOAD_COMMODITY", "ПОГРУЗКА"), Map.entry("UNLOAD_COMMODITY", "ВЫГРУЗКА"),
             Map.entry("LOAD_CONSUMABLE", "ЗАГРУЗКА РАСХОДНИКОВ"), Map.entry("BUY_CONSUMABLE", "ПОКУПКА РАСХОДНИКОВ"),
@@ -101,6 +102,9 @@ public final class ConfirmButton {
         StringBuilder outcome = new StringBuilder(ACTIONS.getOrDefault(action, "ДЕЙСТВИЕ"));
         if (KILOGRAMS.contains(action)) outcome.append(' ').append(amount).append(" КГ");
         if (action.equals("START_MINING")) outcome.append(" ДО ").append(amount).append(" КГ");
+        if (action.equals("SET_STATION_PRICE")) outcome.append(amount == 0 ? ": РЫНОЧНАЯ"
+                : String.format(java.util.Locale.ROOT, " %.3f КР/КГ", amount / 1000d));
+        if (action.equals("SET_STATION_RESERVE")) outcome.append(' ').append(amount).append(" КГ");
         if (PIECES.contains(action)) outcome.append(' ').append(amount).append(" ШТ.");
         return outcome.append(money(walletChangeMilliCredits)).toString();
     }

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 
 /**
  * Generated-world Stage-22 finite propellant planner and local servicing authority.
@@ -58,6 +59,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
     private final ProductionEngineeringRuntimeResolver engineering =
             new ProductionEngineeringRuntimeResolver();
     private final Map<String, String> generatedIndustrialOwnerByStation;
+    private final Supplier<PersonalStationAccess> personalStations;
 
     /**
      * Binds generated infrastructure and physical ship engineering to one refueling authority.
@@ -65,11 +67,14 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
      * @param world ordinary multi-system world authority
      * @param infrastructure canonical generated station endpoints
      * @param industry generated industrial ownership/runtime registry
+     * @param personalStations current campaign view of personally owned stations
      */
     public Stage22GeneratedWorldPropellantLogisticsAuthority(
             WorldSimulation world,
             InfrastructureRegistry infrastructure,
-            MaterializedGeneratedIndustrialRuntime industry) {
+            MaterializedGeneratedIndustrialRuntime industry,
+            Supplier<PersonalStationAccess> personalStations) {
+        this.personalStations = Objects.requireNonNull(personalStations, "personalStations");
         this.world = Objects.requireNonNull(world, "world");
         this.infrastructure = Objects.requireNonNull(infrastructure, "infrastructure");
         this.industry = Objects.requireNonNull(industry, "industry");
@@ -145,7 +150,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                     "finite station projection requires a simple route without repeated systems");
         }
 
-        String participantFaction = fleetFaction(placement);
+        Buyer buyer = new Buyer(id, fleetFaction(placement));
         int segmentCount = route.size() - 1;
         double[] segmentDeltaVMps = new double[segmentCount];
         double previousCumulativeDeltaV = 0d;
@@ -174,7 +179,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
         double[] availableStationStockKg = new double[route.size()];
         for (int index = 0; index < route.size(); index++) {
             availableStationStockKg[index] = projectedAvailableStockKg(
-                    route.get(index), participantFaction, port);
+                    route.get(index), buyer, port);
         }
 
         // Solve backwards for the minimum departure fuel at every route node. This is what makes
@@ -224,7 +229,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                 double requestedTopUpKg = requiredDepartureFuel - currentFuelKg;
                 double maximumTopUpKg = maximumProjectedTopUpKg(
                         route.get(index),
-                        participantFaction,
+                        buyer,
                         port,
                         currentFuelKg,
                         capacityKg,
@@ -241,7 +246,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                 }
                 List<RefuelStop> additions = allocateProjectedTopUp(
                         route.get(index),
-                        participantFaction,
+                        buyer,
                         port,
                         requestedTopUpKg,
                         currentFuelKg,
@@ -303,10 +308,20 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
 
         double loadedMassKg = 0d;
         LinkedHashSet<String> stations = new LinkedHashSet<>();
+        PersonalStationAccess personal = personalStations.get();
+        String buyerFaction = fleetFaction(placement);
         for (RefuelStop stop : planned.refuelStops()) {
             if (!stop.systemId().equals(placement.systemId())) {
                 continue;
             }
+            boolean sale = personal.personallyOwned(stop.stationId()) && !personal.personalFleet(id);
+            if (sale && (buyerFaction == null
+                    || personal.payableKg(stop.stationId(), buyerFaction, stop.commodityId()) + EPSILON < stop.massKg())) {
+                // The owner's price is no longer payable; the revalidated plan decides whether to wait.
+                continue;
+            }
+            // The price is the one quoted before the stock leaves; scarcity raises it only for the next buyer.
+            long ask = sale ? personal.askMilliCreditsPerKg(stop.stationId(), stop.commodityId()) : 0L;
             RuntimeEndpoint endpoint = infrastructure.endpoint(stop.stationId());
             ShipConsumableBinding binding = bindings.findBinding(stop.bindingId());
             ShipEngineeringCatalog catalog = catalogForModule(binding.moduleId());
@@ -324,6 +339,9 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
                         "planned local propellant service failed: " + loaded.status()
                                 + " station=" + stop.stationId()
                                 + " binding=" + stop.bindingId());
+            }
+            if (sale) {
+                personal.settle(stop.stationId(), buyerFaction, stop.commodityId(), loaded.loadedMassKg(), ask);
             }
             RuntimeState state = fitted.runtimeState;
             fitted.setRuntimeState(new RuntimeState(
@@ -393,7 +411,7 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
 
     private double maximumProjectedTopUpKg(
             StarSystemId systemId,
-            String participantFaction,
+            Buyer buyer,
             FuelPort port,
             double currentFuelKg,
             double capacityKg,
@@ -403,19 +421,17 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             return 0d;
         }
         double available = 0d;
-        for (RuntimeEndpoint endpoint : accessibleEndpoints(systemId, participantFaction)) {
+        for (RuntimeEndpoint endpoint : accessibleEndpoints(systemId, buyer)) {
             double alreadyUsed = projectedStationUseKg.getOrDefault(stockKey(
                     endpoint.stationId(), port.binding().commodityId()), 0d);
-            available += Math.max(
-                    0d,
-                    endpoint.storage().commodityMassKg(port.binding().commodityId()) - alreadyUsed);
+            available += Math.max(0d, availableStockKg(endpoint, buyer, port) - alreadyUsed);
         }
         return Math.min(remainingCapacity, available);
     }
 
     private List<RefuelStop> allocateProjectedTopUp(
             StarSystemId systemId,
-            String participantFaction,
+            Buyer buyer,
             FuelPort port,
             double requestedKg,
             double currentFuelKg,
@@ -423,15 +439,13 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
             Map<String, Double> projectedStationUseKg) {
         double remaining = Math.min(requestedKg, Math.max(0d, capacityKg - currentFuelKg));
         ArrayList<RefuelStop> result = new ArrayList<>();
-        for (RuntimeEndpoint endpoint : accessibleEndpoints(systemId, participantFaction)) {
+        for (RuntimeEndpoint endpoint : accessibleEndpoints(systemId, buyer)) {
             if (remaining <= EPSILON) {
                 break;
             }
             String key = stockKey(endpoint.stationId(), port.binding().commodityId());
             double alreadyUsed = projectedStationUseKg.getOrDefault(key, 0d);
-            double available = Math.max(
-                    0d,
-                    endpoint.storage().commodityMassKg(port.binding().commodityId()) - alreadyUsed);
+            double available = Math.max(0d, availableStockKg(endpoint, buyer, port) - alreadyUsed);
             double load = Math.min(remaining, available);
             if (load <= EPSILON) {
                 continue;
@@ -454,24 +468,58 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
 
     private List<RuntimeEndpoint> accessibleEndpoints(
             StarSystemId systemId,
-            String participantFaction) {
+            Buyer buyer) {
         return infrastructure.endpoints().stream()
                 .filter(endpoint -> endpoint.systemId().equals(systemId))
                 .filter(endpoint -> endpoint.handlingCapability().supportedStorageClassIds()
                         .contains(LIQUID_STORAGE_CLASS_ID))
-                .filter(endpoint -> marketAccess(endpoint, participantFaction))
-                .sorted(Comparator.comparing(RuntimeEndpoint::stationId))
+                .filter(endpoint -> marketAccess(endpoint, buyer))
+                // A pilot's fleets use its own stock first; everyone else buys there only after free stock.
+                .sorted(Comparator.comparingInt((RuntimeEndpoint endpoint) -> preference(endpoint, buyer))
+                        .thenComparing(RuntimeEndpoint::stationId))
                 .toList();
     }
 
-    private boolean marketAccess(RuntimeEndpoint endpoint, String participantFaction) {
+    private int preference(RuntimeEndpoint endpoint, Buyer buyer) {
+        PersonalStationAccess personal = personalStations.get();
+        if (!personal.personallyOwned(endpoint.stationId())) {
+            return 1;
+        }
+        return personal.personalFleet(buyer.fleetId()) ? 0 : 2;
+    }
+
+    private boolean marketAccess(RuntimeEndpoint endpoint, Buyer buyer) {
+        PersonalStationAccess personal = personalStations.get();
+        if (personal.personallyOwned(endpoint.stationId())) {
+            // Anyone with a faction may buy here; how much is limited by payment in availableStockKg.
+            return personal.personalFleet(buyer.fleetId()) || buyer.factionId() != null;
+        }
         String owner = endpoint.generatedIndustrial()
                 ? generatedIndustrialOwnerByStation.get(endpoint.stationId())
                 : world.controllingFaction(endpoint.systemId()).orElse(null);
         if (owner == null) {
             return true;
         }
-        return world.evaluateFactionMarketAccess(owner, participantFaction).allowed();
+        return world.evaluateFactionMarketAccess(owner, buyer.factionId()).allowed();
+    }
+
+    /**
+     * @return stock this buyer can take: all of it, except that a non-owner at a personally owned
+     *         station is limited to what it can pay the owner for
+     */
+    private double availableStockKg(RuntimeEndpoint endpoint, Buyer buyer, FuelPort port) {
+        String commodity = port.binding().commodityId();
+        double stored = endpoint.storage().commodityMassKg(commodity);
+        PersonalStationAccess personal = personalStations.get();
+        if (!personal.personallyOwned(endpoint.stationId()) || personal.personalFleet(buyer.fleetId())) {
+            return stored;
+        }
+        return buyer.factionId() == null ? 0d
+                : Math.min(stored, personal.payableKg(endpoint.stationId(), buyer.factionId(), commodity));
+    }
+
+    /** The fleet taking propellant and its stable faction, which pays where a pilot owns the station. */
+    private record Buyer(FleetId fleetId, String factionId) {
     }
 
     private String fleetFaction(FleetPlacementState placement) {
@@ -511,11 +559,10 @@ public final class Stage22GeneratedWorldPropellantLogisticsAuthority
 
     private double projectedAvailableStockKg(
             StarSystemId systemId,
-            String participantFaction,
+            Buyer buyer,
             FuelPort port) {
-        return accessibleEndpoints(systemId, participantFaction).stream()
-                .mapToDouble(endpoint -> endpoint.storage().commodityMassKg(
-                        port.binding().commodityId()))
+        return accessibleEndpoints(systemId, buyer).stream()
+                .mapToDouble(endpoint -> availableStockKg(endpoint, buyer, port))
                 .sum();
     }
 

@@ -91,6 +91,7 @@ public final class Stage228CampaignAuthority {
     private List<CarrierWingAssignment> carrierWings;
     private java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership = java.util.List.of();
     private java.util.Map<String, String> industrialAdmissions = java.util.Map.of();
+    private java.util.List<com.spacesim.persistence.StationSalePolicy> stationSalePolicies = java.util.List.of();
     private com.spacesim.world.SmallCraftLocalFlightRuntime localFlights;
     private final java.util.Set<FleetId> groupIntervalClaims = new java.util.HashSet<>();
 
@@ -110,6 +111,7 @@ public final class Stage228CampaignAuthority {
                 && (!id.equals(this.playerState.activeFleetId()) || !this.playerState.docked())
                 && this.coordinator.runtime().world().findFleetJump(id).isEmpty()
                 && canAdvanceExactPersonalFleet(id));
+        this.coordinator.runtime().bindPersonalStations(new GeneratedCampaignPersonalStations(this));
         this.smallCraft = Objects.requireNonNull(smallCraft, "smallCraft");
         this.hangars = Objects.requireNonNull(hangars, "hangars");
         this.flightDeck = Objects.requireNonNull(flightDeck, "flightDeck");
@@ -270,6 +272,7 @@ public final class Stage228CampaignAuthority {
         restored.crewManifest = saved.crewManifest();
         restored.personalCraftOwnership = saved.personalCraftOwnership();
         restored.industrialAdmissions = saved.industrialAdmissions();
+        restored.stationSalePolicies = saved.stationSalePolicies();
         for (var admission : restored.industrialAdmissions.entrySet()) {
             var ref = restored.pilotMarketReference(admission.getKey()).orElseThrow();
             var faction = coordinator.runtime().world().findSession(ref.systemId()).orElseThrow().getEntityRegistry()
@@ -320,7 +323,7 @@ public final class Stage228CampaignAuthority {
                 Stage228FlightDeckPersistenceMapper.capture(flightDeck),
                 Stage228OperationsPersistenceMapper.capture(
                         missions, logistics, carrierWings),
-                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip, crewManifest, localFlights.capture(), personalCraftOwnership, industrialAdmissions, smallCraftBuilds.capture(), marketObservations);
+                playerState, playerJournal, moduleCustody, repairQueue.capture(), refitQueue.capture(), moduleTransfers.capture(), productTransfers.capture(), yardConstruction.capture(), timeSkip, crewManifest, localFlights.capture(), personalCraftOwnership, industrialAdmissions, smallCraftBuilds.capture(), marketObservations, stationSalePolicies);
     }
 
     /** @return immutable personal committed history, independent of the selected knowledge viewer */
@@ -355,6 +358,49 @@ public final class Stage228CampaignAuthority {
         for (long contact : GeneratedCampaignPersonalSensors.review(this, tick))
             recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "SENSOR_CONTACT_DETECTED",
                     "", "Контакт " + contact, 1, 0, playerState.activeFleetId());
+    }
+
+    /**
+     * @param stationId station
+     * @param commodityId commodity
+     * @return the pilot's current sale terms there; market price and no reserve when none were set
+     */
+    public com.spacesim.persistence.StationSalePolicy stationSalePolicy(String stationId, String commodityId) {
+        return stationSalePolicies.stream().filter(p -> p.stationId().equals(stationId) && p.commodityId().equals(commodityId))
+                .findFirst().orElse(new com.spacesim.persistence.StationSalePolicy(stationId, commodityId, 0, 0));
+    }
+
+    /**
+     * @param stationId personally owned station with a market
+     * @param commodityId commodity with an admitted quote
+     * @return price other fleets pay there: the pilot's price, or the station's market ask when none is set
+     */
+    public long stationSaleAsk(String stationId, String commodityId) {
+        long own = stationSalePolicy(stationId, commodityId).askMilliCreditsPerKg();
+        return own > 0 ? own : pilotCommodityPrice(stationId, commodityId, true);
+    }
+
+    /**
+     * The most an NPC buyer pays per kilogram: the ceiling any market reaches under the shared
+     * scarcity rule (twice the opening quote). A dearer pilot price is refused.
+     * @param commodityId commodity with an admitted quote
+     * @return maximum acceptable price per kilogram
+     */
+    public static long npcAcceptableAsk(String commodityId) {
+        return Math.multiplyExact(pilotCommodityPrice(commodityId, true), 2L);
+    }
+
+    /**
+     * Credits an NPC purchase from the pilot's station, already paid into {@code wallet}, and journals it.
+     * Called by world logistics inside the tick; the stock has already left the station.
+     */
+    void receivePersonalStationSale(long wallet, String stationId, String commodityId, double massKg, long paid) {
+        var p = playerState;
+        playerState = new PlayerState(wallet, p.factionContentId(), p.reputations(), p.ownedFleetIds(), p.activeFleetId(),
+                p.discoveredSystemIds(), p.discoveredObjects(), p.homeSystemId(), p.dockedAt(), p.fleetOrders(), p.threatIntel(),
+                p.ownedConstructionProjectIds(), p.ownedStations());
+        recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind.COMMAND, "STATION_SALE", stationId, commodityId,
+                Math.round(massKg), paid, null);
     }
 
     private void recordPersonalCommit(com.spacesim.player.PlayerJournalState.Kind kind, String action,
@@ -417,7 +463,8 @@ public final class Stage228CampaignAuthority {
                         com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT))
                 .findFirst();
         var reserve = miner.flatMap(m -> idle.stream()
-                        .filter(f -> !f.fleetId().equals(m.fleetId()))
+                        .filter(f -> !f.fleetId().equals(m.fleetId()) && !f.fitId().equals(
+                                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT))
                         .filter(f -> world.findFleet(f.fleetId()).orElseThrow().systemId()
                                 .equals(world.findFleet(m.fleetId()).orElseThrow().systemId()))
                         .findFirst())
@@ -1100,6 +1147,26 @@ public final class Stage228CampaignAuthority {
                     PILOT_MARKET_INITIAL_LIQUIDITY, "new-game-market-working-capital.v2");
         }
         initializeOperatorTreasuries(marketsByOperator);
+        initializeHubOpeningStock();
+    }
+
+    /** New-game finite stock of volatile feedstock at every trade hub that can store it. */
+    public static final double HUB_OPENING_VOLATILE_STOCK_KG = 200_000d;
+
+    /**
+     * Ordinary miners cannot work volatile-bearing bodies, so trade hubs open with a finite, disclosed
+     * stock of volatile feedstock that pilots buy for chemical processing. Placed once at new-game start.
+     */
+    private void initializeHubOpeningStock() {
+        var ontology = com.spacesim.content.Stage18ResourceOntologyLoader.loadDefault();
+        String volatiles = "commodity.feedstock.volatile_feedstock";
+        String storageClass = ontology.findCommodity(volatiles).storageClassId();
+        for (var endpoint : coordinator.runtime().infrastructure().endpoints()) {
+            if (!endpoint.stationArchetypeId().equals("station.infrastructure.trade_logistics_hub")
+                    || !endpoint.handlingCapability().supportedStorageClassIds().contains(storageClass)
+                    || endpoint.storage().remainingCapacityKg(storageClass) < HUB_OPENING_VOLATILE_STOCK_KG) continue;
+            com.spacesim.economy.NewGameOpeningStock.stock(endpoint.storage(), volatiles, HUB_OPENING_VOLATILE_STOCK_KG);
+        }
     }
 
     /** New-game operator treasury, as a multiple of the opening working capital of the operator's markets. */
@@ -1273,13 +1340,17 @@ public final class Stage228CampaignAuthority {
         if (!p.action.equals("ACKNOWLEDGE_JOURNAL")) recordPersonalCommit(
                 com.spacesim.player.PlayerJournalState.Kind.COMMAND, p.action, committedEndpoint, p.commodity,
                 switch (p.action) {
-                    case "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "LOAD_CONSUMABLE", "BUY_CONSUMABLE", "LOAD_AMMUNITION", "START_MINING", "START_MANUFACTURING", "START_REFINING", "START_COMPONENT_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT" -> p.kilograms;
+                    case "BUY", "SELL", "LOAD_COMMODITY", "UNLOAD_COMMODITY", "LOAD_CONSUMABLE", "BUY_CONSUMABLE", "LOAD_AMMUNITION", "START_MINING", "START_MANUFACTURING", "START_REFINING", "START_COMPONENT_MANUFACTURING", "LOAD_PRODUCT", "UNLOAD_PRODUCT", "BUY_PRODUCT", "SET_STATION_PRICE", "SET_STATION_RESERVE" -> p.kilograms;
                     case "PURCHASE", "PURCHASE_STATION", "BUY_RESOURCE_MAP", "BUY_STATION_MAP", "BUY_ROUTE_MAP" -> 1;
                     default -> 0;
                 }, p.action.equals("REPORT_DISCOVERY") ? 0 : playerState.walletMilliCredits() - beforeWallet
                         - (p.action.equals("SELL") ? playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
                                 && e.kind() == com.spacesim.player.PlayerJournalState.Kind.MISSION_CHANGED)
-                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum() : 0),
+                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum() : 0)
+                        // NPC purchases at the pilot's station during the command's own ticks (SCAN) are journaled already.
+                        - playerJournal.entries().stream().filter(e -> e.sequence() >= beforeJournalSequence
+                                && e.action().equals("STATION_SALE"))
+                                .mapToLong(com.spacesim.player.PlayerJournalState.Entry::walletDeltaMilliCredits).sum(),
                 p.action.equals("PURCHASE") || p.action.equals("SWITCH") ? new FleetId(Long.parseLong(p.station))
                         : p.action.equals("CAPITALIZE") || p.action.equals("WITHDRAW") ? null : beforeFleet);
         if (p.action.equals("DOCK")) notifyContactedSupplyOffers(false);
@@ -1391,6 +1462,21 @@ public final class Stage228CampaignAuthority {
     }
 
     private void executePilotAction(String action, String stationId, String commodity, int kg) {
+        if ("SET_STATION_PRICE".equals(action) || "SET_STATION_RESERVE".equals(action)) {
+            // Terms of an owned station, not a ship action: no berth or handling is involved.
+            if (playerState == null || !ownsProductionStation(stationId) || kg < 0)
+                throw new IllegalStateException("Sale terms require the personally owned station and a non-negative value");
+            pilotCommodityPrice(commodity, true); // only commodities with an admitted market quote
+            var current = stationSalePolicy(stationId, commodity);
+            var updated = "SET_STATION_PRICE".equals(action)
+                    ? new com.spacesim.persistence.StationSalePolicy(stationId, commodity, kg, current.reserveKg())
+                    : new com.spacesim.persistence.StationSalePolicy(stationId, commodity, current.askMilliCreditsPerKg(), kg);
+            var next = new java.util.ArrayList<>(stationSalePolicies);
+            next.removeIf(p -> p.stationId().equals(stationId) && p.commodityId().equals(commodity));
+            next.add(updated);
+            stationSalePolicies = com.spacesim.persistence.StationSalePolicy.validate(next);
+            return;
+        }
         if (playerState != null && personalGroupControls(playerState.activeFleetId())
                 && java.util.Set.of("JUMP", "DOCK", "UNDOCK", "SCAN", "START_MINING", "SWITCH",
                         "START_REPAIR", "START_REFIT", "START_REFIT_USED", "LOAD_MODULE", "UNLOAD_MODULE",
@@ -1822,13 +1908,23 @@ public final class Stage228CampaignAuthority {
                 if (definition == null || !handling.supportedStorageClassIds().contains(definition.storageClassId())
                         || kg > handling.openInterval(coordinator.session().fixedStepSeconds()).remainingMassKg())
                     throw new IllegalStateException("Station consumable interface or handling budget unavailable");
+                var service = new com.spacesim.economy.Stage18ShipConsumableService(bindings,
+                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
+                if (ownsProductionStation(endpoint.stationId())) {
+                    // The pilot's own stock: serviced from the station store like unloading, without a sale.
+                    var supplied = service.load(binding.id(), commodity, kg, fitted.fit, old.consumables(), endpoint.storage());
+                    if (!supplied.committed()) throw new IllegalStateException("Own station stock or interface rejected servicing: " + supplied.status());
+                    fitted.setRuntimeState(new com.spacesim.ship.ShipEngineeringRuntime.RuntimeState(supplied.consumables(),
+                            old.sharedBusEnergyJ(), old.shipHeatStoredJ(), old.localHeatJByMount(), old.thrustLimitNByMount(),
+                            old.coolantBusCapacityW(), old.ftlCooldownSecondsByMount()));
+                    runtime.synchronizeFreightEngineeringCargo(fleet.fleetId());
+                    return;
+                }
                 var station = session.getEntityRegistry().require(ref.entityId());
                 var proxy = new com.badlogic.ashley.core.Entity().add(new WalletComponent(playerState.walletMilliCredits()))
                         .add(new com.spacesim.components.IdentityComponent("PLAYER", com.spacesim.components.IdentityComponent.Kind.FLEET));
                 if (playerState.factionContentId() != null) proxy.add(new com.spacesim.components.FactionComponent(
                         world.findFactionRuntimeId(playerState.factionContentId()).orElseThrow()));
-                var service = new com.spacesim.economy.Stage18ShipConsumableService(bindings,
-                        com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.loadDefault());
                 long price = Math.multiplyExact(pilotCommodityPrice(endpoint.stationId(), binding.commodityId(), true), kg);
                 if (!world.createTradeController(session).settlePhysicalCargo(station, proxy,
                         com.spacesim.controllers.TradeTransactionPolicy.Direction.BUY_FROM_STATION, price,
@@ -2046,10 +2142,11 @@ public final class Stage228CampaignAuthority {
      */
     public static long pilotCommodityPrice(String commodityId, boolean buying) {
         long base = switch (commodityId) {
-            case "commodity.material.purified_water" -> 5000L;
+            // Reaction-mass water is priced as cheap fuel: a mining round trip must cost well below its ore.
+            case "commodity.material.purified_water" -> 50L;
             case "commodity.material.structural_alloy" -> 50000L;
             case "commodity.ore.metallic", "commodity.feedstock.metallic_ore" -> 10000L;
-            case "commodity.feedstock.water_ice" -> 2500L;
+            case "commodity.feedstock.water_ice" -> 25L;
             case "commodity.feedstock.volatile_feedstock", "commodity.feedstock.carbonaceous_feedstock",
                     "commodity.feedstock.silicate_minerals" -> 4000L;
             case "commodity.feedstock.light_metal_minerals" -> 12000L;
@@ -2429,6 +2526,8 @@ public final class Stage228CampaignAuthority {
             advancePilotAtTick(tick);
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
+            GeneratedCampaignMarketConsumption.review(this, tick);
+            GeneratedCampaignWaterWorks.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);
@@ -2484,6 +2583,8 @@ public final class Stage228CampaignAuthority {
             advancePilotAtTick(tick);
             recordPersonalSensorContacts(tick);
             GeneratedCampaignMarketWorkingCapital.review(this);
+            GeneratedCampaignMarketConsumption.review(this, tick);
+            GeneratedCampaignWaterWorks.review(this, tick);
             advancePersonalMiningAtTick(tick);
             var handlingBudgets = new java.util.HashMap<String, com.spacesim.economy.Stage18LogisticsRuntime.TransferBudget>();
             advancePersonalManufacturingAtTick(tick, handlingBudgets);

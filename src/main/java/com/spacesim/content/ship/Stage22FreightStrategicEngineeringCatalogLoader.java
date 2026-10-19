@@ -31,6 +31,15 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
     /** Same Union strategic freight hull with its cargo section replaced by excavation equipment. */
     public static final String UNION_MINING_FREIGHT_STRATEGIC_FIT =
             "fit.industrial_union.freight.strategic_mining_v1";
+    /** Same Union strategic freight hull carrying the Union kinetic cassette on its weapon hardpoint. */
+    public static final String UNION_ARMED_FREIGHT_STRATEGIC_FIT =
+            "fit.industrial_union.freight.armed_escort_v1";
+    /** Weapon hardpoint added to the Union freight hull, copied from the Union corvette's primary mount. */
+    public static final String FREIGHT_WEAPON_HARDPOINT = "weapon_primary";
+    /** Union kinetic cassette installed by the armed freight fit. */
+    public static final String UNION_KINETIC_CASSETTE = "module.industrial_union_weapon_cassette_v1";
+    private static final String UNION_FREIGHT_HULL = "hull.industrial_union_freight_v1";
+    private static final String UNION_CORVETTE_HULL = "hull.industrial_union_corvette_v1";
     /** Empire freight-only long-haul drive package. */
     public static final String EMPIRE_LONG_HAUL_DRIVE =
             "module.empire_drive_longhaul_freight_v1";
@@ -79,16 +88,68 @@ public final class Stage22FreightStrategicEngineeringCatalogLoader {
                 base, EMPIRE_BASE, EMPIRE_FREIGHT_STRATEGIC_FIT, EMPIRE_LONG_HAUL_DRIVE));
         fits.add(strategicFreight(
                 base, UNION_BASE, UNION_FREIGHT_STRATEGIC_FIT, UNION_LONG_HAUL_DRIVE));
-        fits.add(miningFreight(fits.get(fits.size() - 1)));
+        DemonstratorFitDefinition unionStrategic = fits.get(fits.size() - 1);
+        fits.add(miningFreight(unionStrategic));
+        fits.add(armedFreight(unionStrategic));
         return new ShipEngineeringCatalog(
                 base.getSchemaVersion(),
                 base.getMigrationVersion(),
                 base.getMaterials(),
                 base.getResponseSurfaces(),
                 base.getProtectionStacks(),
-                base.getHulls(),
+                hullsWithFreightWeaponHardpoint(base),
                 List.copyOf(modules),
                 List.copyOf(fits));
+    }
+
+    /**
+     * The Union freight hull gains one empty weapon hardpoint with the size, arc and envelope of the
+     * Union corvette's primary mount. Existing freight fits leave it empty and are physically unchanged.
+     */
+    private static List<ShipEngineeringCatalog.HullDefinition> hullsWithFreightWeaponHardpoint(ShipEngineeringCatalog base) {
+        var corvette = Objects.requireNonNull(base.findHull(UNION_CORVETTE_HULL), UNION_CORVETTE_HULL);
+        var weapon = corvette.hardpoints().stream().filter(h -> h.id().equals(FREIGHT_WEAPON_HARDPOINT)).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Union corvette lacks its primary weapon hardpoint"));
+        var hulls = new ArrayList<ShipEngineeringCatalog.HullDefinition>();
+        for (var hull : base.getHulls()) {
+            if (!hull.id().equals(UNION_FREIGHT_HULL)) { hulls.add(hull); continue; }
+            var dims = hull.boundingDimensionsM();
+            // Dorsal, forward of the cargo section: inside the hull envelope, same limits as the corvette mount.
+            var mount = new ShipEngineeringCatalog.HardpointDefinition(weapon.id(), weapon.size(),
+                    new ShipEngineeringCatalog.Vector3d(dims.lengthM() * 0.25, 0d, dims.heightM() * 0.5),
+                    weapon.arc(), weapon.maxModuleDimensionsM(), weapon.maxModuleMassKg(), weapon.maxRecoilImpulseNs(),
+                    weapon.allowedModuleFamilies());
+            var hardpoints = new ArrayList<>(hull.hardpoints());
+            hardpoints.add(mount);
+            hulls.add(new ShipEngineeringCatalog.HullDefinition(hull.id(), hull.displayName(), hull.architecture(),
+                    dims, hull.bareHullMassKg(), hull.internalVolumeM3(), hull.slots(), List.copyOf(hardpoints),
+                    hull.compartments(), hull.crewBaseline(), hull.lifeSupportCapacity(), hull.baseSignatureGeometryAreaM2(),
+                    hull.structuralProtectionStackId(), hull.maxOperationalMassKg(), hull.thrustMountCompatibility()));
+        }
+        return List.copyOf(hulls);
+    }
+
+    /**
+     * @param extended hull from this catalogue
+     * @param original same-identity hull from another accepted catalogue
+     * @return whether {@code extended} is {@code original} plus only the freight weapon hardpoint
+     */
+    public static boolean onlyAddsFreightWeaponHardpoint(ShipEngineeringCatalog.HullDefinition extended,
+            ShipEngineeringCatalog.HullDefinition original) {
+        if (!extended.id().equals(UNION_FREIGHT_HULL) || !original.id().equals(UNION_FREIGHT_HULL)) return false;
+        var withoutWeapon = extended.hardpoints().stream().filter(h -> !h.id().equals(FREIGHT_WEAPON_HARDPOINT)).toList();
+        return withoutWeapon.size() == extended.hardpoints().size() - 1 && withoutWeapon.equals(original.hardpoints())
+                && new ShipEngineeringCatalog.HullDefinition(extended.id(), extended.displayName(), extended.architecture(),
+                        extended.boundingDimensionsM(), extended.bareHullMassKg(), extended.internalVolumeM3(), extended.slots(),
+                        original.hardpoints(), extended.compartments(), extended.crewBaseline(), extended.lifeSupportCapacity(),
+                        extended.baseSignatureGeometryAreaM2(), extended.structuralProtectionStackId(), extended.maxOperationalMassKg(),
+                        extended.thrustMountCompatibility()).equals(original);
+    }
+
+    private static DemonstratorFitDefinition armedFreight(DemonstratorFitDefinition source) {
+        var installed = new ArrayList<>(source.installedModules());
+        installed.add(new InstalledModuleDefinition(FREIGHT_WEAPON_HARDPOINT, UNION_KINETIC_CASSETTE));
+        return new DemonstratorFitDefinition(UNION_ARMED_FREIGHT_STRATEGIC_FIT, source.hullId(), List.copyOf(installed));
     }
 
     private static DemonstratorFitDefinition miningFreight(DemonstratorFitDefinition source) {

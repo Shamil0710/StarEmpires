@@ -15,4 +15,20 @@ public final class ExtractionReceiptRoundoff {
         if (residue > certifiedBoundKg) throw new IllegalStateException("Physical cargo remains after receipt ledger consumption");
         if (residue > 0) storage.removeCommodity(commodity, residue);
     }
+
+    /**
+     * Clears physical residue left by receipts that a partial transfer consumed completely, while
+     * other receipts of the commodity remain in custody.
+     * @param storage actual carrying hold
+     * @param commodity commodity whose consumed receipts left the residue
+     * @param residueKg positive physical mass in excess of the remaining receipt provenance
+     * @param certifiedBoundKg bound derived from the consumed receipts' original positive additions
+     */
+    public static void clearConsumedReceiptResidue(Stage18StationStorage storage, String commodity,
+            double residueKg, double certifiedBoundKg) {
+        if (!Double.isFinite(certifiedBoundKg) || certifiedBoundKg < 0 || !Double.isFinite(residueKg) || residueKg <= 0)
+            throw new IllegalArgumentException("Invalid consumed receipt residue");
+        if (residueKg > certifiedBoundKg) throw new IllegalStateException("Residue exceeds the consumed receipts' roundoff bound");
+        storage.removeCommodity(commodity, residueKg);
+    }
 }

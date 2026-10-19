@@ -29,8 +29,16 @@ class GeneratedCampaignInitialMiningReserveTest {
         assertEquals(original.productLots(), actual.productLots());
         assertEquals(original.freighters().size(), actual.freighters().size());
         var changed = actual.freighters().stream().filter(f -> !f.equals(oldRuntime.freight().findFreighter(f.fleetId()).orElseThrow())).toList();
-        assertEquals(1, changed.size());
-        var miner = changed.get(0);
+        // The manifest reconfigures exactly two existing spare Union reserves: the miner and the armed escort.
+        assertEquals(2, changed.size());
+        var escort = changed.stream().filter(f -> f.fitId().equals(
+                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT)).findFirst().orElseThrow();
+        var escortOld = oldRuntime.freight().findFreighter(escort.fleetId()).orElseThrow();
+        assertEquals(escortOld.hullId(), escort.hullId());
+        assertEquals(escortOld.cargoCapacityKg(), escort.cargoCapacityKg());
+        assertEquals(escortOld.ownershipOrdinal(), escort.ownershipOrdinal());
+        assertEquals(escortOld.currentSystemId(), escort.currentSystemId());
+        var miner = changed.stream().filter(f -> f != escort).findFirst().orElseThrow();
         var oldHull = oldRuntime.freight().findFreighter(miner.fleetId()).orElseThrow();
         assertEquals("faction.beta", miner.stableFactionId());
         assertEquals(oldHull.stableFactionId(), miner.stableFactionId());

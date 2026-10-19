@@ -26,6 +26,7 @@ import java.util.Objects;
  * Version 14 retains paid refit obligations and actual equipment ownership independently of storage.
  * Version 19 admits executable reserved refining batches in the existing industrial process sidecar.
  * Version 23 retains explicit initial crew observations; version 24 retains retired group history.
+ * Version 31 retains the pilot's station sale terms (price and reserve); older files have none.
  * Historical checkpoints receive empty non-granting journal and equipment sidecars where absent.</p>
  *
  * @param schemaVersion exact current M22.8 envelope schema
@@ -50,6 +51,7 @@ import java.util.Objects;
  * @param personalCraftOwnership explicit personal property independent of host and faction
  * @param localFlights exact observed local physical craft deployments, empty for historical files
  * @param marketObservations quotes the player actually saw while docked; empty for files before v30
+ * @param stationSalePolicies the pilot's price and reserve terms for selling own-station stock; none before v31
  */
 public record Stage228GeneratedCampaignPersistentState(
         int schemaVersion,
@@ -72,7 +74,60 @@ public record Stage228GeneratedCampaignPersistentState(
         com.spacesim.world.SmallCraftLocalFlightState localFlights,
         java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership,
         java.util.Map<String, String> industrialAdmissions, com.spacesim.economy.ShipyardSmallCraftBuildQueueState smallCraftBuilds,
+        com.spacesim.player.PlayerMarketObservationState marketObservations,
+        java.util.List<StationSalePolicy> stationSalePolicies) {
+
+    /**
+     * Source-compatible composition with default station sale terms (market price, no reserve; files before v31).
+     * @param schemaVersion existing retained owner
+     * @param runtimeVersion existing retained owner
+     * @param stage21Runtime existing retained owner
+     * @param smallCraft existing retained owner
+     * @param hangars existing retained owner
+     * @param flightDeck existing retained owner
+     * @param operations existing retained owner
+     * @param playerState existing retained owner
+     * @param playerJournal existing retained owner
+     * @param moduleCustody existing retained owner
+     * @param repairQueue existing retained owner
+     * @param refitQueue existing retained owner
+     * @param moduleTransfers existing retained owner
+     * @param productTransfers existing retained owner
+     * @param yardConstruction existing retained owner
+     * @param timeSkip existing retained owner
+     * @param crewManifest existing retained owner
+     * @param localFlights existing retained owner
+     * @param personalCraftOwnership existing retained owner
+     * @param industrialAdmissions existing retained owner
+     * @param smallCraftBuilds existing retained owner
+     * @param marketObservations existing retained owner
+     */
+    public Stage228GeneratedCampaignPersistentState(
+        int schemaVersion,
+        String runtimeVersion,
+        Stage21IGeneratedWorldRuntimePersistentState stage21Runtime,
+        Stage228SmallCraftPersistentState smallCraft,
+        Stage228HangarPersistentState hangars,
+        Stage228FlightDeckPersistentState flightDeck,
+        Stage228OperationsPersistentState operations,
+        PlayerState playerState,
+        PlayerJournalState playerJournal,
+        ShipyardModuleCustodyState moduleCustody,
+        ShipyardRepairQueueState repairQueue,
+        ShipyardRefitQueueState refitQueue,
+        com.spacesim.economy.ShipyardModuleTransferWorkQueue.State moduleTransfers,
+        com.spacesim.economy.FinishedProductTransferWorkQueue.State productTransfers,
+        com.spacesim.economy.Stage23YardConstructionWorkQueue.State yardConstruction,
+        com.spacesim.simulation.CampaignTimeSkipState timeSkip,
+        com.spacesim.world.Stage23FleetCrewManifest crewManifest,
+        com.spacesim.world.SmallCraftLocalFlightState localFlights,
+        java.util.List<com.spacesim.world.SmallCraftId> personalCraftOwnership,
+        java.util.Map<String, String> industrialAdmissions, com.spacesim.economy.ShipyardSmallCraftBuildQueueState smallCraftBuilds,
         com.spacesim.player.PlayerMarketObservationState marketObservations) {
+        this(schemaVersion, runtimeVersion, stage21Runtime, smallCraft, hangars, flightDeck, operations, playerState, playerJournal,
+                moduleCustody, repairQueue, refitQueue, moduleTransfers, productTransfers, yardConstruction, timeSkip, crewManifest,
+                localFlights, personalCraftOwnership, industrialAdmissions, smallCraftBuilds, marketObservations, java.util.List.of());
+    }
 
     /**
      * Source-compatible composition without market observations (files before v30 have none).
@@ -169,9 +224,9 @@ public record Stage228GeneratedCampaignPersistentState(
     }
 
     /** Current M22.8 campaign envelope schema. */
-    public static final int CURRENT_VERSION = 30;
+    public static final int CURRENT_VERSION = 31;
     /** Current M22.8 campaign runtime contract. */
-    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v30";
+    public static final String CURRENT_RUNTIME_VERSION = "m22.8.generated-campaign.v31";
 
 
     /**
@@ -600,6 +655,7 @@ public record Stage228GeneratedCampaignPersistentState(
  * @param industrialAdmissions explicit existing-station legal operators
      * @param personalCraftOwnership explicit personal property rights independent of current host
      * @param marketObservations quotes the player actually saw while docked
+     * @param stationSalePolicies the pilot's price and reserve terms for own-station stock
      */
     public Stage228GeneratedCampaignPersistentState {
         if (schemaVersion != CURRENT_VERSION) {
@@ -625,6 +681,9 @@ public record Stage228GeneratedCampaignPersistentState(
         long tick = stage20.worldState().systems().stream().filter(s -> s.systemId().equals(stage20.activeSystemId()))
                 .findFirst().orElseThrow().simulationState().clock().tick();
         industrialAdmissions = IndustrialStationAdmissionCodec.validate(Objects.requireNonNull(industrialAdmissions));
+        stationSalePolicies = StationSalePolicy.validate(Objects.requireNonNull(stationSalePolicies, "stationSalePolicies"));
+        if (playerState == null && !stationSalePolicies.isEmpty())
+            throw new IllegalArgumentException("Station sale terms require an initialized player");
         Objects.requireNonNull(crewManifest);
         Objects.requireNonNull(localFlights);
         if (new java.util.HashSet<>(Objects.requireNonNull(personalCraftOwnership)).size() != personalCraftOwnership.size())

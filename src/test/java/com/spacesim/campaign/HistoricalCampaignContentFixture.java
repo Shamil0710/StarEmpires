@@ -50,12 +50,19 @@ final class HistoricalCampaignContentFixture {
                 s.timeSkip(), s.crewManifest(), s.localFlights(), s.personalCraftOwnership(), s.industrialAdmissions(),
                 s.smallCraftBuilds(), observations);
     }
-    /** Drops the v30 market-observation section after proving it is empty, so nothing is discarded. */
+    /**
+     * Drops the v30 market-observation and v31 station-sale-terms sections after proving both are
+     * empty, so nothing is discarded.
+     */
     static void skipEmptyObservations(DataInputStream in) throws IOException {
         int length = in.readInt();
         if (length <= 0 || length > in.available()) throw new AssertionError("Invalid market observation fixture framing");
         var state = com.spacesim.persistence.PlayerMarketObservationPersistenceCodec.decode(in.readNBytes(length));
         if (!state.series().isEmpty()) throw new AssertionError("Historical fixture cannot discard observed market quotes");
+        length = in.readInt();
+        if (length <= 0 || length > in.available()) throw new AssertionError("Invalid station sale terms fixture framing");
+        if (!com.spacesim.persistence.StationSalePolicy.decode(in.readNBytes(length)).isEmpty())
+            throw new AssertionError("Historical fixture cannot discard station sale terms");
     }
     static void copyPayloads(DataInputStream in, DataOutputStream out, int count) throws IOException {
         byte[] stage21 = null;

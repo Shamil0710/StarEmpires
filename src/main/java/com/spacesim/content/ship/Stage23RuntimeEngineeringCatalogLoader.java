@@ -23,9 +23,23 @@ public final class Stage23RuntimeEngineeringCatalogLoader {
                 merge(freight.getMaterials(), craft.getMaterials(), ShipEngineeringCatalog.MaterialDefinition::id),
                 merge(freight.getResponseSurfaces(), craft.getResponseSurfaces(), ShipEngineeringCatalog.HeavyImpactResponseSurfaceDefinition::id),
                 merge(freight.getProtectionStacks(), craft.getProtectionStacks(), ShipEngineeringCatalog.ProtectionStackDefinition::id),
-                merge(freight.getHulls(), craft.getHulls(), ShipEngineeringCatalog.HullDefinition::id),
+                mergeHulls(freight.getHulls(), craft.getHulls()),
                 merge(freight.getModules(), craft.getModules(), ShipEngineeringCatalog.ModuleDefinition::id),
                 merge(freight.getDemonstratorFits(), craft.getDemonstratorFits(), ShipEngineeringCatalog.DemonstratorFitDefinition::id));
+    }
+
+    /** The freight catalogue's Union freight hull may extend the shared one with only its weapon hardpoint. */
+    private static List<ShipEngineeringCatalog.HullDefinition> mergeHulls(
+            List<ShipEngineeringCatalog.HullDefinition> freight, List<ShipEngineeringCatalog.HullDefinition> craft) {
+        var byId = new LinkedHashMap<String, ShipEngineeringCatalog.HullDefinition>();
+        for (var hull : freight) byId.put(hull.id(), hull);
+        var compatible = new java.util.ArrayList<ShipEngineeringCatalog.HullDefinition>();
+        for (var hull : craft) {
+            var extended = byId.get(hull.id());
+            compatible.add(extended != null && Stage22FreightStrategicEngineeringCatalogLoader.onlyAddsFreightWeaponHardpoint(extended, hull)
+                    ? extended : hull);
+        }
+        return merge(freight, compatible, ShipEngineeringCatalog.HullDefinition::id);
     }
 
     private static <T> List<T> merge(List<T> existing, List<T> additional, Function<T, String> identity) {

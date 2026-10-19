@@ -2,7 +2,9 @@
 
 Status: **FROZEN FOR v0.7 RC TRAIN**
 
-Current development identity (2026-10-18): `campaign=30` / `m22.8.generated-campaign.v30`.
+Current development identity (2026-10-19): `campaign=31` / `m22.8.generated-campaign.v31`.
+Native v31 appends the pilot's station sale terms (price and reserve per station and commodity) as
+payload 22; the legacy decoder gives v1–30 no terms (market price, no reserve).
 Native v30 appends the player's observed market quotes as payload 21; the game loads only the current
 format (`readCurrent`) and rejects older dev saves from the file header before restoring anything; the
 legacy decoder still reads v1–29 for tests, giving them no observations.

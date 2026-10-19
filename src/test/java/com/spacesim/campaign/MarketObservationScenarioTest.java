@@ -103,7 +103,7 @@ class MarketObservationScenarioTest {
             Files.write(file, bytes);
             var rejected = assertThrows(UnsupportedSaveVersionException.class, () -> Stage228GeneratedCampaignPersistenceCodec.readCurrent(file));
             assertEquals(29, rejected.fileVersion());
-            assertEquals(30, rejected.currentVersion());
+            assertEquals(com.spacesim.persistence.Stage228GeneratedCampaignPersistentState.CURRENT_VERSION, rejected.currentVersion());
             Files.write(file, new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
             assertEquals(-1, assertThrows(UnsupportedSaveVersionException.class,
                     () -> Stage228GeneratedCampaignPersistenceCodec.readCurrent(file)).fileVersion());

@@ -41,12 +41,14 @@ public final class GeneratedCampaignJournalUi {
                     || e.action().equals("START_REFINING") || e.action().equals("START_MINING")
                     || e.action().equals("START_COMPONENT_MANUFACTURING") || e.action().equals("COMPONENT_MANUFACTURING_COMPLETED")
                     || e.action().equals("YARD_MATERIAL_DELIVERED") || e.action().equals("SUPPLY_OFFER_AVAILABLE")
+                    || e.action().equals("STATION_SALE") || e.action().equals("SET_STATION_RESERVE")
                     ? " кг" : e.action().startsWith("REFINING_") ? " кг (округлено)"
                     : e.action().equals("TIME_SKIP_MINUTES_STARTED") ? " мин."
                     : e.action().equals("START_MANUFACTURING") || e.kind() == PlayerJournalState.Kind.MANUFACTURING_COMPLETED
                     || e.action().equals("LOAD_PRODUCT") || e.action().equals("UNLOAD_PRODUCT")
                     || java.util.Set.of("BUY_PRODUCT", "PRODUCT_PURCHASE_SETTLED", "PRODUCT_PURCHASE_REFUNDED").contains(e.action())
                     || e.action().equals("PRODUCT_TRANSFER_COMPLETED") || e.action().equals("LOAD_AMMUNITION") ? " шт."
+                    : e.action().equals("SET_STATION_PRICE") ? " мкр./кг"
                     : java.util.Set.of("REPAIR_SERVICE_SETTLED", "REFIT_SERVICE_SETTLED").contains(e.action()) ? " мкр." : "";
             result.add(new Row(new UiSelection(SelectionKind.SURFACE_ROW, "personal-event:" + e.sequence()),
                     description(e), "Личный журнал", unread ? "Новое событие" : "Прочитано",
@@ -145,6 +147,9 @@ public final class GeneratedCampaignJournalUi {
             case "ALLOCATE_YARD_RESOURCES_AVAILABLE" -> "Верфи выделена доступная доля существующих ресурсов станции";
             case "SELLER_STATION_BRIEFING" -> "Получены координаты гражданских станций из архива продавца корабля";
             case "STATION_SALE_LISTING" -> "Получены координаты станций, выставленных на продажу";
+            case "STATION_SALE" -> "NPC купили воду на вашей станции и заплатили вам";
+            case "SET_STATION_PRICE" -> "Цена воды для NPC на вашей станции изменена (0 — рыночная)";
+            case "SET_STATION_RESERVE" -> "Неприкосновенный запас воды на вашей станции изменён";
             case "BUY_RESOURCE_MAP" -> "Карта ресурсного участка куплена у местного оператора";
             case "BUY_STATION_MAP" -> "Навигационная карта станции куплена у местного оператора";
             case "BUY_ROUTE_MAP" -> "Архив пройденного маршрута куплен у местного оператора";

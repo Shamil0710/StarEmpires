@@ -35,6 +35,6 @@ final class GeneratedCampaignPlayerWorldTransition {
                 Stage228GeneratedCampaignPersistentState.CURRENT_RUNTIME_VERSION, nextI, source.smallCraft(), source.hangars(),
                 source.flightDeck(), source.operations(), player, source.playerJournal(), source.moduleCustody(), source.repairQueue(), source.refitQueue(), source.moduleTransfers(), source.productTransfers(), source.yardConstruction(),
                 source.timeSkip(), source.crewManifest(), source.localFlights(), source.personalCraftOwnership(), source.industrialAdmissions(), source.smallCraftBuilds(),
-                source.marketObservations());
+                source.marketObservations(), source.stationSalePolicies());
     }
 }

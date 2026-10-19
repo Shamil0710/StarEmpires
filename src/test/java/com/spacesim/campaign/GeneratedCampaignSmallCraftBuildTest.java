@@ -257,9 +257,11 @@ class GeneratedCampaignSmallCraftBuildTest {
             out.writeInt(in.readInt()); out.writeInt(in.readInt()); out.writeInt(in.readInt()); out.writeUTF(in.readUTF());
             for (int i = 0; i < 19; i++) { int length = in.readInt(); out.writeInt(length); out.write(in.readNBytes(length)); }
             HistoricalCampaignContentFixture.skipEmptyBuild(in);
-            int observationLength = in.readInt(); byte[] observations = in.readNBytes(observationLength); assertEquals(-1, in.read());
+            int observationLength = in.readInt(); byte[] observations = in.readNBytes(observationLength);
+            int termsLength = in.readInt(); byte[] terms = in.readNBytes(termsLength); assertEquals(-1, in.read());
             byte[] payload = ShipyardSmallCraftBuildQueuePersistenceCodec.encode(builds); out.writeInt(payload.length); out.write(payload);
             out.writeInt(observationLength); out.write(observations);
+            out.writeInt(termsLength); out.write(terms);
         }
         return bytes.toByteArray();
     }

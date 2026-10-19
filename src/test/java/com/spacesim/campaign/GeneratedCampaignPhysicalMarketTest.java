@@ -40,8 +40,8 @@ class GeneratedCampaignPhysicalMarketTest {
         var r = c.coordinator().runtime(); var p = r.world().findFleet(c.playerState().orElseThrow().activeFleetId()).orElseThrow();
         assertEquals(2, r.infrastructure().endpoints().stream().filter(e -> c.pilotMarketReference(e.stationId()).isPresent()).count());
         var market = r.infrastructure().endpoints().stream().filter(e -> e.systemId().equals(p.systemId()) && e.storage().commodityMassKg(WATER) > 0).findFirst().orElseThrow();
-        assertEquals(5000L, c.pilotCommodityPrice(market.stationId(), WATER, true));
-        assertEquals(4500L, c.pilotCommodityPrice(market.stationId(), WATER, false));
+        assertEquals(50L, c.pilotCommodityPrice(market.stationId(), WATER, true));
+        assertEquals(45L, c.pilotCommodityPrice(market.stationId(), WATER, false));
         assertEquals(saved, c.captureState()); assertArrayEquals(original, bytes); assertFalse(c.canStartIndependentPilot());
         roundtrip(c);
     }
@@ -58,7 +58,7 @@ class GeneratedCampaignPhysicalMarketTest {
                 && e.handlingCapability().supportedStorageClassIds().contains(waterClass)
                 && quoting.pilotCommodityPrice(e.stationId(), WATER, false) > ask).findFirst().orElseThrow();
         var destination = target.systemId();
-        assertEquals(2500L, ask); assertTrue(c.pilotCommodityPrice(target.stationId(), WATER, false) > ask);
+        assertEquals(25L, ask); assertTrue(c.pilotCommodityPrice(target.stationId(), WATER, false) > ask);
         long initialPersonal = c.playerState().orElseThrow().walletMilliCredits();
         long sourceMoney = wallet(c, source.stationId()).getBalanceMilliCredits(); long targetMoney = wallet(c, target.stationId()).getBalanceMilliCredits();
         double sourceStock = source.storage().commodityMassKg(WATER);

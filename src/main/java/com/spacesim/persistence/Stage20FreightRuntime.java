@@ -1163,6 +1163,30 @@ public final class Stage20FreightRuntime {
         }
         if (lots.values().stream().noneMatch(l -> l.fleetId().equals(fleetId) && l.commodityId().equals(commodityId)))
             com.spacesim.economy.ExtractionReceiptRoundoff.clearEmptyLedgerResidue(requireHold(fleetId), commodityId, certifiedRoundoff);
+        else reconcileRetainedMirror(fleetId, commodityId, certifiedRoundoff);
+    }
+
+    /**
+     * A partial transfer can leave a small remainder whose own roundoff bound no longer covers the
+     * drift accumulated by the receipts just consumed. That drift belongs to the consumed receipts and
+     * leaves with them: excess provenance is consumed FIFO from the oldest retained lot, and excess
+     * physical residue is cleared from the hold, both only within the consumed receipts' certified bound.
+     */
+    private void reconcileRetainedMirror(FleetId fleetId, String commodityId, double certifiedRoundoff) {
+        var rest = lots.values().stream().filter(l -> l.fleetId().equals(fleetId) && l.commodityId().equals(commodityId))
+                .sorted(Comparator.comparingDouble(CargoLotState::loadedAtSimulationSeconds).thenComparing(CargoLotState::lotId)).toList();
+        var hold = requireHold(fleetId);
+        double excessProvenance = rest.stream().mapToDouble(CargoLotState::massKg).sum() - hold.commodityMassKg(commodityId);
+        if (excessProvenance == 0d || Math.abs(excessProvenance) > certifiedRoundoff) return;
+        if (excessProvenance < 0d) {
+            com.spacesim.economy.ExtractionReceiptRoundoff.clearConsumedReceiptResidue(hold, commodityId, -excessProvenance, certifiedRoundoff);
+            return;
+        }
+        var oldest = rest.get(0);
+        if (CargoLotFifo.availableMassKg(oldest) <= excessProvenance) return;
+        var retained = CargoLotFifo.split(oldest, excessProvenance).retained();
+        lots.remove(oldest.lotId());
+        if (retained != null) lots.put(retained.lotId(), retained);
     }
 
     private List<CargoLotState> matchingCargoLots(FleetId fleetId, String orderId, String commodityId, boolean personal) {

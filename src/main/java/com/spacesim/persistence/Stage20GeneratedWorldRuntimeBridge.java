@@ -278,6 +278,9 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 .add(freightEngineering(fleet));
     }
 
+    private static final String UNION_KINETIC_FEED = "kinetic_feed";
+    private static final String UNION_DART_AMMUNITION = "ammo.industrial_union_dart_140kg_v1";
+
     /**
      * Projects the legacy Stage-20 freight ownership row onto its reviewed Stage-22 physical asset.
      *
@@ -287,8 +290,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
      * not an infinite-flight fallback.</p>
      */
     private static com.spacesim.components.EngineeringComponent freightEngineering(FreighterState fleet) {
-        String fitId = fleet.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
-                && fleet.stableFactionId().equals("faction.beta") ? fleet.fitId() : switch (fleet.stableFactionId()) {
+        boolean unionVariant = fleet.stableFactionId().equals("faction.beta") && (fleet.fitId().equals(
+                com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)
+                || fleet.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT));
+        String fitId = unionVariant ? fleet.fitId() : switch (fleet.stableFactionId()) {
             case "faction.alpha" ->
                     com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader
                             .EMPIRE_FREIGHT_STRATEGIC_FIT;
@@ -321,6 +326,10 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                             iface.capacity(),
                             iface.capacity(),
                             0L));
+                } else if (iface.kind() == com.spacesim.content.ship.ShipEngineeringCatalog.InterfaceKind.AMMUNITION) {
+                    // Armed reserves start with an empty magazine; rounds are loaded only by ordinary supply.
+                    loads.add(new com.spacesim.ship.ShipEngineeringState.ConsumableLoad(
+                            installed.mountId(), iface.id(), iface.kind(), 0, 0, 0L));
                 }
             }
         }
@@ -333,10 +342,17 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 fit,
                 consumables,
                 com.spacesim.ship.ShipEngineeringState.DamageState.pristine());
-        return new com.spacesim.components.EngineeringComponent(
-                fit,
-                operating,
-                com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral());
+        var instance = com.spacesim.ship.ShipInstanceRuntimeState.legacyNeutral();
+        if (fitId.equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT)) {
+            // The armed reserve's kinetic feed is bound to the Union 140 kg dart that pilots can manufacture.
+            instance = new com.spacesim.ship.ShipInstanceRuntimeState(instance.damage(), instance.shieldStatesByMount(),
+                    instance.maintenance(), new com.spacesim.ship.WeaponLoadoutState(java.util.List.of(
+                            new com.spacesim.ship.WeaponLoadoutState.FeedBinding(
+                                    com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.FREIGHT_WEAPON_HARDPOINT,
+                                    UNION_KINETIC_FEED, UNION_DART_AMMUNITION))),
+                    instance.weaponMountRuntime());
+        }
+        return new com.spacesim.components.EngineeringComponent(fit, operating, instance);
     }
 
     private static void rollbackCreatedFreight(
@@ -524,6 +540,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
         private final com.spacesim.economy.Stage18ManufacturingWorkQueue manufacturingQueue;
         private final com.spacesim.economy.Stage18FacilityConstructionWorkQueue constructionQueue;
+        private PersonalStationAccess personalStations = PersonalStationAccess.NONE;
 
         private LiveRuntime(
                 Stage20GeneratedCampaignPersistentState campaignAuthority,
@@ -564,8 +581,19 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 throw new IllegalArgumentException("Manufacturing watermark exceeds world time");
             this.world.bindFleetPropellantLogisticsAuthority(
                     new Stage22GeneratedWorldPropellantLogisticsAuthority(
-                            this.world, this.infrastructure, this.industry));
+                            this.world, this.infrastructure, this.industry, () -> personalStations));
         }
+
+        /**
+         * Binds the campaign's view of personally owned stations for world logistics; transient, rebound on restore.
+         * @param access campaign authority over the pilot's stations
+         */
+        public void bindPersonalStations(PersonalStationAccess access) {
+            personalStations = Objects.requireNonNull(access, "personalStations");
+        }
+
+        /** @return the campaign's view of personally owned stations, or {@link PersonalStationAccess#NONE} */
+        public PersonalStationAccess personalStations() { return personalStations; }
 
         /** @return current immutable observer-local discovery registry */
         public Stage20DiscoveryPersistentState discoveryState() { return discovery; }
@@ -1143,6 +1171,27 @@ public final class Stage20GeneratedWorldRuntimeBridge {
         }
 
         /**
+         * Moves already extracted commodity from a source outpost into a station of the same system,
+         * through the ordinary Stage-18 logistics authority and both handling limits.
+         *
+         * @param siteId generated source-outpost site
+         * @param stationId receiving station in the outpost's system
+         * @param massKg recovered commodity mass
+         * @param durationSeconds local handling interval
+         * @return ordinary Stage-18 physical transfer result
+         */
+        public TransferResult transferOutpostToStation(String siteId, String stationId, double massKg, double durationSeconds) {
+            MaterializedExtractionOutpost outpost = industry.sourceOutposts().outpost(siteId);
+            RuntimeEndpoint station = infrastructure.endpoint(stationId);
+            if (!outpost.site().systemId().equals(station.systemId()))
+                throw new IllegalArgumentException("source outpost and station must share a system");
+            HandlingCapability handling = intersectHandling("stage23b.outpost-to-station:" + siteId + ':' + stationId,
+                    outpost.stationNode().handlingCapability(), station.handlingCapability());
+            return logistics.transferCommodity(outpost.storage(), station.storage(),
+                    outpost.source().sourceState().outputCommodityId(), massKg, handling, handling.openInterval(durationSeconds));
+        }
+
+        /**
          * Moves already extracted cargo from its outpost to the order's exact local major hub.
          *
          * @param fleetId order-owning freight fleet
@@ -1371,7 +1420,7 @@ public final class Stage20GeneratedWorldRuntimeBridge {
                 }
             }
             if (!preparation.ready()) {
-                throw new IllegalStateException(
+                throw new FreightPropellantUnavailableException(
                         "freighter cannot start remaining route without a safe finite-propellant plan: "
                                 + fleetId + " reason=" + preparation.reason()
                                 + " requiredDeltaVMps=" + preparation.journey().requiredDeltaVMps()

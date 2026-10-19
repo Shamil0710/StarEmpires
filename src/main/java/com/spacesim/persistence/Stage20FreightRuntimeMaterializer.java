@@ -227,6 +227,9 @@ public final class Stage20FreightRuntimeMaterializer {
                     && faction.stableFactionId().equals("faction.beta") && freeSlots.size() >= 2
                     && authority.fitId().equals("fit.test_bulk_freighter_baseline_v1")
                     ? freeSlots.stream().mapToInt(s -> s.ownershipOrdinal()).max().orElseThrow() : -1;
+            // With a third spare Union slot, the next-highest one becomes the armed escort reserve.
+            int armedOrdinal = miningOrdinal >= 0 && freeSlots.size() >= 3
+                    ? freeSlots.stream().mapToInt(s -> s.ownershipOrdinal()).filter(o -> o != miningOrdinal).max().orElseThrow() : -1;
             for (OwnershipSlot slot : faction.materializationSlots()) {
                 FleetId fleetId = new FleetId(fleetIdValue++);
                 OwnerSlotKey key = new OwnerSlotKey(slot.stableFactionId(), slot.ownershipOrdinal());
@@ -273,6 +276,9 @@ public final class Stage20FreightRuntimeMaterializer {
                     capacity = com.spacesim.content.ship.Stage22CivilianMiningEngineeringCatalogLoader.ORE_CAPACITY_KG;
                     emptyHold = new StationStorageSnapshot(Stage20FreightPersistentState.cargoHoldId(fleetId),
                             Map.of("storage.dry_bulk", capacity), Map.of(), Map.of());
+                } else if (phase == FreightPhase.IDLE && slot.ownershipOrdinal() == armedOrdinal) {
+                    // Same hull and cargo section; only the hull's weapon hardpoint carries the kinetic cassette.
+                    initialFit = com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT;
                 }
                 freighters.add(new FreighterState(
                         fleetId,
@@ -462,6 +468,9 @@ public final class Stage20FreightRuntimeMaterializer {
             ShipEngineeringCatalog engineering) {
         if (!ship.hullId().equals(authority.hullId())) return false;
         if (ship.fitId().equals(authority.fitId()))
+            return Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) == 0;
+        if (authority.fitId().equals("fit.test_bulk_freighter_baseline_v1") && ship.stableFactionId().equals("faction.beta")
+                && ship.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_ARMED_FREIGHT_STRATEGIC_FIT))
             return Double.compare(ship.cargoCapacityKg(), authority.cargoCapacityKg()) == 0;
         if (!authority.fitId().equals("fit.test_bulk_freighter_baseline_v1") || !ship.stableFactionId().equals("faction.beta")
                 || !ship.fitId().equals(com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT)

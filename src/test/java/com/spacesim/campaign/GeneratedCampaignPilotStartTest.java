@@ -65,7 +65,17 @@ class GeneratedCampaignPilotStartTest {
                 "Seed 1 starts beside the Union miner, so the listing is not limited to the ship seller's stations");
         campaign.submitIndependentPilotStart(offer);
         archives.forEach((faction, archive) -> assertEquals(archive, runtime.discoveryState().knowledgeFor(faction)));
-        assertEquals(industrial, runtime.captureState().campaign().industrialState(), "Briefing cannot issue stock, facilities or work");
+        var after = runtime.captureState().campaign().industrialState();
+        assertEquals(industrial.sources(), after.sources());
+        assertEquals(industrial.facilities(), after.facilities(), "Briefing cannot issue facilities");
+        assertEquals(industrial.yards(), after.yards());
+        assertEquals(industrial.constructionOrders(), after.constructionOrders(), "Briefing cannot issue work");
+        assertEquals(industrial.processOrders(), after.processOrders());
+        // The only stock change at the start is the hubs' disclosed opening volatile feedstock.
+        double opened = runtime.infrastructure().endpoints().stream()
+                .mapToDouble(e -> e.storage().commodityMassKg("commodity.feedstock.volatile_feedstock")).sum();
+        assertEquals(0d, opened % Stage228CampaignAuthority.HUB_OPENING_VOLATILE_STOCK_KG, 1e-6);
+        assertTrue(opened > 0, "trade hubs open with volatile feedstock");
         var received = runtime.discoveryState().knowledgeFor(com.spacesim.world.Stage21HPlayerMissionAuthority.PLAYER_ACTOR_ID);
         var briefing = received.entries().stream().filter(e -> e.evidence().stream().anyMatch(v ->
                 v.source() == com.spacesim.world.Stage20DiscoveryKnowledgeState.DiscoverySource.FACTION_INTELLIGENCE

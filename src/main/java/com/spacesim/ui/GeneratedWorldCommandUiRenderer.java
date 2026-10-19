@@ -941,6 +941,14 @@ public final class GeneratedWorldCommandUiRenderer {
             labels = new String[]{"- ШТ.", "+ ШТ.", "ИЗГОТОВИТЬ " + physicalPilotKilograms + " ШТ."};
             width = (inspectorRect.width() - 40f * scale) / 3f;
         }
+        if (physicalPilotManufacturing.startsWith("SET_STATION_")) {
+            boolean price = physicalPilotManufacturing.equals("SET_STATION_PRICE");
+            ids = new String[]{"pilot.less", "pilot.more", "pilot.set-station-terms"};
+            labels = new String[]{price ? "- ЦЕНА" : "- КГ", price ? "+ ЦЕНА" : "+ КГ", price
+                    ? physicalPilotKilograms == 0 ? "ЦЕНА: РЫНОЧНАЯ" : String.format(Locale.ROOT, "ЦЕНА %.3f КР/КГ", physicalPilotKilograms / 1000d)
+                    : "ЗАПАС " + physicalPilotKilograms + " КГ"};
+            width = (inspectorRect.width() - 40f * scale) / 3f;
+        }
         if (physicalPilotManufacturing.equals("ALLOCATE_FACILITY_RESOURCES")) {
             ids = new String[]{"pilot.allocate-facility-resources", "pilot.allocate-facility-resources-half"};
             labels = new String[]{"ШТАТНЫЕ РЕСУРСЫ", "50 % РЕСУРСОВ"};

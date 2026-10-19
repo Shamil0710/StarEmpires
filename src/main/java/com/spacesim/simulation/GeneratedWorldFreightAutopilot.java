@@ -1,7 +1,5 @@
 package com.spacesim.simulation;
 
-import com.spacesim.content.Stage18ExtractionCatalogLoader;
-import com.spacesim.content.Stage18ResourceOntologyLoader;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreightPhase;
 import com.spacesim.persistence.Stage20FreightPersistentState.FreighterState;
 import com.spacesim.persistence.Stage20FreightPersistentState.TransportOrderState;
@@ -65,7 +63,7 @@ public final class GeneratedWorldFreightAutopilot {
                 case AT_SOURCE -> {
                     TransportOrderState order = runtime.freight()
                             .findOrder(fleet.activeOrderId()).orElseThrow();
-                    if (!hasLegalOrderAccess(fleet, order)) {
+                    if (!hasLegalOrderAccess(fleet, order) || servesPersonalStation(order)) {
                         continue;
                     }
                     var endpoint = runtime.infrastructure().endpoint(order.sourceEndpointId());
@@ -133,8 +131,12 @@ public final class GeneratedWorldFreightAutopilot {
                             case COOLDOWN_ACTIVE, STORED_ENERGY_UNAVAILABLE, THERMAL_LIMIT -> true;
                             default -> false;
                         }) continue;
-                        runtime.requestNextRouteHop(fleet.fleetId());
-                        jumpsRequested++;
+                        try {
+                            runtime.requestNextRouteHop(fleet.fleetId());
+                            jumpsRequested++;
+                        } catch (com.spacesim.persistence.FreightPropellantUnavailableException waitForPropellant) {
+                            // No safe propellant plan yet: the freighter waits in place and retries on a later tick.
+                        }
                     }
                 }
                 case AT_DESTINATION -> {
@@ -170,55 +172,16 @@ public final class GeneratedWorldFreightAutopilot {
             com.spacesim.persistence.Stage20GeneratedWorldRuntimeBridge.RuntimeEndpoint endpoint,
             double remainingFreightCapacityKg,
             double elapsedSimulationSeconds) {
-        var source = outpost.source().sourceState();
-        var method = Stage18ExtractionCatalogLoader.loadDefault()
-                .findMethod(outpost.site().extractionMethodId());
-        if (method == null) {
-            throw new IllegalStateException(
-                    "generated extraction site references missing installed method: "
-                            + outpost.site().extractionMethodId());
-        }
-        var commodity = Stage18ResourceOntologyLoader.loadDefault()
-                .findCommodity(source.outputCommodityId());
-        if (commodity == null) {
-            throw new IllegalStateException(
-                    "generated extraction source references missing installed commodity: "
-                            + source.outputCommodityId());
-        }
-        double recoveryFraction = source.gradeFraction()
-                * source.sourceRecoveryFraction()
-                * method.recoveryFraction();
-        if (!Double.isFinite(recoveryFraction) || recoveryFraction <= MASS_EPSILON_KG) {
-            return 0d;
-        }
+        return OutpostExtractionBudget.feasibleSourceMassKg(outpost, endpoint, remainingFreightCapacityKg, elapsedSimulationSeconds);
+    }
 
-        var facility = outpost.facilityCapability();
-        double maxSourceMassKg = source.remainingAccessibleMassKg();
-        maxSourceMassKg = Math.min(
-                maxSourceMassKg,
-                method.maxSourceKgPerSecond() * elapsedSimulationSeconds);
-        maxSourceMassKg = Math.min(
-                maxSourceMassKg,
-                facility.effectiveProcessPowerW() * elapsedSimulationSeconds
-                        / method.energyJPerSourceKg());
-        maxSourceMassKg = Math.min(
-                maxSourceMassKg,
-                facility.effectiveEngineeringWorkRate() * elapsedSimulationSeconds
-                        / method.workSecondsPerSourceKg());
-        maxSourceMassKg = Math.min(
-                maxSourceMassKg,
-                facility.effectiveMaintenanceWorkRate() * elapsedSimulationSeconds
-                        / method.maintenanceWorkSecondsPerSourceKg());
-
-        double outpostStorageOutputKg = outpost.storage().remainingCapacityKg(commodity.storageClassId());
-        double stagingOutputKg = Math.min(
-                outpost.stationNode().handlingCapability().massRateKgPerSecond(),
-                endpoint.handlingCapability().massRateKgPerSecond()) * elapsedSimulationSeconds;
-        double outputBudgetKg = Math.min(
-                remainingFreightCapacityKg,
-                Math.min(outpostStorageOutputKg, stagingOutputKg));
-        maxSourceMassKg = Math.min(maxSourceMassKg, outputBudgetKg / recoveryFraction);
-        return Math.max(0d, maxSourceMassKg);
+    /**
+     * A station sold to a pilot leaves its seller's recurring program: no new cycle loads for it or
+     * from it. A run already under way still completes; the freighter then waits at its source.
+     */
+    private boolean servesPersonalStation(TransportOrderState order) {
+        var personal = runtime.personalStations();
+        return personal.personallyOwned(order.sourceEndpointId()) || personal.personallyOwned(order.destinationEndpointId());
     }
 
     private boolean hasLegalOrderAccess(FreighterState fleet, TransportOrderState order) {

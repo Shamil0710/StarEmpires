@@ -59,7 +59,8 @@ final class GeneratedCampaignNpcSupplyOffers {
         if (emergency != delayedOrLost) return false;
         var endpoint = runtime.infrastructure().endpoints().stream()
                 .filter(e -> e.stationId().equals(order.destinationEndpointId())).findFirst().orElse(null);
-        if (endpoint == null) return false;
+        // A station sold to the pilot is no longer the seller's to supply.
+        if (endpoint == null || runtime.personalStations().personallyOwned(endpoint.stationId())) return false;
         var ref = new StaticObjectRef(endpoint.systemId(), StaticObjectKind.INFRASTRUCTURE, endpoint.stationId());
         if (archive.knowledge(ref).filter(k -> k.knownLocation().isPresent()).isEmpty()) return false;
         var definition = Stage18ResourceOntologyLoader.loadDefault().findCommodity(order.commodityId());

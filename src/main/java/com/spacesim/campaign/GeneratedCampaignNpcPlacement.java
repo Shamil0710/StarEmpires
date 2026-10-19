@@ -28,8 +28,25 @@ final class GeneratedCampaignNpcPlacement {
         }
     }
 
-    /** Named new-game policy: dispatchers' operators archive the free-body resource sites of their posting systems. */
+    /** Named new-game policy: dispatchers' operators archive the free-body resource sites around their posts. */
     static final String LOCAL_RESOURCE_SURVEY_VERSION = "new-game-local-resource-survey.v1";
+    /** Jumps around each dispatcher post covered by its operator's opening resource survey. */
+    static final int LOCAL_RESOURCE_SURVEY_RADIUS_JUMPS = 5;
+
+    private static java.util.Set<com.spacesim.world.StarSystemId> systemsWithin(
+            com.spacesim.world.GalaxyTopology topology, com.spacesim.world.StarSystemId origin, int jumps) {
+        var reached = new java.util.HashMap<com.spacesim.world.StarSystemId, Integer>();
+        var pending = new java.util.ArrayDeque<com.spacesim.world.StarSystemId>();
+        reached.put(origin, 0);
+        pending.add(origin);
+        while (!pending.isEmpty()) {
+            var system = pending.remove();
+            if (reached.get(system) == jumps) continue;
+            for (var next : topology.neighbors(system))
+                if (reached.putIfAbsent(next, reached.get(system) + 1) == null) pending.add(next);
+        }
+        return reached.keySet();
+    }
 
     /** Installs a local dispatcher at each existing archived civilian station on new-game authoring only. */
     static void install(GeneratedCampaignCoordinator coordinator) {
@@ -66,7 +83,8 @@ final class GeneratedCampaignNpcPlacement {
         service.installNpcRoster(roster);
         var postingSystems = new java.util.TreeMap<String, java.util.Set<com.spacesim.world.StarSystemId>>();
         for (var npc : roster)
-            postingSystems.computeIfAbsent(npc.factionContentId(), f -> new java.util.HashSet<>()).add(npc.locationSystemId());
+            postingSystems.computeIfAbsent(npc.factionContentId(), f -> new java.util.HashSet<>())
+                    .addAll(systemsWithin(runtime.world().getTopology(), npc.locationSystemId(), LOCAL_RESOURCE_SURVEY_RADIUS_JUMPS));
         runtime.authorInitialLocalResourceSurveys(postingSystems, LOCAL_RESOURCE_SURVEY_VERSION);
         for (var npc : roster) {
             var archive = coordinator.runtime().discoveryState().knowledgeFor(npc.factionContentId());

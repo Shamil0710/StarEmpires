@@ -6,6 +6,8 @@ Acceptance and tests:
 - A slice is accepted by targeted tests plus scenario tests (`@Tag("scenario")`) that drive
   the ordinary player path (player commands + world ticks + save/load) on a small authored
   world. Keep the existing money/mass conservation and exact round-trip checks.
+- Scenarios longer than a few minutes are tagged `@Tag("soak")`: excluded from verify and CI by default,
+  run with `-Dtest.excludedGroups=` (e.g. `IndustrialChainScenarioTest`, ~18 min).
 - Long QA journeys over the generated galaxy (`tools/qa/*Journey*`) are soak runs: on request
   or weekly, never the acceptance gate of a single slice. Do not start one without the user.
 - Run targeted tests while working; run full `mvn -Ptest-parallel verify` before pushing a

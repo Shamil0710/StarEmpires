@@ -62,8 +62,13 @@ final class ScenarioPilot {
     /** Submits one previewed pilot action; a rejection fails the scenario with the authority's reason. */
     long action(String verb, String target, String subject, int amount) {
         var preview = campaign.previewPilotAction(verb, target, subject, amount);
-        if (!preview.allowed()) throw new AssertionError("Rejected " + verb + " target=" + target + " subject=" + subject
-                + " amount=" + amount + " at tick=" + world().getAuthoritativeWorldTick() + ": " + rejectionReason(verb, target, subject, amount));
+        if (!preview.allowed()) {
+            String reason = rejectionReason(verb, target, subject, amount);
+            String checkpoint = saveFailureCheckpoint();
+            throw new AssertionError("Rejected " + verb + " target=" + target + " subject=" + subject
+                    + " amount=" + amount + " at tick=" + world().getAuthoritativeWorldTick() + ": " + reason
+                    + " (checkpoint " + checkpoint + ")");
+        }
         campaign.submitPilotAction(preview);
         return preview.walletChangeMilliCredits();
     }
@@ -73,18 +78,34 @@ final class ScenarioPilot {
     }
 
     /** Diagnostic only: repeats the rejected action on an isolated restored copy to surface its exception. */
-    private String rejectionReason(String verb, String target, String subject, int amount) {
+    String rejectionReason(String verb, String target, String subject, int amount) {
         try {
             var isolated = Stage228CampaignAuthority.restore(campaign.captureState());
             var execute = Stage228CampaignAuthority.class.getDeclaredMethod("executePilotAction",
                     String.class, String.class, String.class, int.class);
             execute.setAccessible(true);
             execute.invoke(isolated, verb, target, subject, amount);
+            // The preview also captures the result; its persistence invariants can reject what execution allowed.
+            isolated.captureState();
             return "no exception on isolated copy";
         } catch (java.lang.reflect.InvocationTargetException e) {
             return String.valueOf(e.getCause());
         } catch (ReflectiveOperationException e) {
             return "diagnostic unavailable: " + e;
+        } catch (RuntimeException e) {
+            return "capture after execution failed: " + e;
+        }
+    }
+
+    /** Writes the failing state so a short probe can reproduce the rejection without replaying the scenario. */
+    private String saveFailureCheckpoint() {
+        try {
+            var path = java.nio.file.Path.of("target", "scenario-failure-" + world().getAuthoritativeWorldTick() + ".s25");
+            java.nio.file.Files.createDirectories(path.getParent());
+            Stage228GeneratedCampaignPersistenceCodec.write(path, campaign.captureState());
+            return path.toString();
+        } catch (java.io.IOException | RuntimeException e) {
+            return "not saved: " + e;
         }
     }
 
@@ -228,6 +249,10 @@ final class ScenarioPilot {
             if (cruise < .1) throw new AssertionError("No finite flight and braking plan");
             plan = ENGINEERING.planDeltaV(fitted, Math.hypot(ux * cruise - initial.velocityXMps(), uy * cruise - initial.velocityYMps()) + cruise);
         }
+        // A crawl on an almost empty tank takes days of ticks; an ordinary pilot would refuel first.
+        if (cruise < cruiseLimitMps / 8) throw new AssertionError(String.format(java.util.Locale.ROOT,
+                "Too little reaction mass for a working flight: %.0f kg aboard allows only %.1f of %.0f m/s cruise",
+                reactionMassKg(), cruise, cruiseLimitMps));
         double brakingAcceleration = .8 * plan.deliveredDeltaVMps() / plan.burnSeconds();
         float step = campaign.coordinator().session().fixedStepSeconds();
         while (true) {

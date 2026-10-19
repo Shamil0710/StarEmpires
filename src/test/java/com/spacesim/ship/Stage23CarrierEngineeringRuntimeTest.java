@@ -17,7 +17,10 @@ class Stage23CarrierEngineeringRuntimeTest {
             original.getMaterials().forEach(value -> assertEquals(value, combined.findMaterial(value.id())));
             original.getResponseSurfaces().forEach(value -> assertEquals(value, combined.findResponseSurface(value.id())));
             original.getProtectionStacks().forEach(value -> assertEquals(value, combined.findProtectionStack(value.id())));
-            original.getHulls().forEach(value -> assertEquals(value, combined.findHull(value.id())));
+            // The Union freight hull is the one documented extension: it only gains the freight weapon hardpoint.
+            original.getHulls().forEach(value -> assertTrue(value.equals(combined.findHull(value.id()))
+                    || com.spacesim.content.ship.Stage22FreightStrategicEngineeringCatalogLoader.onlyAddsFreightWeaponHardpoint(
+                            combined.findHull(value.id()), value), value.id()));
             original.getModules().forEach(value -> assertEquals(value, combined.findModule(value.id())));
             original.getDemonstratorFits().forEach(value -> assertEquals(value, combined.findDemonstratorFit(value.id())));
         }
