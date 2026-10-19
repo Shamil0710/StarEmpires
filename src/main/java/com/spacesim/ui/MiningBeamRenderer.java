@@ -23,7 +23,7 @@ final class MiningBeamRenderer {
     private boolean disposed;
 
     /**
-     * Draws one beam inside an active batch, with additive blending restored to normal afterwards.
+     * Draws one beam inside an active batch; the batch's tint and blend factors are restored after.
      *
      * @param batch active sprite batch
      * @param segment beam {x1, y1, x2, y2} from hull edge to source surface, or null when they overlap
@@ -37,30 +37,33 @@ final class MiningBeamRenderer {
             float sparkReachPx, float scale) {
         if (disposed) throw new IllegalStateException("mining beam renderer is disposed");
         float intensity = effect.intensity() * MiningBeamGeometry.pulse(effect.ageSeconds());
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
-        double beamX = 1d;
-        double beamY = 0d;
-        if (segment != null) {
-            beamX = segment[2] - segment[0];
-            beamY = segment[3] - segment[1];
-            float length = (float) Math.hypot(beamX, beamY);
-            float rotation = (float) Math.toDegrees(Math.atan2(beamY, beamX));
-            stretch(batch, band, segment[0], segment[1], length, 8f * scale, rotation, BAND, 0.42f * intensity);
-            stretch(batch, band, segment[0], segment[1], length, 2.4f * scale, rotation, CORE, 0.85f * intensity);
-            glow(batch, segment[0], segment[1], 6f * scale, CORE, 0.45f * intensity);
-        }
-        glow(batch, contactX, contactY, 18f * scale, CONTACT, 0.7f * intensity);
-        glow(batch, contactX, contactY, 6f * scale, CORE, 0.9f * intensity);
-        if (effect.bursting()) {
-            for (var spark : MiningBeamGeometry.sparks(effect.burstSeed(), effect.burstAge(),
-                    MiningBeamEffects.BURST_SECONDS, contactX, contactY, beamX, beamY, sparkReachPx)) {
-                float alpha = spark.alpha() * effect.intensity();
-                stretch(batch, pixel, spark.x(), spark.y(), 4.5f * scale, 1.5f * scale, spark.directionDegrees(), SPARK, alpha);
-                glow(batch, spark.x(), spark.y(), 3.5f * scale, SPARK, 0.6f * alpha);
+        BatchState entry = BatchState.capture(batch);
+        try {
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+            double beamX = 1d;
+            double beamY = 0d;
+            if (segment != null) {
+                beamX = segment[2] - segment[0];
+                beamY = segment[3] - segment[1];
+                float length = (float) Math.hypot(beamX, beamY);
+                float rotation = (float) Math.toDegrees(Math.atan2(beamY, beamX));
+                stretch(batch, band, segment[0], segment[1], length, 8f * scale, rotation, BAND, 0.42f * intensity);
+                stretch(batch, band, segment[0], segment[1], length, 2.4f * scale, rotation, CORE, 0.85f * intensity);
+                glow(batch, segment[0], segment[1], 6f * scale, CORE, 0.45f * intensity);
             }
+            glow(batch, contactX, contactY, 18f * scale, CONTACT, 0.7f * intensity);
+            glow(batch, contactX, contactY, 6f * scale, CORE, 0.9f * intensity);
+            if (effect.bursting()) {
+                for (var spark : MiningBeamGeometry.sparks(effect.burstSeed(), effect.burstAge(),
+                        MiningBeamEffects.BURST_SECONDS, contactX, contactY, beamX, beamY, sparkReachPx)) {
+                    float alpha = spark.alpha() * effect.intensity();
+                    stretch(batch, pixel, spark.x(), spark.y(), 4.5f * scale, 1.5f * scale, spark.directionDegrees(), SPARK, alpha);
+                    glow(batch, spark.x(), spark.y(), 3.5f * scale, SPARK, 0.6f * alpha);
+                }
+            }
+        } finally {
+            entry.restore(batch);
         }
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        batch.setColor(Color.WHITE);
     }
 
     /** Releases the renderer-owned textures exactly once. */

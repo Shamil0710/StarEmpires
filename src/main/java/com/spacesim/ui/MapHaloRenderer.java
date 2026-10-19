@@ -22,7 +22,8 @@ final class MapHaloRenderer {
     private boolean disposed;
 
     /**
-     * Draws the halos of one layer inside an active batch; the blend function is restored after.
+     * Draws the halos of one layer inside an active batch; the batch's tint and blend factors are
+     * restored after.
      *
      * @param batch active sprite batch
      * @param halos halos of this frame
@@ -30,21 +31,18 @@ final class MapHaloRenderer {
      */
     void draw(SpriteBatch batch, List<MapHaloLayout.Halo> halos, MapHaloLayout.Layer layer) {
         if (disposed) throw new IllegalStateException("map halo renderer is disposed");
-        boolean any = false;
-        for (MapHaloLayout.Halo item : halos) {
-            if (item.layer() != layer) continue;
-            if (!any) {
-                batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
-                any = true;
+        BatchState entry = BatchState.capture(batch);
+        try {
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+            for (MapHaloLayout.Halo item : halos) {
+                if (item.layer() != layer) continue;
+                Color color = color(item.tint());
+                batch.setColor(color.r, color.g, color.b, Math.min(1f, item.alpha()));
+                float radius = item.radiusPx();
+                batch.draw(item.flare() ? flare : halo, item.x() - radius, item.y() - radius, radius * 2f, radius * 2f);
             }
-            Color color = color(item.tint());
-            batch.setColor(color.r, color.g, color.b, Math.min(1f, item.alpha()));
-            float radius = item.radiusPx();
-            batch.draw(item.flare() ? flare : halo, item.x() - radius, item.y() - radius, radius * 2f, radius * 2f);
-        }
-        if (any) {
-            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-            batch.setColor(Color.WHITE);
+        } finally {
+            entry.restore(batch);
         }
     }
 

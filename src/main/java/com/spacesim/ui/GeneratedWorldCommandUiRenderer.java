@@ -56,7 +56,7 @@ public final class GeneratedWorldCommandUiRenderer {
     private final MapHaloRenderer haloRenderer = new MapHaloRenderer();
     /** Presentation clock of halo pulsing and beacon blinking; it reads no simulation time. */
     private float haloClock;
-    private List<MiningBeam> miningBeams = List.of();
+    private List<MiningBeamEffects.Effect> miningFrame = List.of();
     private final GlyphLayout glyph = new GlyphLayout();
     private final ArrayList<HitTarget> hitTargets = new ArrayList<>();
     private final MapCameraState systemMapCamera = new MapCameraState();
@@ -412,6 +412,7 @@ public final class GeneratedWorldCommandUiRenderer {
         systemProjectionRefit = true;
         localObjectMotion.reset();
         miningEffects.clear();
+        miningFrame = List.of();
     }
 
     /**
@@ -1307,11 +1308,11 @@ public final class GeneratedWorldCommandUiRenderer {
 
 
     /**
-     * Mining beams from the player's mining ships to their sources, over the sprites. The effects
-     * advance once per drawn frame; a beam whose ship or source is not on this map is skipped.
+     * Mining beams from the player's mining ships to their sources, over the sprites, from the
+     * effects of this frame; a beam whose ship or source is not on this map is skipped.
      */
     private void drawMiningBeams(List<LocalObjectView> objects, Map<String, Point> points, double pixelsPerMetre) {
-        List<MiningBeamEffects.Effect> effects = miningEffects.advance(miningBeams, frameSeconds());
+        List<MiningBeamEffects.Effect> effects = miningFrame;
         if (effects.isEmpty()) return;
         Map<String, LocalObjectView> byId = new HashMap<>();
         for (LocalObjectView object : objects) byId.put(object.stableId(), object);
@@ -1391,8 +1392,13 @@ public final class GeneratedWorldCommandUiRenderer {
     /** @param table quotes of the station the player's ship is docked at, or null when not docked */
     public void bindDockedMarket(MarketTable table) { dockedMarket = table; }
 
-    /** @param beams the player's active mining orders, refreshed every frame from the campaign */
-    public void bindMiningBeams(List<MiningBeam> beams) { miningBeams = List.copyOf(beams); }
+    /**
+     * Advances the mining beam effects by one frame. Called every frame on every tab, so an
+     * extraction or a stop while another tab is shown is observed in order.
+     *
+     * @param beams the player's mining contacts, refreshed every frame from the campaign
+     */
+    public void bindMiningBeams(List<MiningBeam> beams) { miningFrame = miningEffects.advance(beams, frameSeconds()); }
 
     /** @return height reserved for the market table: all rows, at most 55 % of the inspector */
     private float marketTableHeight(Rect inspector) {

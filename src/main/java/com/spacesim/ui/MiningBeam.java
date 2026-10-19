@@ -3,33 +3,36 @@ package com.spacesim.ui;
 import java.util.Objects;
 
 /**
- * One active personal mining order of the player, as the system map shows it: a beam from the
- * ship to the contacted source.
+ * One personal mining contact of the player, as the system map shows it: a beam from the ship to
+ * the contacted source while the order is active, and the extraction sparks.
  *
- * <p>The order exists only while extraction succeeds; the campaign removes it on the first tick
- * that cannot extract. {@code lastProcessedTick} is the order's authoritative watermark: it is the
- * assignment tick right after the start and then the last tick that extracted, so each advance of
- * it is one completed extraction.</p>
+ * <p>Both facts are authoritative. {@code active} is the existence of the mining order, which the
+ * campaign removes on the first tick that cannot extract (or after a tick that depletes the
+ * source). {@code lastExtractionTick} is the tick of the newest extraction receipt aboard the ship
+ * for this source; it survives the order's removal, so the final extraction of a depleted source
+ * still counts, and a stop and restart of the order is not an extraction.</p>
  *
  * @param shipStableId system-map id of the mining ship ({@code fleet:<id>})
  * @param sourceStableId system-map id of the contacted source ({@code resource:<id>})
- * @param lastProcessedTick authoritative tick watermark of the order
+ * @param active whether the mining order exists
+ * @param lastExtractionTick tick of the newest extraction receipt, or -1 without one
  */
-public record MiningBeam(String shipStableId, String sourceStableId, long lastProcessedTick) {
+public record MiningBeam(String shipStableId, String sourceStableId, boolean active, long lastExtractionTick) {
     /**
      * Validates one beam.
      *
      * @param shipStableId system-map id of the mining ship
      * @param sourceStableId system-map id of the contacted source
-     * @param lastProcessedTick non-negative tick watermark
+     * @param active whether the mining order exists
+     * @param lastExtractionTick tick of the newest extraction receipt, or -1 without one
      */
     public MiningBeam {
         Objects.requireNonNull(shipStableId, "shipStableId");
         Objects.requireNonNull(sourceStableId, "sourceStableId");
-        if (lastProcessedTick < 0) throw new IllegalArgumentException("negative mining tick");
+        if (lastExtractionTick < -1) throw new IllegalArgumentException("invalid extraction tick");
     }
 
-    /** @return identity of the ship-source pair, stable while the order lasts */
+    /** @return identity of the ship-source pair */
     String key() {
         return shipStableId + '|' + sourceStableId;
     }

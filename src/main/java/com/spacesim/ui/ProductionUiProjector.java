@@ -639,19 +639,40 @@ public final class ProductionUiProjector {
     }
 
     /**
-     * Mining beams of the player's own active mining orders, for the system map. Only the
-     * player's own fleets are shown; the order's tick watermark drives the extraction sparks.
+     * Mining contacts of the player's own fleets, for the system map: one active beam per personal
+     * mining order, plus an inactive one for an extraction in the latest tick whose order is already
+     * gone (the tick that depleted the source). Each carries the newest extraction receipt aboard
+     * the ship for that source, which drives the extraction sparks.
      *
      * @param campaign current campaign
-     * @return one beam per personal mining order, ordered by ship id; empty without a pilot
+     * @return contacts ordered by ship and source id; empty without a pilot
      */
     public static List<MiningBeam> miningBeams(Stage228CampaignAuthority campaign) {
         var player = campaign.playerState().orElse(null);
         if (player == null) return List.of();
-        return campaign.coordinator().runtime().freight().personalMiningOrders().stream()
-                .filter(order -> player.ownedFleetIds().contains(order.fleetId()))
-                .map(order -> new MiningBeam("fleet:" + order.fleetId().value(), "resource:" + order.sourceId(),
-                        order.lastProcessedTick()))
+        var freight = campaign.coordinator().runtime().freight();
+        long now = campaign.coordinator().runtime().world().getAuthoritativeWorldTick();
+        // Newest extraction receipt per own ship and source.
+        var newest = new java.util.HashMap<String, Long>();
+        for (var lot : freight.cargoLots()) {
+            if (lot.receiptSeries() == null || !player.ownedFleetIds().contains(lot.fleetId())) continue;
+            newest.merge(lot.fleetId().value() + "|" + lot.sourceEndpointId(), lot.receiptSeries().lastTick(), Math::max);
+        }
+        var beams = new java.util.TreeMap<String, MiningBeam>();
+        for (var order : freight.personalMiningOrders()) {
+            if (!player.ownedFleetIds().contains(order.fleetId())) continue;
+            String key = order.fleetId().value() + "|" + order.sourceId();
+            beams.put(key, new MiningBeam("fleet:" + order.fleetId().value(), "resource:" + order.sourceId(), true,
+                    newest.getOrDefault(key, -1L)));
+        }
+        for (var entry : newest.entrySet()) {
+            if (entry.getValue() != now || beams.containsKey(entry.getKey())) continue;
+            // Fleet ids are numeric, so the first separator splits the pair.
+            int split = entry.getKey().indexOf('|');
+            beams.put(entry.getKey(), new MiningBeam("fleet:" + entry.getKey().substring(0, split),
+                    "resource:" + entry.getKey().substring(split + 1), false, entry.getValue()));
+        }
+        return beams.values().stream()
                 .sorted(java.util.Comparator.comparing(MiningBeam::shipStableId).thenComparing(MiningBeam::sourceStableId))
                 .toList();
     }

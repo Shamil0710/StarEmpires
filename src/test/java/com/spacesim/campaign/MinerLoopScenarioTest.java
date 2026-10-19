@@ -92,23 +92,39 @@ class MinerLoopScenarioTest {
         assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).isEmpty(), "no beam before mining");
         pilot.action("START_MINING", sourceId, "", MINING_KG_PER_TICK);
         // The system map draws a beam between the two objects it shows, from the order itself.
-        var beam = new MiningBeam("fleet:" + pilot.fleetId().value(), "resource:" + sourceId,
-                pilot.world().getAuthoritativeWorldTick());
-        assertEquals(List.of(beam), ProductionUiProjector.miningBeams(pilot.campaign()), "the assigned order shows a beam");
+        var beam = new MiningBeam("fleet:" + pilot.fleetId().value(), "resource:" + sourceId, true, -1);
+        assertEquals(List.of(beam), ProductionUiProjector.miningBeams(pilot.campaign()),
+                "the assigned order shows a beam, with no extraction yet");
         var shown = mapObjectIds(pilot);
         assertTrue(shown.contains(beam.shipStableId()) && shown.contains(beam.sourceStableId()),
                 "the beam's ship and source are both on the system map");
         pilot.ticks(MINING_TICKS / 2);
         assertEquals(pilot.world().getAuthoritativeWorldTick(),
-                ProductionUiProjector.miningBeams(pilot.campaign()).get(0).lastProcessedTick(),
-                "the watermark advances with every extraction, which is what fires the sparks");
+                ProductionUiProjector.miningBeams(pilot.campaign()).get(0).lastExtractionTick(),
+                "every extraction leaves a receipt in the hold, which is what fires the sparks");
         double beforeReload = oreKg(pilot) - cargoBefore;
         var beamsBeforeReload = ProductionUiProjector.miningBeams(pilot.campaign());
         pilot.saveAndReload();
         assertEquals(beamsBeforeReload, ProductionUiProjector.miningBeams(pilot.campaign()), "same beam after save/load");
+
+        // A stop and a restart of the same contact is not an extraction: the receipt stays the old one.
+        long receipt = beamsBeforeReload.get(0).lastExtractionTick();
+        pilot.action("STOP_MINING", "", "", 0);
+        assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).stream().noneMatch(MiningBeam::active),
+                "the beam ends with the order");
+        pilot.tick();
+        pilot.action("START_MINING", sourceId, "", MINING_KG_PER_TICK);
+        assertEquals(List.of(new MiningBeam(beam.shipStableId(), beam.sourceStableId(), true, receipt)),
+                ProductionUiProjector.miningBeams(pilot.campaign()), "the restarted order carries no new receipt");
         pilot.ticks(MINING_TICKS / 2);
         pilot.action("STOP_MINING", "", "", 0);
-        assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).isEmpty(), "the beam ends with the order");
+        // The order is gone, but this tick's extraction still reaches the map, as on the tick that
+        // depletes a source and removes the order.
+        assertEquals(List.of(new MiningBeam(beam.shipStableId(), beam.sourceStableId(), false,
+                        pilot.world().getAuthoritativeWorldTick())), ProductionUiProjector.miningBeams(pilot.campaign()),
+                "no active beam after the stop, only the latest tick's extraction");
+        pilot.tick();
+        assertTrue(ProductionUiProjector.miningBeams(pilot.campaign()).isEmpty(), "nothing once that tick has passed");
         double mined = oreKg(pilot) - cargoBefore;
         System.out.printf("SCENARIO mining before reload=%.3f kg, after reload=%.3f kg%n", beforeReload, mined - beforeReload);
         assertTrue(beforeReload > 0 && mined > beforeReload, "mining progresses on both sides of save/load");

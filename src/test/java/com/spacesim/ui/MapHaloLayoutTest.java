@@ -107,9 +107,23 @@ class MapHaloLayoutTest {
     }
 
     @Test
-    void haloCountIsBounded() {
+    void steadyHalosAndBlinkingLightsHaveSeparateBudgets() {
         var many = new ArrayList<Body>();
         for (int i = 0; i < 400; i++) many.add(new Body("station:" + i, ObjectKind.STATION, 400f, 300f, 300f, 200f, 0d, 16f));
-        assertEquals(MapHaloLayout.MAX_HALOS, MapHaloLayout.layout(many, MAP, 0.1f, 1f).size());
+        var halos = MapHaloLayout.layout(many, MAP, 0.1f, 1f);
+        assertEquals(MapHaloLayout.MAX_HALOS, halos.stream().filter(h -> h.layer() == Layer.BEHIND).count());
+        assertTrue(halos.stream().filter(h -> h.layer() == Layer.OVER).count() <= MapHaloLayout.MAX_LIGHT_QUADS);
+
+        // The route from the review: a station first, then 159 anchors. The anchors' fields stay the
+        // same whether the station's light is lit or dark.
+        var mixed = new ArrayList<Body>();
+        mixed.add(station(300f, 0d));
+        for (int i = 0; i < 159; i++) mixed.add(new Body("jump:" + i, ObjectKind.JUMP_ANCHOR, 100f, 100f, 0f, 0f, 0d, 12f));
+        float offset = MapHaloLayout.phaseOffset("station:hub.8");
+        float lit = (MapHaloLayout.BEACON_DUTY / 2f - offset + 1f) * MapHaloLayout.BEACON_PERIOD_SECONDS;
+        for (float time : new float[] {lit, darkTime()}) {
+            var frame = MapHaloLayout.layout(mixed, MAP, time, 1f);
+            assertEquals(159, frame.stream().filter(h -> h.tint() == Tint.JUMP).count(), "every anchor keeps its field at " + time);
+        }
     }
 }

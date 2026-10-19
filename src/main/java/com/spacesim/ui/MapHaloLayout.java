@@ -15,8 +15,10 @@ import java.util.List;
  * clock, phased per object; it reads no simulation state. Pure presentation geometry.</p>
  */
 final class MapHaloLayout {
-    /** Most halos drawn in one frame, a fixed frame-budget bound. */
+    /** Most steady halos drawn in one frame, a fixed frame-budget bound. */
     static final int MAX_HALOS = 160;
+    /** Most marker-light quads (two per lit light) drawn in one frame, a separate budget. */
+    static final int MAX_LIGHT_QUADS = 64;
     /** Seconds of one beacon blink cycle. */
     static final float BEACON_PERIOD_SECONDS = 2.4f;
     /** Share of the cycle a beacon is lit. */
@@ -74,38 +76,50 @@ final class MapHaloLayout {
     }
 
     /**
-     * Lays out the halos of one frame.
+     * Lays out the halos of one frame: the steady halos first, within {@link #MAX_HALOS}, then the
+     * blinking lights within their own {@link #MAX_LIGHT_QUADS}, so a blinking light never pushes
+     * a steady halo out of the budget.
      *
      * @param bodies objects on the map
      * @param map map box; halos entirely outside it are dropped
      * @param timeSeconds presentation clock for blinking and pulsing
      * @param scale UI scale
-     * @return halos in body order, at most {@link #MAX_HALOS}
+     * @return steady halos in body order, then the lit marker lights
      */
     static List<Halo> layout(List<Body> bodies, MapLabelLayout.Box map, float timeSeconds, float scale) {
         float time = Float.isFinite(timeSeconds) ? timeSeconds : 0f;
         List<Halo> halos = new ArrayList<>();
+        List<Halo> lights = new ArrayList<>();
         for (Body body : bodies) {
-            if (halos.size() >= MAX_HALOS) break;
             if (!Float.isFinite(body.x()) || !Float.isFinite(body.y())) continue;
             float hull = hullRadius(body);
             switch (body.kind()) {
                 case STATION -> {
-                    add(halos, map, new Halo(body.x(), body.y(), clamp(1.4f * Math.max(hull, body.markerPx() * 1.6f),
-                            12f * scale, 320f * scale), Tint.STATION, 0.5f, Layer.BEHIND, false));
-                    addBeacons(halos, map, body, time, scale);
+                    if (halos.size() < MAX_HALOS) add(halos, map, new Halo(body.x(), body.y(),
+                            clamp(1.4f * Math.max(hull, body.markerPx() * 1.6f), 12f * scale, 320f * scale),
+                            Tint.STATION, 0.5f, Layer.BEHIND, false));
+                    if (lights.size() < MAX_LIGHT_QUADS) addBeacons(lights, map, body, time, scale);
                 }
-                case EXTRACTION_OUTPOST -> add(halos, map, new Halo(body.x(), body.y(),
-                        clamp(1.3f * Math.max(hull, body.markerPx() * 1.6f), 10f * scale, 220f * scale),
-                        Tint.OUTPOST, 0.45f, Layer.BEHIND, false));
-                case JUMP_ANCHOR -> add(halos, map, new Halo(body.x(), body.y(), body.markerPx() * 3.2f, Tint.JUMP,
-                        0.6f * (0.9f + 0.1f * (float) Math.sin(time * 2d * Math.PI / 3.2d)), Layer.BEHIND, false));
-                case SPECIAL_LOCATION -> add(halos, map, new Halo(body.x(), body.y(), body.markerPx() * 3f,
-                        Tint.ANOMALY, 0.5f, Layer.BEHIND, false));
+                case EXTRACTION_OUTPOST -> {
+                    if (halos.size() < MAX_HALOS) add(halos, map, new Halo(body.x(), body.y(),
+                            clamp(1.3f * Math.max(hull, body.markerPx() * 1.6f), 10f * scale, 220f * scale),
+                            Tint.OUTPOST, 0.45f, Layer.BEHIND, false));
+                }
+                case JUMP_ANCHOR -> {
+                    if (halos.size() < MAX_HALOS) add(halos, map, new Halo(body.x(), body.y(), body.markerPx() * 3.2f,
+                            Tint.JUMP, 0.6f * (0.9f + 0.1f * (float) Math.sin(time * 2d * Math.PI / 3.2d)),
+                            Layer.BEHIND, false));
+                }
+                case SPECIAL_LOCATION -> {
+                    if (halos.size() < MAX_HALOS) add(halos, map, new Halo(body.x(), body.y(), body.markerPx() * 3f,
+                            Tint.ANOMALY, 0.5f, Layer.BEHIND, false));
+                }
                 default -> { }
             }
         }
-        return halos.size() > MAX_HALOS ? List.copyOf(halos.subList(0, MAX_HALOS)) : List.copyOf(halos);
+        List<Halo> result = new ArrayList<>(halos);
+        result.addAll(lights.size() > MAX_LIGHT_QUADS ? lights.subList(0, MAX_LIGHT_QUADS) : lights);
+        return List.copyOf(result);
     }
 
     /**

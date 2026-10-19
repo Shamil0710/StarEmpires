@@ -1,18 +1,22 @@
 package com.spacesim.ui;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Presentation state of mining beams between frames: each beam fades in when its order appears,
- * emits a spark burst each time the order's authoritative watermark advances (one completed
- * extraction), and fades out after the order is gone.
+ * Presentation state of mining beams between frames: a beam fades in while its order is active
+ * and fades out after it ends; each newer extraction receipt the state observes fires one spark
+ * burst, also on a fading beam (the final extraction of a depleted source).
  *
- * <p>Bursts are driven only by observed watermark advances, never by a local timer, so a paused
- * or stopped campaign emits nothing new. The state never reads or changes simulation state and is
- * not saved: after a load the first frame only records the watermarks.</p>
+ * <p>Bursts are driven only by authoritative extraction receipts, never by a local timer or the
+ * order's assignment, so a pause, a stop or a restart emits nothing. The renderer advances the
+ * state every frame on every tab, so nothing is missed while the system map is hidden. The state
+ * never reads or changes simulation state and is not saved: a new track only records the newest
+ * receipt.</p>
  */
 final class MiningBeamEffects {
     /** Seconds a beam takes to reach full intensity. */
@@ -45,7 +49,7 @@ final class MiningBeamEffects {
     private static final class Track {
         final String ship;
         final String source;
-        long watermark;
+        long lastExtraction;
         float intensity;
         boolean active = true;
         float burstAge = -1f;
@@ -55,7 +59,7 @@ final class MiningBeamEffects {
         Track(MiningBeam beam) {
             ship = beam.shipStableId();
             source = beam.sourceStableId();
-            watermark = beam.lastProcessedTick();
+            lastExtraction = beam.lastExtractionTick();
         }
     }
 
@@ -64,38 +68,36 @@ final class MiningBeamEffects {
     /**
      * Advances the effects by one frame.
      *
-     * @param live beams of the current authoritative orders
+     * @param live current mining contacts: active orders and the latest tick's extractions
      * @param deltaSeconds frame time; non-finite or negative counts as zero
      * @return beams to draw, in first-seen order
      */
     List<Effect> advance(List<MiningBeam> live, float deltaSeconds) {
         float dt = Float.isFinite(deltaSeconds) && deltaSeconds > 0f ? deltaSeconds : 0f;
-        java.util.Set<String> seen = new java.util.HashSet<>();
+        Set<String> seen = new HashSet<>();
+        Set<String> active = new HashSet<>();
         for (MiningBeam beam : live) {
             if (!seen.add(beam.key())) continue;
             Track track = tracks.get(beam.key());
             if (track == null) {
-                if (tracks.size() >= MAX_TRACKED) continue;
+                // An extraction without an order or a visible beam has nothing to light up.
+                if (!beam.active() || tracks.size() >= MAX_TRACKED) continue;
                 tracks.put(beam.key(), new Track(beam));
+                active.add(beam.key());
                 continue;
             }
-            if (!track.active) {
-                // A new order on a fading pair: its watermark is an assignment, not an extraction.
-                track.active = true;
-                track.watermark = beam.lastProcessedTick();
-                continue;
-            }
-            if (beam.lastProcessedTick() > track.watermark) {
-                track.watermark = beam.lastProcessedTick();
+            if (beam.active()) active.add(beam.key());
+            if (beam.lastExtractionTick() > track.lastExtraction) {
+                track.lastExtraction = beam.lastExtractionTick();
                 track.burstAge = 0f;
-                track.burstSeed = seed(beam.key(), track.watermark);
+                track.burstSeed = seed(beam.key(), track.lastExtraction);
             }
         }
         List<Effect> effects = new ArrayList<>();
         var iterator = tracks.values().iterator();
         while (iterator.hasNext()) {
             Track track = iterator.next();
-            track.active = seen.contains(track.ship + '|' + track.source);
+            track.active = active.contains(track.ship + '|' + track.source);
             track.age += dt;
             if (track.burstAge >= 0f) track.burstAge += dt;
             if (track.active) {
