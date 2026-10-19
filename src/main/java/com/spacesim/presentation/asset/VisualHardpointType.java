@@ -6,6 +6,8 @@ public enum VisualHardpointType {
     ENGINE,
     /** Weapon muzzle or launcher origin. */
     WEAPON,
+    /** Station docking port where a boarding arm attaches; the direction points out of the hull. */
+    DOCKING,
     /** Reserved generic attachment point for future presentation features. */
     UTILITY
 }

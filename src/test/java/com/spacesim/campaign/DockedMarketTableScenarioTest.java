@@ -27,6 +27,7 @@ class DockedMarketTableScenarioTest {
         campaign.submitIndependentPilotStart(campaign.previewIndependentPilotStart());
         var pilot = new ScenarioPilot(campaign, 400_000L);
         assertNull(ProductionUiProjector.dockedMarket(pilot.campaign()), "no quotes before docking");
+        assertNull(ProductionUiProjector.dockingArm(pilot.campaign()), "no boarding arm before docking");
 
         var miner = pilot.campaign().coordinator().runtime().freight().capture().freighters().stream()
                 .filter(f -> f.fitId().equals(Stage22FreightStrategicEngineeringCatalogLoader.UNION_MINING_FREIGHT_STRATEGIC_FIT))
@@ -38,6 +39,11 @@ class DockedMarketTableScenarioTest {
         MarketTable table = ProductionUiProjector.dockedMarket(pilot.campaign());
         assertNotNull(table, "docked pilot sees the station's quotes");
         assertEquals("station:" + hub, table.stationStableId());
+        // The system map links the docked ship to the station with a boarding arm; both are on the map.
+        var arm = ProductionUiProjector.dockingArm(pilot.campaign());
+        assertEquals(new com.spacesim.ui.DockingArm("fleet:" + pilot.fleetId().value(), "station:" + hub), arm);
+        var shown = mapObjectIds(pilot);
+        assertTrue(shown.contains(arm.shipStableId()) && shown.contains(arm.stationStableId()), "arm ends are on the system map");
         assertEquals(expectedCommodities(pilot, hub), table.rows().stream().map(MarketTable.Row::commodityId).toList(),
                 "one row per commodity both the hold and the station handle");
 
@@ -56,9 +62,21 @@ class DockedMarketTableScenarioTest {
 
         pilot.saveAndReload();
         assertEquals(table, ProductionUiProjector.dockedMarket(pilot.campaign()), "same table after save/load");
+        assertEquals(arm, ProductionUiProjector.dockingArm(pilot.campaign()), "same arm after save/load");
 
         pilot.action("UNDOCK", "", "", 0);
         assertNull(ProductionUiProjector.dockedMarket(pilot.campaign()), "quotes disappear after undocking");
+        assertNull(ProductionUiProjector.dockingArm(pilot.campaign()), "the arm retracts after undocking");
+    }
+
+    /** Ids of the objects the pilot's system map shows, from the same model the game draws. */
+    private static java.util.Set<String> mapObjectIds(ScenarioPilot pilot) {
+        var campaign = pilot.campaign();
+        var coordinator = campaign.coordinator();
+        var model = new com.spacesim.ui.GeneratedWorldUiModel(coordinator.rootSeed(), coordinator.runtime(), coordinator.content(),
+                com.spacesim.ui.GeneratedCampaignCarrierUi.source(campaign), () -> campaign.playerState().orElse(null));
+        return model.capture().localObjects().stream().map(com.spacesim.ui.GeneratedWorldUiSnapshot.LocalObjectView::stableId)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     /** Every cell equals the authoritative quote, opening quote and hold mass of its commodity. */

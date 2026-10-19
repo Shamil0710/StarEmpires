@@ -104,11 +104,13 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         production = projector.capture(campaign, snapshot, true);
         // Quotes re-read the content catalogue, so they refresh at projection cadence, not per frame.
         dockedMarket = ProductionUiProjector.dockedMarket(campaign);
+        dockingArm = ProductionUiProjector.dockingArm(campaign);
         updateTimeControls();
         projectionAge = 0f;
     }
 
     private com.spacesim.ui.MarketTable dockedMarket;
+    private com.spacesim.ui.DockingArm dockingArm;
 
     private void updateTimeControls() {
         production = com.spacesim.ui.GeneratedCampaignTimeSkipUi.append(production, campaign, timeSkipMinutes, editingTimeSkipMinutes);
@@ -951,6 +953,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
             campaign = candidate; model = nextModel; snapshot = nextSnapshot;
             projector = nextProjector; production = nextProjection; projectionAge = 0;
             dockedMarket = ProductionUiProjector.dockedMarket(campaign);
+            dockingArm = ProductionUiProjector.dockingArm(campaign);
             workspace.reset(); renderer.resetSystemMapCamera(); renderer.clearKeyboardFocus();
             status = "Кампания загружена.";
         } catch (IOException | RuntimeException exception) {
@@ -1002,6 +1005,7 @@ public final class GeneratedWorldCommandGame extends ApplicationAdapter {
         renderer.bindDockedMarket(campaign.playerState().map(p -> p.docked()).orElse(false) ? dockedMarket : null);
         // Mining orders are few and change every tick, so beams read them every frame.
         renderer.bindMiningBeams(ProductionUiProjector.miningBeams(campaign));
+        renderer.bindDockingArm(campaign.playerState().map(p -> p.docked()).orElse(false) ? dockingArm : null);
         if (workspace.tab() != Tab.GALAXY || !selectedPilot.equals(pendingRouteSelection)
                 || !campaign.coordinator().isPaused()) pendingRoute = null;
         renderer.bindPersonalRoute(pendingRoute, campaign.coordinator().runtime().world().getTopology(),

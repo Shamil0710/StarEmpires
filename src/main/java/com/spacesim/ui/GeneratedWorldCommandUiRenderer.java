@@ -53,6 +53,8 @@ public final class GeneratedWorldCommandUiRenderer {
             new SectorSpaceBackgroundTextureRenderer();
     private final MiningBeamRenderer miningBeamRenderer = new MiningBeamRenderer();
     private final MiningBeamEffects miningEffects = new MiningBeamEffects();
+    private final DockingArmRenderer dockingArmRenderer = new DockingArmRenderer();
+    private DockingArm dockingArm;
     private final MapHaloRenderer haloRenderer = new MapHaloRenderer();
     /** Presentation clock of halo pulsing and beacon blinking; it reads no simulation time. */
     private float haloClock;
@@ -1255,6 +1257,7 @@ public final class GeneratedWorldCommandUiRenderer {
                     MovementAlignedHeading.degrees(object.headingRad()));
         }
         batch.end();
+        drawDockingArm(snapshot.localObjects(), points, pixelsPerMetre);
         drawMiningBeams(snapshot.localObjects(), points, pixelsPerMetre);
         batch.begin();
         haloRenderer.draw(batch, halos, MapHaloLayout.Layer.OVER);
@@ -1339,6 +1342,40 @@ public final class GeneratedWorldCommandUiRenderer {
         batch.end();
     }
 
+
+    /**
+     * Boarding arm from the docked station's nearest docking port to the player's ship, over both
+     * hulls. Skipped while either is drawn as a marker or is not on this map.
+     */
+    private void drawDockingArm(List<LocalObjectView> objects, Map<String, Point> points, double pixelsPerMetre) {
+        if (dockingArm == null) return;
+        LocalObjectView ship = null;
+        LocalObjectView station = null;
+        for (LocalObjectView object : objects) {
+            if (object.stableId().equals(dockingArm.shipStableId())) ship = object;
+            if (object.stableId().equals(dockingArm.stationStableId())) station = object;
+        }
+        if (ship == null || station == null || station.sprite() == null || !ship.systemId().equals(station.systemId())) return;
+        Point shipPoint = points.get(ship.stableId());
+        Point stationPoint = points.get(station.stableId());
+        if (shipPoint == null || stationPoint == null) return;
+        float stationLength = (float) (station.physicalLengthM() * pixelsPerMetre);
+        float stationWidth = (float) (station.physicalWidthM() * pixelsPerMetre);
+        if (!(stationLength >= markerSize(station.kind())) || !Float.isFinite(stationLength) || !(stationWidth > 0f)) return;
+        var port = DockingArmGeometry.nearest(DockingArmGeometry.ports(station.sprite().hardpoints(), stationPoint.x(),
+                stationPoint.y(), stationLength, stationWidth, Math.toRadians(MovementAlignedHeading.degrees(station.headingRad()))),
+                shipPoint.x(), shipPoint.y());
+        if (port == null) return;
+        float scale = metrics.scale();
+        float armWidth = Math.max(4f * scale, Math.min(48f * scale, (float) (DockingArmGeometry.ARM_WIDTH_M * pixelsPerMetre)));
+        var arm = DockingArmGeometry.layout(port, shipPoint.x(), shipPoint.y(),
+                (float) (ship.physicalLengthM() * pixelsPerMetre), (float) (ship.physicalWidthM() * pixelsPerMetre),
+                Math.toRadians(MovementAlignedHeading.degrees(ship.headingRad())), armWidth);
+        if (arm == null) return;
+        batch.begin();
+        dockingArmRenderer.draw(batch, arm);
+        batch.end();
+    }
     /** Objects on the map as the halo layout sees them: screen centre, drawn hull and marker size. */
     private List<MapHaloLayout.Body> haloBodies(List<LocalObjectView> objects, Map<String, Point> points,
             double pixelsPerMetre) {
@@ -1399,6 +1436,9 @@ public final class GeneratedWorldCommandUiRenderer {
      * @param beams the player's mining contacts, refreshed every frame from the campaign
      */
     public void bindMiningBeams(List<MiningBeam> beams) { miningFrame = miningEffects.advance(beams, frameSeconds()); }
+
+    /** @param arm boarding arm of the player's docked ship, or null when not docked */
+    public void bindDockingArm(DockingArm arm) { dockingArm = arm; }
 
     /** @return height reserved for the market table: all rows, at most 55 % of the inspector */
     private float marketTableHeight(Rect inspector) {
@@ -2607,6 +2647,7 @@ public final class GeneratedWorldCommandUiRenderer {
         sectorBackgrounds.dispose();
         miningBeamRenderer.dispose();
         haloRenderer.dispose();
+        dockingArmRenderer.dispose();
         sprites.dispose();
         batch.dispose();
         shapes.dispose();

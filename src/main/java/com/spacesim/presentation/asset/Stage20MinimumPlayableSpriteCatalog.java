@@ -451,13 +451,18 @@ public final class Stage20MinimumPlayableSpriteCatalog {
                 "ships/imperial_medium_cruiser_v1.png", 310d, 96d, List.of()));
         add(result, full(
                 "imperial.trade-hub.v1", VisualRole.TRADE_DOCK_STATION,
-                "stations/imperial_trade_hub_v1.png", AtlasRegion.fullSquare(), 1_600d, 1_000d));
+                "stations/imperial_trade_hub_v1.png", AtlasRegion.fullSquare(), 1_600d, 1_000d,
+                // The four clamp mouths at the arm ends, in the visible (trimmed) region.
+                List.of(dock("dock_aft", 0.057f, 0.5f, 180f), dock("dock_fore", 0.941f, 0.5f, 0f),
+                        dock("dock_port", 0.5f, 0.94f, 90f), dock("dock_starboard", 0.5f, 0.085f, 270f))));
         add(result, full(
                 "imperial.industrial-station.v1", VisualRole.INDUSTRIAL_STATION,
-                "stations/imperial_industrial_station_v1.png", AtlasRegion.fullLandscape(), 1_200d, 780d));
+                "stations/imperial_industrial_station_v1.png", AtlasRegion.fullLandscape(), 1_200d, 780d,
+                List.of(dock("dock_aft", 0.01f, 0.5f, 180f), dock("dock_fore", 0.99f, 0.5f, 0f))));
         add(result, full(
                 "imperial.shipyard.v1", VisualRole.SHIPYARD_STATION,
-                "stations/imperial_shipyard_v1.png", AtlasRegion.fullLandscape(), 1_600d, 1_000d));
+                "stations/imperial_shipyard_v1.png", AtlasRegion.fullLandscape(), 1_600d, 1_000d,
+                List.of(dock("dock_aft", 0.01f, 0.5f, 180f), dock("dock_fore", 0.98f, 0.5f, 0f))));
         add(result, atlas(
                 "resource.carbonaceous.v1", VisualRole.RESOURCE_CARBONACEOUS,
                 new AtlasRegion(0, 0, 320, 320)));
@@ -487,6 +492,10 @@ public final class Stage20MinimumPlayableSpriteCatalog {
             double nominalWidthM,
             List<VisualHardpoint> hardpoints) {
         return full(assetId, role, path, AtlasRegion.fullLandscape(), nominalLengthM, nominalWidthM, hardpoints);
+    }
+
+    private static VisualHardpoint dock(String id, float x, float y, float directionDegrees) {
+        return new VisualHardpoint(id, VisualHardpointType.DOCKING, x, y, directionDegrees);
     }
 
     private static SpriteBinding atlas(String assetId, VisualRole role, AtlasRegion region) {

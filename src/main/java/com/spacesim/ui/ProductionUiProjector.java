@@ -639,6 +639,20 @@ public final class ProductionUiProjector {
     }
 
     /**
+     * The boarding arm of the player's docked ship, for the system map: the same docked station the
+     * market table uses ({@link com.spacesim.campaign.DockedMarketQuotes#dockedEndpoint}).
+     *
+     * @param campaign current campaign
+     * @return the arm, or null when the active ship is not docked at a local station
+     */
+    public static DockingArm dockingArm(Stage228CampaignAuthority campaign) {
+        var endpoint = com.spacesim.campaign.DockedMarketQuotes.dockedEndpoint(campaign).orElse(null);
+        if (endpoint == null) return null;
+        return new DockingArm("fleet:" + campaign.playerState().orElseThrow().activeFleetId().value(),
+                "station:" + endpoint.stationId());
+    }
+
+    /**
      * Mining contacts of the player's own fleets, for the system map: one active beam per personal
      * mining order, plus an inactive one for an extraction in the latest tick whose order is already
      * gone (the tick that depleted the source). Each carries the newest extraction receipt aboard
