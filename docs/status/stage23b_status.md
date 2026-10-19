@@ -1,6 +1,8 @@
 # Stage 23B — статус
 
-Обновлено 2026-10-17. Статус этапа: **ACTIVE / PARTIAL**. Короткая таблица по
+Обновлено 2026-10-19. Статус этапа: **ACTIVE / PARTIAL — новые функции заморожены до плейтеста первого часа**
+([план плейтеста](../playtest/first_hour_playtest_v1.md)); черновик танкеров воды (W2) — в локальной ветке
+`stage23b-water-tankers-draft`, водозаводы депо (W1) в PR. Короткая таблица по
 [development_process_plan.md](../development_process_plan.md); подробная история — в
 [stage23b_remaining_work.md](../ui/stage23b_remaining_work.md) (архив доказательств).
 
